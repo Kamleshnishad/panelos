@@ -23,8 +23,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\OrderController;
 
 Route::prefix('auth')->group(function () {
-    // Public routes
-    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    // Public routes — rate-limited to slow brute-force (10 attempts/min per IP)
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {
@@ -35,8 +35,8 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-// Protected routes
-Route::middleware('auth:sanctum')->group(function () {
+// Protected routes — generous per-user throttle to cap runaway/abusive traffic
+Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     // Home Dashboard
     Route::get('/dashboard', [\App\Http\Controllers\Api\DashboardController::class, 'index'])->name('dashboard');
 

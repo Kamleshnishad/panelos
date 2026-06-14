@@ -28,6 +28,13 @@ class Kernel extends ConsoleKernel
             ->weekly()
             ->onOneServer()
             ->withoutOverlapping(10);
+
+        // Nightly database backup (retain last 14 dumps)
+        $schedule->command('db:backup --keep=14')
+            ->dailyAt('01:30')
+            ->onOneServer()
+            ->withoutOverlapping(30)
+            ->runInBackground();
     }
 
     protected function commands()

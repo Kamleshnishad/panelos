@@ -8,10 +8,17 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
     use ApiResponse;
+
+    /** Shared password policy for setting/changing a password (min 8, letters + numbers). */
+    public static function passwordPolicy(): Password
+    {
+        return Password::min(8)->letters()->numbers();
+    }
 
     /**
      * Login - POST /auth/login
@@ -142,7 +149,7 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'current_password' => 'required|string|min:6',
-            'new_password' => 'required|string|min:6|confirmed',
+            'new_password' => ['required', 'confirmed', self::passwordPolicy()],
             'new_password_confirmation' => 'required',
         ]);
 

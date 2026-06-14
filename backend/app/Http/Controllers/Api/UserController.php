@@ -91,7 +91,7 @@ class UserController extends Controller
                 'name'             => 'required|string|max:255',
                 'email'            => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
                 'phone'            => 'nullable|string|max:20',
-                'password'         => 'required|string|min:6',
+                'password'         => ['required', \App\Http\Controllers\Api\AuthController::passwordPolicy()],
                 'role_id'          => ['nullable', Rule::exists('roles', 'id')->where('company_id', $companyId)],
                 'is_company_admin' => 'nullable|boolean',
                 'is_active'        => 'nullable|boolean',
@@ -161,7 +161,7 @@ class UserController extends Controller
             $user = User::where('company_id', $request->user()->company_id)->findOrFail($id);
 
             $validated = $request->validate([
-                'password' => 'required|string|min:6',
+                'password' => ['required', \App\Http\Controllers\Api\AuthController::passwordPolicy()],
             ]);
 
             $user->update(['password' => Hash::make($validated['password'])]);
