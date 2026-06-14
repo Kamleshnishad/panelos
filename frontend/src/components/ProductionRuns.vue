@@ -22,10 +22,37 @@
             <span class="status-badge" :class="run.status">{{ statusLabel(run.status) }}</span>
           </div>
           <div class="rh-actions">
+            <button class="btn btn-ghost sm" @click="toggleMaterial(run)">📦 Material</button>
             <button v-if="run.status === 'draft'" class="btn btn-primary sm" :disabled="busy === run.id" @click="act(run, 'start')">▶ Start</button>
             <button v-if="run.status === 'in_progress'" class="btn btn-primary sm" :disabled="busy === run.id" @click="act(run, 'complete')">✓ Complete</button>
             <button v-if="run.status === 'draft'" class="btn btn-danger sm" :disabled="busy === run.id" @click="act(run, 'cancel')">Cancel</button>
           </div>
+        </div>
+
+        <!-- Material requirement (advisory) -->
+        <div v-if="matOpen === run.id" class="mat-panel">
+          <div v-if="matLoading" class="mat-loading">Computing material requirement…</div>
+          <template v-else-if="matReq[run.id]">
+            <div class="mat-head">
+              <strong>Raw Material Requirement</strong>
+              <span class="mat-overall" :class="matReq[run.id].all_ok ? 'ok' : 'short'">
+                {{ matReq[run.id].all_ok ? '✓ Stock sufficient' : '⚠ Stock short' }}
+              </span>
+            </div>
+            <table class="mat-table">
+              <thead><tr><th>Material</th><th class="r">Required</th><th class="r">Available</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr v-for="(l, i) in matReq[run.id].lines" :key="i" :class="{ 'row-short': !l.ok }">
+                  <td>{{ l.label }}</td>
+                  <td class="r mono">{{ fmt(l.required) }} {{ l.unit }}</td>
+                  <td class="r mono">{{ fmt(l.available) }} {{ l.unit }}</td>
+                  <td><span class="mat-badge" :class="l.ok ? 'ok' : 'short'">{{ l.ok ? 'OK' : 'short ' + fmt(l.short_by) }}</span></td>
+                </tr>
+                <tr v-if="!matReq[run.id].lines.length"><td colspan="4" class="mat-empty">No computable material (panel specs incomplete).</td></tr>
+              </tbody>
+            </table>
+            <p class="mat-note" v-for="(n, i) in matReq[run.id].notes" :key="'n'+i">• {{ n }}</p>
+          </template>
         </div>
 
         <div v-if="run.label" class="run-spec">{{ run.label }}</div>
@@ -67,6 +94,9 @@ defineEmits(['view-order', 'go-planner'])
 const loading = ref(true)
 const busy = ref(null)
 const runs = ref([])
+const matOpen = ref(null)
+const matLoading = ref(false)
+const matReq = ref({})
 
 function fmt(n) { return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '' }
@@ -84,6 +114,22 @@ async function load() {
     toastError(e?.response?.data?.message ?? 'Could not load runs.')
   } finally {
     loading.value = false
+  }
+}
+
+async function toggleMaterial(run) {
+  if (matOpen.value === run.id) { matOpen.value = null; return }
+  matOpen.value = run.id
+  if (matReq.value[run.id]) return   // cached
+  matLoading.value = true
+  try {
+    const res = await productionService.runMaterialRequirement(run.id)
+    matReq.value = { ...matReq.value, [run.id]: res?.data ?? res }
+  } catch (e) {
+    toastError(e?.response?.data?.message ?? 'Could not compute material requirement.')
+    matOpen.value = null
+  } finally {
+    matLoading.value = false
   }
 }
 
@@ -154,6 +200,25 @@ defineExpose({ reload: load })
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-ghost { background: transparent; border: 1px solid #ddd; color: #555; }
 .btn-danger { background: #c62828; color: #fff; }
+
+/* Material requirement panel */
+.mat-panel { margin-top: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.mat-loading { font-size: 12px; color: var(--text-3); padding: 6px; }
+.mat-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; }
+.mat-overall { font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 10px; }
+.mat-overall.ok { background: #e8f5e9; color: #2e7d32; }
+.mat-overall.short { background: #fff5f5; color: #c62828; }
+.mat-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--surface); border-radius: 6px; overflow: hidden; }
+.mat-table th { text-align: left; background: var(--primary-tint); color: #333; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; padding: 5px 8px; }
+.mat-table th.r, .mat-table td.r { text-align: right; }
+.mat-table td { padding: 6px 8px; border-bottom: 1px solid var(--surface-2); }
+.mat-table tr.row-short td { background: #fff7f7; }
+.mat-badge { font-size: 10px; font-weight: 700; padding: 1px 8px; border-radius: 8px; }
+.mat-badge.ok { background: #e8f5e9; color: #2e7d32; }
+.mat-badge.short { background: #ffebee; color: #c62828; }
+.mat-empty { text-align: center; color: #aaa; font-style: italic; }
+.mat-note { font-size: 10.5px; color: var(--text-3); margin: 6px 0 0; line-height: 1.4; }
+.mono { font-variant-numeric: tabular-nums; }
 
 @media (max-width: 900px) { .pr-wrap { padding: 16px 16px 40px; } }
 </style>

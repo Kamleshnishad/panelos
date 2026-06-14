@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ProductionRun;
 use App\Services\ProductionRunService;
+use App\Services\MaterialBomService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -13,7 +14,21 @@ class ProductionRunController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(private ProductionRunService $runService) {}
+    public function __construct(
+        private ProductionRunService $runService,
+        private MaterialBomService $bomService,
+    ) {}
+
+    /** Advisory raw-material requirement for a run + stock availability. */
+    public function materialRequirement(Request $request, int $id)
+    {
+        try {
+            $run = ProductionRun::where('company_id', $request->user()->company_id)->findOrFail($id);
+            return $this->successResponse($this->bomService->requirementForRun($run), 'Material requirement computed');
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'BOM_ERROR', 400);
+        }
+    }
 
     public function index(Request $request)
     {

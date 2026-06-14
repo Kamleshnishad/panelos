@@ -31,7 +31,8 @@ auto-consume → wastage → valuation. Built on existing `coil_stocks` /
 
 ---
 
-## Phase 1 — BOM engine (compute only, NO deduction)  ✅ safe
+## Phase 1 — BOM engine (compute only, NO deduction)  ✅ DONE
+> Done: `material_settings` (auto-default, GET/PUT); `MaterialBomService` (coil=area×thk×7.85, foam=area×thk×density×overpack split by iso:polyol ratio, film/tape, +wastage) with stock availability match; `GET /production/runs/{id}/material-requirement`; "📦 Material" panel on each run in ProductionRuns.vue. Verified 100sqm/50mm example → coil 808.55kg, polyol 105, iso 115.5, film 102 (exact). No stock change.
 **DB**
 - [ ] `material_settings` (per company): steel_density(7.85), iso_polyol_ratio, foam_overpack_pct, default wastage % (coil/chemical/consumable), film_per_sqm, tape_per_panel, oil_per_shift. (Ya company table mein columns.)
 **Backend**

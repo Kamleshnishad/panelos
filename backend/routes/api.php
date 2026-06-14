@@ -112,7 +112,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/production/runs/{id}', [\App\Http\Controllers\Api\ProductionRunController::class, 'show'])->name('runs.show');
     Route::post('/production/runs/{id}/start', [\App\Http\Controllers\Api\ProductionRunController::class, 'start'])->name('runs.start');
     Route::post('/production/runs/{id}/complete', [\App\Http\Controllers\Api\ProductionRunController::class, 'complete'])->name('runs.complete');
+    Route::get('/production/runs/{id}/material-requirement', [\App\Http\Controllers\Api\ProductionRunController::class, 'materialRequirement'])->name('runs.material');
     Route::delete('/production/runs/{id}', [\App\Http\Controllers\Api\ProductionRunController::class, 'destroy'])->name('runs.cancel');
+
+    // Material / BOM settings (per company)
+    Route::get('/material-settings', [StockController::class, 'getMaterialSettings'])->name('material.settings.get');
+    Route::put('/material-settings', [StockController::class, 'updateMaterialSettings'])->name('material.settings.update');
 
     // Production Batches CRUD
     Route::get('/batches', [ProductionBatchController::class, 'index'])->name('batches.index');

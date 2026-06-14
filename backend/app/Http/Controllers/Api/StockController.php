@@ -569,6 +569,39 @@ class StockController extends Controller
         }
     }
 
+    public function getMaterialSettings()
+    {
+        try {
+            $s = \App\Models\MaterialSetting::firstOrCreate(['company_id' => auth()->user()->company_id]);
+            return $this->apiResponse(true, $s, 'Material settings retrieved');
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 500);
+        }
+    }
+
+    public function updateMaterialSettings(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'steel_density'          => 'nullable|numeric|min:0.1|max:20',
+                'iso_polyol_ratio'       => 'nullable|numeric|min:0.1|max:5',
+                'foam_overpack_pct'      => 'nullable|numeric|min:0|max:50',
+                'wastage_coil_pct'       => 'nullable|numeric|min:0|max:50',
+                'wastage_chemical_pct'   => 'nullable|numeric|min:0|max:50',
+                'wastage_consumable_pct' => 'nullable|numeric|min:0|max:50',
+                'film_per_sqm'           => 'nullable|numeric|min:0|max:10',
+                'tape_per_panel_m'       => 'nullable|numeric|min:0|max:100',
+            ]);
+            $s = \App\Models\MaterialSetting::firstOrCreate(['company_id' => auth()->user()->company_id]);
+            $s->update($validated);
+            return $this->apiResponse(true, $s->fresh(), 'Material settings updated');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->apiResponse(false, $e->errors(), 'Validation failed', 422);
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 400);
+        }
+    }
+
     public function getDashboard()
     {
         try {
