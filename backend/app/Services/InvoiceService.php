@@ -330,7 +330,7 @@ class InvoiceService
         });
     }
 
-    public function generatePdf($invoiceId, $companyId = null)
+    public function generatePdf($invoiceId, $companyId = null, $template = null)
     {
         $companyId = $companyId ?? auth()->user()->company_id;
 
@@ -340,17 +340,21 @@ class InvoiceService
 
         $total = $invoice->subtotal + ($invoice->taxCalculation->tax_amount ?? 0);
 
-        $html = view('invoices.pdf', compact('invoice', 'total'))->render();
+        // Chosen template (defaults to the current blade); preview can override.
+        $view = $template ?: app(\App\Services\DocumentTemplateService::class)->viewFor((int) $companyId, 'invoice', 'invoices.pdf');
+        if (!\Illuminate\Support\Facades\View::exists($view)) $view = 'invoices.pdf';
+
+        $html = view($view, compact('invoice', 'total'))->render();
 
         return $html;
     }
 
-    public function downloadPdf($invoiceId, $companyId = null)
+    public function downloadPdf($invoiceId, $companyId = null, $template = null)
     {
         $companyId = $companyId ?? auth()->user()->company_id;
 
         $invoice = Invoice::where('company_id', $companyId)->findOrFail($invoiceId);
-        $html = $this->generatePdf($invoiceId, $companyId);
+        $html = $this->generatePdf($invoiceId, $companyId, $template);
 
         // Using DomPDF to generate PDF
         $pdf = app('dompdf.wrapper');
