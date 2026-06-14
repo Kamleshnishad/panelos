@@ -47,6 +47,7 @@ class StockController extends Controller
 
             $coils = $query->paginate($perPage, ['*'], 'page', $page);
 
+            if (!auth()->user()->canViewCost()) $coils->getCollection()->each->makeHidden('unit_cost');
             return $this->apiResponse(true, $coils, 'Coil inventory retrieved successfully');
         } catch (\Exception $e) {
             return $this->apiResponse(false, null, $e->getMessage(), 500);
@@ -188,6 +189,7 @@ class StockController extends Controller
 
             $chemicals = $query->paginate($perPage, ['*'], 'page', $page);
 
+            if (!auth()->user()->canViewCost()) $chemicals->getCollection()->each->makeHidden('unit_cost');
             return $this->apiResponse(true, $chemicals, 'Chemical inventory retrieved successfully');
         } catch (\Exception $e) {
             return $this->apiResponse(false, null, $e->getMessage(), 500);
@@ -372,6 +374,7 @@ class StockController extends Controller
             }
 
             $items = $query->paginate($request->input('per_page', 20), ['*'], 'page', $request->input('page', 1));
+            if (!auth()->user()->canViewCost()) $items->getCollection()->each->makeHidden('unit_cost');
             return $this->apiResponse(true, $items, 'Consumable inventory retrieved successfully');
         } catch (\Exception $e) {
             return $this->apiResponse(false, null, $e->getMessage(), 500);

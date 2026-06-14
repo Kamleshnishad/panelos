@@ -137,6 +137,9 @@ class ProcurementController extends Controller
 
     public function valuation(Request $r)
     {
+        if (!$r->user()->canViewCost()) {
+            return $this->successResponse(['masked' => true, 'total' => null, 'coil' => null, 'chemical' => null, 'consumable' => null], 'Stock valuation (restricted)');
+        }
         return $this->successResponse($this->proc->stockValuation($this->cid($r)), 'Stock valuation computed');
     }
 }

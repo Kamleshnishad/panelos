@@ -21,7 +21,7 @@
           <div class="nav-group-label">{{ group.label }}</div>
           <button
             v-for="item in group.items"
-            v-show="!item.admin || isAdmin"
+            v-show="(!item.admin || isAdmin) && (!item.perm || can(item.perm))"
             :key="item.key"
             :class="['nav-item', { active: active === item.key }]"
             @click="go(item.key)"
@@ -189,19 +189,19 @@ const nav = [
   ]},
   { label: 'Inventory', items: [
     { key: 'stock',       label: 'Stock',           icon: ic.stock },
-    { key: 'procurement', label: 'Procurement',     icon: ic.order },
+    { key: 'procurement', label: 'Procurement',     icon: ic.order, perm: 'procurement.view' },
   ]},
   { label: 'Sales & Finance', items: [
     { key: 'dispatches',  label: 'Dispatches',      icon: ic.truck },
     { key: 'invoices',    label: 'Invoices',        icon: ic.invoice },
     { key: 'receivables', label: 'Receivables',     icon: ic.money, badgeDanger: true },
-    { key: 'reports',     label: 'Reports',         icon: ic.chart },
+    { key: 'reports',     label: 'Reports',         icon: ic.chart, perm: 'reports.view' },
   ]},
   { label: 'Settings', items: [
     { key: 'company',     label: 'Company',         icon: ic.building },
     { key: 'doctemplates',label: 'Doc Templates',   icon: ic.quote },
     { key: 'master',      label: 'Master Data',     icon: ic.grid },
-    { key: 'users',       label: 'Users & Roles',   icon: ic.users },
+    { key: 'users',       label: 'Users & Roles',   icon: ic.users, admin: true },
     { key: 'audit',       label: 'Audit Log',       icon: ic.qc, admin: true },
   ]},
 ]
@@ -214,7 +214,14 @@ const initials = computed(() => {
   return n.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 })
 const roleLabel = computed(() => user.value?.is_super_admin ? 'Super Admin' : (user.value?.is_company_admin ? 'Company Admin' : 'User'))
-const isAdmin = computed(() => !!(user.value?.is_company_admin || user.value?.is_super_admin))
+const isAdmin = computed(() => !!(user.value?.is_admin || user.value?.is_company_admin || user.value?.is_super_admin))
+function can(key) {
+  const u = user.value
+  if (!u) return false
+  if (u.is_admin || u.is_company_admin || u.is_super_admin) return true
+  const p = u.permissions || []
+  return p.includes('*') || p.includes(key)
+}
 
 function go(key) { quotationOpenId.value = null; quotationPrefill.value = null; active.value = key; mobileOpen.value = false }
 
@@ -227,6 +234,8 @@ function quickJump() {
 }
 
 onMounted(async () => {
+  // Refresh the user so permissions/is_admin are current (drives nav gating).
+  try { const u = await authService.me(); if (u) user.value = u } catch { /* ignore */ }
   try {
     const res = await dashboardService.get()
     const d = res?.data ?? res

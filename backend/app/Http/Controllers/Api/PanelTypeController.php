@@ -17,7 +17,9 @@ class PanelTypeController extends Controller
         $query = PanelType::where('company_id', $companyId)->orderBy('name');
         if (!$all) $query->where('is_active', true);
 
-        return response()->json(['success' => true, 'data' => $query->get()]);
+        $types = $query->get();
+        if (!auth()->user()->canViewCost()) $types->each->makeHidden('base_price');
+        return response()->json(['success' => true, 'data' => $types]);
     }
 
     public function store(Request $request)

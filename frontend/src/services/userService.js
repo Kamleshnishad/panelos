@@ -14,4 +14,6 @@ export default {
   create(data)            { return api('post', '/api/users', data) },
   update(id, data)        { return api('put',  `/api/users/${id}`, data) },
   resetPassword(id, data) { return api('post', `/api/users/${id}/reset-password`, data) },
+  permissionRegistry()    { return api('get',  '/api/permissions') },
+  updateRolePermissions(id, permissions) { return api('put', `/api/roles/${id}/permissions`, { permissions }) },
 }

@@ -63,4 +63,31 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Role::class);
     }
+
+    // ── RBAC ──────────────────────────────────────────────────────────────
+    public function isAdmin(): bool
+    {
+        return (bool) ($this->is_super_admin || $this->is_company_admin);
+    }
+
+    /** Effective permission keys (['*'] for admins). */
+    public function effectivePermissions(): array
+    {
+        if ($this->isAdmin()) return ['*'];
+        $perms = $this->role?->permissions;
+        return is_array($perms) ? $perms : [];
+    }
+
+    public function hasPermission(string $key): bool
+    {
+        if ($this->isAdmin()) return true;
+        $perms = $this->effectivePermissions();
+        return in_array('*', $perms, true) || in_array($key, $perms, true);
+    }
+
+    /** Gate for cost / margin / valuation fields. */
+    public function canViewCost(): bool
+    {
+        return $this->hasPermission('costing.view');
+    }
 }

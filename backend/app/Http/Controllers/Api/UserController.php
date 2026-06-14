@@ -46,10 +46,37 @@ class UserController extends Controller
         try {
             $roles = Role::where('company_id', $request->user()->company_id)
                 ->orderBy('id')
-                ->get(['id', 'name', 'description', 'is_system_role']);
+                ->get(['id', 'name', 'description', 'is_system_role', 'permissions']);
             return $this->successResponse($roles, 'Roles retrieved');
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], 'Failed to load roles', 'ROLE_LIST_ERROR', 500);
+        }
+    }
+
+    /** Permission registry (module → key → label) for the role matrix UI. */
+    public function permissionRegistry(Request $request)
+    {
+        return $this->successResponse(config('permissions', []), 'Permission registry');
+    }
+
+    /** Set a role's permission keys (admin only). */
+    public function updateRolePermissions(Request $request, $id)
+    {
+        if ($deny = $this->authorizeAdmin($request)) return $deny;
+        try {
+            $role = Role::where('company_id', $request->user()->company_id)->findOrFail($id);
+            $data = $request->validate(['permissions' => 'present|array', 'permissions.*' => 'string|max:60']);
+
+            // keep only keys that exist in the registry
+            $valid = collect(config('permissions', []))->flatMap(fn ($g) => array_keys($g))->all();
+            $perms = array_values(array_intersect($data['permissions'], $valid));
+
+            $role->update(['permissions' => $perms]);
+            return $this->successResponse($role->fresh(), 'Permissions updated');
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'ROLE_PERM_ERROR', 400);
         }
     }
 

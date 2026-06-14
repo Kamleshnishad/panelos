@@ -51,6 +51,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/users/{id}', [\App\Http\Controllers\Api\UserController::class, 'update'])->name('users.update');
     Route::post('/users/{id}/reset-password', [\App\Http\Controllers\Api\UserController::class, 'resetPassword'])->name('users.reset-password');
     Route::get('/roles', [\App\Http\Controllers\Api\UserController::class, 'roles'])->name('roles.index');
+    Route::get('/permissions', [\App\Http\Controllers\Api\UserController::class, 'permissionRegistry'])->name('permissions.registry');
+    Route::put('/roles/{id}/permissions', [\App\Http\Controllers\Api\UserController::class, 'updateRolePermissions'])->name('roles.permissions');
 
     // Document Templates (PDF template library)
     Route::get('/document-templates', [\App\Http\Controllers\Api\DocumentTemplateController::class, 'index'])->name('doc-templates.index');

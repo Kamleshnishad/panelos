@@ -1,17 +1,42 @@
 <template>
   <div class="um-wrap">
     <div class="um-header">
-      <h2>User Management</h2>
-      <button class="btn btn-primary" @click="openCreate">+ Add User</button>
+      <h2>Users &amp; Roles</h2>
+      <div class="um-tabs">
+        <button :class="{ on: tab === 'users' }" @click="tab = 'users'">Users</button>
+        <button :class="{ on: tab === 'roles' }" @click="tab = 'roles'; loadRoles()">Roles &amp; Permissions</button>
+      </div>
+      <button v-if="tab === 'users'" class="btn btn-primary" @click="openCreate">+ Add User</button>
     </div>
 
     <div v-if="error" class="error-banner">{{ error }}</div>
     <div v-if="success" class="success-banner">{{ success }}</div>
     <div v-if="forbidden" class="info-banner">Only company admins can manage users.</div>
 
-    <div v-if="loading" class="loading-state">Loading users…</div>
+    <!-- ROLES & PERMISSIONS -->
+    <div v-if="tab === 'roles'" class="roles-view">
+      <div v-if="rolesLoading" class="loading-state">Loading roles…</div>
+      <p v-else-if="!roles.length" class="empty-row">No roles defined.</p>
+      <div v-else class="role-cards">
+        <div v-for="r in roles" :key="r.id" class="role-card">
+          <div class="role-head">
+            <b>{{ r.name }}</b>
+            <button class="btn btn-primary btn-sm" :disabled="savingRole === r.id" @click="saveRole(r)">{{ savingRole === r.id ? 'Saving…' : 'Save' }}</button>
+          </div>
+          <div v-for="(perms, group) in registry" :key="group" class="perm-group">
+            <div class="perm-group-label">{{ group }}</div>
+            <label v-for="(label, key) in perms" :key="key" class="perm-chk">
+              <input type="checkbox" :value="key" v-model="r._perms" /> {{ label }}
+            </label>
+          </div>
+        </div>
+      </div>
+      <p class="roles-note">Note: Company/Super admins always have every permission. <b>costing.view</b> controls visibility of cost, margin &amp; stock valuation.</p>
+    </div>
 
-    <table v-else-if="!forbidden" class="um-table">
+    <div v-else-if="tab === 'users' && loading" class="loading-state">Loading users…</div>
+
+    <table v-else-if="tab === 'users' && !forbidden" class="um-table">
       <thead>
         <tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Admin</th><th>Status</th><th></th></tr>
       </thead>
@@ -105,6 +130,33 @@ const success = ref(null)
 const forbidden = ref(false)
 const currentUserId = ref(null)
 
+const tab = ref('users')
+const registry = ref({})
+const rolesLoading = ref(false)
+const savingRole = ref(null)
+
+async function loadRoles() {
+  if (roles.value.length && Object.keys(registry.value).length) return
+  rolesLoading.value = true
+  try {
+    const [rRes, regRes] = await Promise.all([userService.roles(), userService.permissionRegistry()])
+    const list = rRes?.data ?? []
+    list.forEach(r => { r._perms = Array.isArray(r.permissions) ? [...r.permissions] : [] })
+    roles.value = list
+    registry.value = regRes?.data ?? {}
+  } catch (e) { error.value = e?.response?.data?.message ?? 'Failed to load roles.' }
+  finally { rolesLoading.value = false }
+}
+
+async function saveRole(r) {
+  savingRole.value = r.id; error.value = null; success.value = null
+  try {
+    await userService.updateRolePermissions(r.id, r._perms || [])
+    success.value = `Permissions saved for ${r.name}.`
+  } catch (e) { error.value = e?.response?.data?.message ?? 'Failed to save permissions.' }
+  finally { savingRole.value = null }
+}
+
 const showModal = ref(false)
 const editing = ref(false)
 const editId = ref(null)
@@ -178,6 +230,22 @@ onMounted(load)
 .um-wrap { padding: 24px 32px 48px; max-width: 1600px; margin: 0 auto; font-family: inherit; }
 .um-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .um-header h2 { margin: 0; font-size: 22px; color: var(--primary); }
+
+.um-tabs { display: flex; gap: 4px; background: #eef1f5; padding: 4px; border-radius: 8px; }
+.um-tabs button { border: 0; background: transparent; padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #555; cursor: pointer; }
+.um-tabs button.on { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+
+.roles-view { display: flex; flex-direction: column; gap: 16px; }
+.role-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+.role-card { background: #fff; border: 1px solid #e2e6ec; border-radius: 10px; padding: 16px 18px; }
+.role-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #eef1f5; }
+.role-head b { font-size: 15px; color: var(--primary); text-transform: capitalize; }
+.btn-sm { padding: 5px 14px; font-size: 12px; }
+.perm-group { margin-bottom: 12px; }
+.perm-group-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #8a93a0; margin-bottom: 6px; }
+.perm-chk { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #333; padding: 3px 0; cursor: pointer; }
+.perm-chk input { width: 15px; height: 15px; cursor: pointer; }
+.roles-note { font-size: 12px; color: #6b7280; background: #f8fafc; border: 1px solid #e2e6ec; border-radius: 8px; padding: 10px 14px; }
 
 .error-banner { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 10px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
 .success-banner { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; padding: 10px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }

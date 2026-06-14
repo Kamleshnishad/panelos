@@ -98,6 +98,9 @@ class AuthController extends Controller
             'company_id'       => $user->company_id,
             'is_super_admin'   => $user->is_super_admin,
             'is_company_admin' => $user->is_company_admin,
+            'is_admin'         => $user->isAdmin(),
+            'role'             => $user->role?->name,
+            'permissions'      => $user->effectivePermissions(),
             'is_active'        => $user->is_active,
             'last_login_at'    => $user->last_login_at,
             'company'          => $company ? [
