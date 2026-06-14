@@ -6,6 +6,33 @@
 
 ---
 
+## Version Control & Rollback (read this first)
+
+This project is on GitHub (private): **https://github.com/Kamleshnishad/panelos**
+
+**Save your work (do this often — especially before any risky change):**
+```bash
+git add -A
+git commit -m "describe what changed"
+git push
+```
+> First push asks for credentials → enter your GitHub **username** and paste a **Personal Access Token** as the password. Windows stores it after that.
+
+**Undo / roll back when something breaks:**
+```bash
+git log --oneline                 # find the last good commit id
+git restore <file>                # undo uncommitted edits to one file
+git restore --source=<id> <file>  # bring one file back from an older commit
+git revert <id>                   # safely undo a commit (keeps history)
+git reset --hard <id>             # ⚠ reset everything to <id> (discards uncommitted work)
+```
+
+**Golden rule:** commit before you change anything important. Each commit is a restore point.
+
+> ⚠️ Never commit `backend/.env` (it holds the DB password). It's already git-ignored — keep it that way.
+
+---
+
 ## Quick Navigation
 
 | Document | Description |

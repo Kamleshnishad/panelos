@@ -1,5 +1,10 @@
 # UX Change Log — rollback record
 
+> **NOTE (superseded):** The project is now under Git version control
+> (https://github.com/Kamleshnishad/panelos). Use `git log` / `git restore` / `git revert`
+> for rollback — see the README. The `_ux_rollback_2/` and `_ux_rollback_3/` snapshot
+> folders referenced below have been **removed**; this file is kept only as a change history.
+
 **Rollback snapshot:** `_ux_rollback_2/` holds a copy of `frontend/src` and `backend/routes/api.php` taken **before this batch of changes**.
 
 **To roll back everything in this batch:**
