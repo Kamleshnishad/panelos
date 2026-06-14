@@ -2,9 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class PurchaseOrderItem extends BaseModel
+// Child of PurchaseOrder — extends plain Model (NOT BaseModel) because the
+// purchase_order_items table has no company_id; BaseModel would auto-inject it
+// on insert and crash. Tenant scoping comes via the parent PO.
+class PurchaseOrderItem extends Model
 {
     use SoftDeletes;
 

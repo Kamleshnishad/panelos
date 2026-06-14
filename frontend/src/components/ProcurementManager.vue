@@ -102,8 +102,8 @@
                   <option v-for="(p, pi) in purchasable" :key="pi" :value="pi">{{ p.name }} ({{ p.unit }})</option>
                 </select>
               </td>
-              <td><input v-model.number="l.quantity" type="number" min="0" step="0.01" class="num" /></td>
-              <td><input v-model.number="l.rate" type="number" min="0" step="0.01" class="num" /></td>
+              <td class="r"><input v-model.number="l.quantity" type="number" min="0" step="0.01" class="num" /></td>
+              <td class="r"><input v-model.number="l.rate" type="number" min="0" step="0.01" class="num" /></td>
               <td class="r mono">₹ {{ fmt((l.quantity || 0) * (l.rate || 0)) }}</td>
               <td><button class="btn-x" @click="form.items.splice(i, 1)">✕</button></td>
             </tr>
@@ -393,7 +393,7 @@ onMounted(load)
 .lines-head { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 6px; font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; }
 .line-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .line-table th { background: var(--surface-2); color: #555; padding: 5px 8px; text-align: left; font-size: 10px; text-transform: uppercase; }
-.line-table th.r { text-align: right; }
+.line-table th.r, .line-table td.r { text-align: right; }
 .line-table td { padding: 5px 6px; border-bottom: 1px solid #f0f0f0; }
 .line-table select { width: 100%; padding: 5px 6px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; }
 .num { width: 90px; padding: 5px 6px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; text-align: right; }
