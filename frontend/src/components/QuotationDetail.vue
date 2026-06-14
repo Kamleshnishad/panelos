@@ -153,9 +153,14 @@
       </div>
     </div>
 
-    <!-- Inline rate-entry save bar -->
+    <!-- Inline rate-entry save bar (sticky — live totals visible without scrolling) -->
     <div v-if="canEditRates" class="rate-save-bar">
-      <span class="rsb-hint">✏️ Enter <strong>Rate (₹/SQM)</strong> in the table above, then save. To add/remove panels use <strong>Edit</strong>.</span>
+      <div class="rsb-live">
+        <span class="rsb-item"><label>Subtotal</label>₹ {{ fmtNum(fin.subtotal) }}</span>
+        <span class="rsb-item"><label>GST</label>₹ {{ fmtNum(fin.cgst + fin.sgst + fin.igst) }}</span>
+        <span class="rsb-item rsb-grand"><label>Grand Total</label>₹ {{ fmtNum(fin.grand) }}</span>
+        <span class="rsb-item"><label>Balance</label>₹ {{ fmtNum(fin.balance) }}</span>
+      </div>
       <button class="btn btn-primary" :disabled="savingRates" @click="saveRates">{{ savingRates ? 'Saving…' : '💾 Save Rates' }}</button>
     </div>
 
@@ -163,24 +168,24 @@
     <div class="totals-card card">
       <h3>Financial Summary</h3>
       <div class="totals-grid">
-        <div class="t-row"><span>Panel Subtotal</span><span>₹ {{ fmtNum(quotation.panel_subtotal) }}</span></div>
-        <div class="t-row" v-if="quotation.accessory_subtotal > 0"><span>Accessories</span><span>₹ {{ fmtNum(quotation.accessory_subtotal) }}</span></div>
-        <div class="t-row" v-if="quotation.installation_amount > 0"><span>Installation</span><span>₹ {{ fmtNum(quotation.installation_amount) }}</span></div>
-        <div class="t-row border-top"><span>Subtotal</span><span>₹ {{ fmtNum(quotation.subtotal) }}</span></div>
-        <div class="t-row discount" v-if="quotation.discount_pct > 0"><span>Discount ({{ quotation.discount_pct }}%)</span><span>- ₹ {{ fmtNum(quotation.discount_amount) }}</span></div>
-        <div class="t-row border-top"><span>Taxable Amount</span><span>₹ {{ fmtNum(quotation.taxable_amount) }}</span></div>
-        <div class="t-row" v-if="quotation.is_inter_state"><span>IGST @ 18%</span><span>₹ {{ fmtNum(quotation.igst_amount) }}</span></div>
+        <div class="t-row"><span>Panel Subtotal</span><span>₹ {{ fmtNum(fin.panel) }}</span></div>
+        <div class="t-row" v-if="fin.acc > 0"><span>Accessories</span><span>₹ {{ fmtNum(fin.acc) }}</span></div>
+        <div class="t-row" v-if="fin.install > 0"><span>Installation</span><span>₹ {{ fmtNum(fin.install) }}</span></div>
+        <div class="t-row border-top"><span>Subtotal</span><span>₹ {{ fmtNum(fin.subtotal) }}</span></div>
+        <div class="t-row discount" v-if="fin.discPct > 0"><span>Discount ({{ fin.discPct }}%)</span><span>- ₹ {{ fmtNum(fin.disc) }}</span></div>
+        <div class="t-row border-top"><span>Taxable Amount</span><span>₹ {{ fmtNum(fin.taxable) }}</span></div>
+        <div class="t-row" v-if="fin.inter"><span>IGST @ 18%</span><span>₹ {{ fmtNum(fin.igst) }}</span></div>
         <template v-else>
-          <div class="t-row"><span>CGST @ 9%</span><span>₹ {{ fmtNum(quotation.cgst_amount) }}</span></div>
-          <div class="t-row"><span>SGST @ 9%</span><span>₹ {{ fmtNum(quotation.sgst_amount) }}</span></div>
+          <div class="t-row"><span>CGST @ 9%</span><span>₹ {{ fmtNum(fin.cgst) }}</span></div>
+          <div class="t-row"><span>SGST @ 9%</span><span>₹ {{ fmtNum(fin.sgst) }}</span></div>
         </template>
-        <div class="t-row" v-if="quotation.transport_fixed && quotation.transport_amount > 0"><span>Transportation</span><span>₹ {{ fmtNum(quotation.transport_amount) }}</span></div>
+        <div class="t-row" v-if="fin.transportFixed"><span>Transportation</span><span>₹ {{ fmtNum(fin.transport) }}</span></div>
         <div class="t-row" v-else><span>Transportation</span><span class="text-muted">Extra as Actual</span></div>
-        <div class="t-row" v-if="quotation.round_off != 0"><span>Round Off</span><span>₹ {{ fmtNum(quotation.round_off) }}</span></div>
-        <div class="t-row grand"><span>GRAND TOTAL</span><span>₹ {{ fmtNum(quotation.total_amount) }}</span></div>
-        <div class="t-row"><span>Advance ({{ quotation.advance_pct }}%)</span><span>₹ {{ fmtNum(quotation.advance_amount) }}</span></div>
-        <div class="t-row balance"><span>Balance Due</span><span>₹ {{ fmtNum(quotation.balance_amount) }}</span></div>
-        <div class="t-row"><span>Total SQM</span><span>{{ Number(quotation.total_sqm).toFixed(3) }} SQM</span></div>
+        <div class="t-row" v-if="fin.roundOff != 0"><span>Round Off</span><span>₹ {{ fmtNum(fin.roundOff) }}</span></div>
+        <div class="t-row grand"><span>GRAND TOTAL</span><span>₹ {{ fmtNum(fin.grand) }}</span></div>
+        <div class="t-row"><span>Advance ({{ fin.advPct }}%)</span><span>₹ {{ fmtNum(fin.advance) }}</span></div>
+        <div class="t-row balance"><span>Balance Due</span><span>₹ {{ fmtNum(fin.balance) }}</span></div>
+        <div class="t-row"><span>Total SQM</span><span>{{ Number(fin.sqm).toFixed(3) }} SQM</span></div>
       </div>
     </div>
 
@@ -232,6 +237,34 @@ function lineAmt(sz) {
 function itemAmt(item) {
   return (item.sizes || []).reduce((s, z) => s + lineAmt(z), 0)
 }
+
+// Live financial summary — mirrors backend recalculate() so it updates as rates
+// are typed (before saving).
+const fin = computed(() => {
+  const q = quotation.value || {}
+  const panel = (q.items || []).reduce((s, it) => s + itemAmt(it), 0)
+  const acc = Number(q.accessory_subtotal || 0)
+  const install = Number(q.installation_amount || 0)
+  const subtotal = panel + acc + install
+  const discPct = Number(q.discount_pct || 0)
+  const disc = subtotal * discPct / 100
+  const taxable = subtotal - disc
+  const gst = taxable * 0.18
+  const inter = !!q.is_inter_state
+  const transport = (q.transport_fixed && Number(q.transport_amount) > 0) ? Number(q.transport_amount) : 0
+  const raw = taxable + gst + transport
+  const roundOff = Math.round(raw) - raw
+  const grand = raw + roundOff
+  const advPct = Number(q.advance_pct || 0)
+  const advance = grand * advPct / 100
+  return {
+    panel, acc, install, subtotal, discPct, disc, taxable, gst,
+    cgst: inter ? 0 : gst / 2, sgst: inter ? 0 : gst / 2, igst: inter ? gst : 0,
+    inter, transport, transportFixed: !!(q.transport_fixed && Number(q.transport_amount) > 0),
+    roundOff, grand, advPct, advance, balance: grand - advance,
+    sqm: (q.items || []).reduce((s, it) => s + Number(it.total_sqm || 0), 0),
+  }
+})
 
 async function saveRates() {
   savingRates.value = true
@@ -333,9 +366,12 @@ onMounted(load)
 
 .rate-input { width: 110px; padding: 6px 8px; border: 1px solid var(--primary); border-radius: 6px; font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
 .rate-input:focus { outline: none; box-shadow: 0 0 0 2px var(--primary-tint); }
-.rate-save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  background: var(--surface, #fff); border: 1px solid var(--primary-bd, #c5cae9); border-radius: 10px; padding: 12px 18px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
-.rsb-hint { font-size: 12.5px; color: var(--text-2, #555); }
+.rate-save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  background: var(--surface, #fff); border: 1px solid var(--primary-bd, #c5cae9); border-radius: 10px; padding: 12px 18px; box-shadow: 0 -4px 20px rgba(0,0,0,0.10); }
+.rsb-live { display: flex; gap: 24px; flex-wrap: wrap; }
+.rsb-item { display: flex; flex-direction: column; font-size: 14px; font-weight: 700; color: var(--ink, #15181E); font-variant-numeric: tabular-nums; }
+.rsb-item label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3, #888); margin-bottom: 1px; }
+.rsb-grand { color: var(--primary); font-size: 16px; }
 
 .qd-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .qd-title { display: flex; align-items: center; gap: 8px; flex: 1; }
