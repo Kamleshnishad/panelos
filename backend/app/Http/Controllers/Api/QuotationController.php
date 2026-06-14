@@ -247,6 +247,7 @@ class QuotationController extends Controller
             'notes'            => 'nullable|string|max:2000',
             'quotation_prefix' => 'nullable|string|max:10',
             'as_boq'           => 'nullable|boolean',
+            'lead_id'          => 'nullable|integer',
             // Panel rows
             'panel_rows'                            => ($update ? 'sometimes|' : '') . 'required|array|min:1',
             'panel_rows.*.panel_type_id'            => 'required|integer|exists:panel_types,id',

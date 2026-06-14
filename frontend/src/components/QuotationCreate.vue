@@ -556,6 +556,8 @@ import { confirmDialog, toastSuccess, toastError } from '../services/ui.js'
 const props = defineProps({
   editId: { type: Number, default: null },
   mode:   { type: String, default: 'quotation' }, // 'quotation' | 'boq'
+  prefillCustomerId: { type: Number, default: null }, // from a converted Lead
+  leadId: { type: Number, default: null },            // back-link target
 })
 const emit = defineEmits(['cancel', 'saved'])
 
@@ -899,6 +901,7 @@ async function save(mode) {
     const payload = {
       ...form,
       as_boq: isBoq.value,
+      lead_id: props.leadId || null,
       panel_rows: panelRows.value.map(row => ({
         panel_type_id: row.panel_type_id,
         application: row.application || null,
@@ -1052,6 +1055,11 @@ onMounted(async () => {
   companyStateCode.value  = stateCode
 
   if (isEdit.value) await loadForEdit()
+  // Lead → quotation: prefill the customer
+  if (!isEdit.value && props.prefillCustomerId) {
+    form.customer_id = props.prefillCustomerId
+    onCustomerChange()
+  }
   // Start dirty-tracking only after initial data/edit load settles.
   await nextTick()
   watch([form, panelRows, accessories_rows], () => { dirty.value = true }, { deep: true })

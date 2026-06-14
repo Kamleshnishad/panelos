@@ -90,6 +90,18 @@ class LeadController extends Controller
         }
     }
 
+    /** Ensure a customer exists for the lead; returns ids to open a prefilled quotation. */
+    public function convert(Request $r, int $id)
+    {
+        try {
+            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $customerId = $this->leads->ensureCustomer($lead);
+            return $this->successResponse(['lead_id' => $lead->id, 'customer_id' => $customerId], 'Customer ready');
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'CONVERT_ERROR', 400);
+        }
+    }
+
     public function destroy(Request $r, int $id)
     {
         try {

@@ -105,6 +105,10 @@
             <button v-for="s in moveTo(detail.status)" :key="s" class="btn btn-status sm" :disabled="busy" @click="setStatus(detail, s)">{{ s }}</button>
             <button v-if="detail.status !== 'lost' && detail.status !== 'won'" class="btn btn-danger sm" :disabled="busy" @click="markLost(detail)">Lost</button>
           </div>
+          <button v-if="!['won','lost'].includes(detail.status)" class="btn btn-convert" :disabled="busy" @click="convertLead(detail)">
+            → Convert to Quotation
+          </button>
+          <p v-if="detail.quotation_id" class="conv-note">✓ Quotation #{{ detail.quotation_id }} linked</p>
         </div>
 
         <!-- Activity / follow-up timeline -->
@@ -143,6 +147,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import leadService from '../services/leadService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
+
+const emit = defineEmits(['convert'])
 
 const sources = ['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other']
 const applications = ['Wall', 'Roof', 'Cold Room', 'Partition', 'Clean Room', 'Ceiling', 'PEB Shade', 'Architectural']
@@ -283,6 +289,23 @@ async function markLost(l) {
   finally { busy.value = false }
 }
 
+async function convertLead(l) {
+  const ok = await confirmDialog({
+    title: 'Convert to Quotation?',
+    message: 'A customer will be created/linked from this lead and a new quotation opened. The lead will move to "quoted" on save.',
+    confirmLabel: 'Convert', cancelLabel: 'Cancel',
+  })
+  if (!ok) return
+  busy.value = true
+  try {
+    const res = await leadService.convert(l.id)
+    const d = res?.data ?? res
+    detail.value = null
+    emit('convert', { customer_id: d.customer_id, lead_id: d.lead_id })
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Convert failed.') }
+  finally { busy.value = false }
+}
+
 async function removeLead(l) {
   const ok = await confirmDialog({ title: 'Delete lead?', message: `Delete ${l.lead_no}?`, confirmLabel: 'Delete', cancelLabel: 'Cancel', danger: true })
   if (!ok) return
@@ -377,5 +400,7 @@ onMounted(load)
 .btn-status { background: var(--primary-tint); color: var(--primary); text-transform: capitalize; }
 .btn-danger { background: #c62828; color: #fff; }
 .btn-danger-ghost { background: transparent; border: 1px solid #ef9a9a; color: #c62828; }
+.btn-convert { width: 100%; margin-top: 10px; background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; font-weight: 700; }
+.conv-note { font-size: 12px; color: #2e7d32; margin: 8px 0 0; font-weight: 600; }
 .error-msg { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
 </style>

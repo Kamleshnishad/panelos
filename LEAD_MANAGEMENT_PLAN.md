@@ -45,7 +45,8 @@
 - Lead detail timeline (activities, newest first).
 - **Verify** + commit.
 
-## Phase 3 — Convert to Quotation / Customer  ✅ medium
+## Phase 3 — Convert to Quotation / Customer  ✅ DONE
+> `LeadService::ensureCustomer` (create/link customer from lead — mirrors all NOT-NULL customer columns) + `linkQuotation`; `POST /leads/{id}/convert`; `QuotationService::create` accepts optional `lead_id` and back-links the lead (status→quoted, quotation_id) — additive, normal quotation flow unaffected. Frontend: "→ Convert to Quotation" in drawer → AppShell sets prefill → QuotationManager opens QuotationCreate prefilled (customer + lead_id) → on save lead linked. **Also fixed latent CustomerController bug** (passed null to NOT-NULL address/state/pincode columns → would crash the new-customer modal; now ''). Verified: convert→quote→lead quoted, normal quote still works, all models field-audit clean.
 - "Convert" on a qualified lead → pick existing customer OR create one (reuse `quotationService.createCustomer`) → open existing **QuotationCreate** prefilled (customer + requirement note) → on save set `lead.status = quoted`, `lead.quotation_id`, `lead.customer_id`.
 - "Mark Won" (auto when its quotation→order) / "Mark Lost" (with `lost_reason`).
 - Quotations table untouched — only `leads` stores the link.

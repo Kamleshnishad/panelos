@@ -78,6 +78,11 @@ class QuotationService
             $this->saveAccessories($quotation, $data['accessories'] ?? []);
             $this->recalculate($quotation);
 
+            // If this quotation was started from a Lead, back-link it (additive).
+            if (!empty($data['lead_id'])) {
+                app(\App\Services\LeadService::class)->linkQuotation((int) $data['lead_id'], $companyId, $quotation->id, $customer->id);
+            }
+
             return $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer');
         });
     }

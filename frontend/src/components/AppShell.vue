@@ -75,8 +75,8 @@
 
       <main class="content">
         <home-dashboard        v-if="active === 'dashboard'"   @navigate="go" />
-        <lead-manager          v-else-if="active === 'leads'" />
-        <quotation-manager     v-else-if="active === 'quotations'" :open-id="quotationOpenId" @order-created="go('orders')" />
+        <lead-manager          v-else-if="active === 'leads'" @convert="onLeadConvert" />
+        <quotation-manager     v-else-if="active === 'quotations'" :open-id="quotationOpenId" :prefill="quotationPrefill" @order-created="go('orders')" />
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />
         <order-manager         v-else-if="active === 'orders'"      @view-quotation="go('quotations')" @view-batch="go('batches')" />
         <batch-manager         v-else-if="active === 'batches'"     @view-order="go('orders')" />
@@ -133,6 +133,14 @@ const companyLogo = ref(null)
 const badges      = ref({})
 const alertCount  = ref(0)
 const quotationOpenId = ref(null)
+const quotationPrefill = ref(null)
+
+function onLeadConvert(payload) {
+  quotationPrefill.value = payload   // { customer_id, lead_id }
+  quotationOpenId.value = null
+  active.value = 'quotations'
+  mobileOpen.value = false
+}
 const mobileOpen  = ref(false)
 const searchQ     = ref('')
 
@@ -197,7 +205,7 @@ const initials = computed(() => {
 })
 const roleLabel = computed(() => user.value?.is_super_admin ? 'Super Admin' : (user.value?.is_company_admin ? 'Company Admin' : 'User'))
 
-function go(key) { quotationOpenId.value = null; active.value = key; mobileOpen.value = false }
+function go(key) { quotationOpenId.value = null; quotationPrefill.value = null; active.value = key; mobileOpen.value = false }
 
 // Quick-jump: match the typed text against nav labels and navigate.
 function quickJump() {

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Customer;
 use App\Models\Lead;
 use App\Models\LeadActivity;
 use Illuminate\Support\Carbon;
@@ -85,6 +86,72 @@ class LeadService
     public function delete(Lead $lead): void
     {
         $lead->delete();
+    }
+
+    /**
+     * Prepare a lead for quotation: ensure a linked customer exists (create one
+     * from the lead's details if needed). Returns the customer id. The quotation
+     * itself is created by the normal QuotationCreate flow, which back-links the
+     * lead via lead_id (see QuotationService::create).
+     */
+    public function ensureCustomer(Lead $lead): int
+    {
+        if ($lead->customer_id && Customer::where('company_id', $lead->company_id)->whereKey($lead->customer_id)->exists()) {
+            return $lead->customer_id;
+        }
+
+        $name = $lead->company_name ?: $lead->contact_name;
+        // Mirror CustomerController::store exactly so all NOT-NULL columns are set.
+        $customer = Customer::create([
+            'company_id'          => $lead->company_id,
+            'name'                => $name,
+            'code'                => strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $name), 0, 4)) . rand(100, 999),
+            'type'                => 'retail',
+            'contact_person'      => $lead->contact_name,
+            'email'               => $lead->email,
+            'phone'               => $lead->phone ?: '',
+            'whatsapp_no'         => null,
+            'gstin'               => null,
+            'address_line1'       => '',
+            'city'                => $lead->city ?: '',
+            'state'               => '',
+            'state_code'          => '',
+            'pincode'             => '',
+            'country'             => 'India',
+            'credit_limit'        => 0,
+            'outstanding_balance' => 0,
+            'payment_terms_days'  => 30,
+            'is_active'           => true,
+        ]);
+
+        $lead->update(['customer_id' => $customer->id]);
+
+        LeadActivity::create([
+            'company_id'    => $lead->company_id,
+            'lead_id'       => $lead->id,
+            'user_id'       => auth()?->id(),
+            'type'          => 'status_change',
+            'description'   => "Customer created/linked: {$customer->name}",
+            'activity_date' => now(),
+        ]);
+
+        return $customer->id;
+    }
+
+    /** Called from QuotationService after a quotation is made for a lead. */
+    public function linkQuotation(int $leadId, int $companyId, int $quotationId, int $customerId): void
+    {
+        $lead = Lead::where('company_id', $companyId)->find($leadId);
+        if (!$lead) return;
+        $lead->update(['status' => 'quoted', 'quotation_id' => $quotationId, 'customer_id' => $customerId]);
+        LeadActivity::create([
+            'company_id'    => $companyId,
+            'lead_id'       => $lead->id,
+            'user_id'       => auth()?->id(),
+            'type'          => 'status_change',
+            'description'   => 'Converted to quotation',
+            'activity_date' => now(),
+        ]);
     }
 
     /** Count of leads whose follow-up is due/overdue (for the nav badge). */
