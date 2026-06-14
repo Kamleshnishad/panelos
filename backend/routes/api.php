@@ -58,6 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'show'])->name('leads.show');
     Route::put('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'update'])->name('leads.update');
     Route::post('/leads/{id}/status', [\App\Http\Controllers\Api\LeadController::class, 'changeStatus'])->name('leads.status');
+    Route::post('/leads/{id}/activities', [\App\Http\Controllers\Api\LeadController::class, 'addActivity'])->name('leads.activities');
     Route::delete('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'destroy'])->name('leads.destroy');
 
     // Customer Management

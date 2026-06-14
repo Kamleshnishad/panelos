@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Lead;
+use App\Models\LeadActivity;
 use Illuminate\Support\Carbon;
 
 class LeadService
@@ -32,7 +33,19 @@ class LeadService
 
     public function getDetails(Lead $lead): Lead
     {
-        return $lead->load('assignedUser', 'customer', 'quotation');
+        return $lead->load('assignedUser', 'customer', 'quotation', 'activities.user');
+    }
+
+    public function addActivity(Lead $lead, array $data, ?int $userId = null): LeadActivity
+    {
+        return LeadActivity::create([
+            'company_id'    => $lead->company_id,
+            'lead_id'       => $lead->id,
+            'user_id'       => $userId,
+            'type'          => $data['type'] ?? 'note',
+            'description'   => $data['description'] ?? null,
+            'activity_date' => $data['activity_date'] ?? now(),
+        ]);
     }
 
     public function create(int $companyId, array $data): Lead
@@ -49,11 +62,23 @@ class LeadService
         return $lead->fresh('assignedUser', 'customer');
     }
 
-    public function changeStatus(Lead $lead, string $status, ?string $lostReason = null): Lead
+    public function changeStatus(Lead $lead, string $status, ?string $lostReason = null, ?int $userId = null): Lead
     {
+        $from = $lead->status;
         $payload = ['status' => $status];
         if ($status === 'lost') $payload['lost_reason'] = $lostReason;
         $lead->update($payload);
+
+        // Auto-log the status change as an activity
+        LeadActivity::create([
+            'company_id'    => $lead->company_id,
+            'lead_id'       => $lead->id,
+            'user_id'       => $userId,
+            'type'          => 'status_change',
+            'description'   => "Status: {$from} → {$status}" . ($lostReason ? " (reason: {$lostReason})" : ''),
+            'activity_date' => now(),
+        ]);
+
         return $lead->fresh('assignedUser', 'customer');
     }
 

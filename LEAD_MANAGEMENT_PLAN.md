@@ -37,7 +37,8 @@
 - Status as a coloured badge; source dropdown; assigned-to (users list).
 - **Verify:** migrate, authed create/list test, field audit, build.
 
-## Phase 2 — Activity log + follow-ups  ✅ safe
+## Phase 2 — Activity log + follow-ups  ✅ DONE
+> `lead_activities` table + LeadActivity model; `LeadService::addActivity` + status changes auto-log a `status_change` activity; `getDetails` loads activities.user; `POST /leads/{id}/activities`. Frontend: detail drawer activity timeline + log-activity form (note/call/email/whatsapp/meeting). Follow-up overdue/today highlight + nav badge (Phase 1). Verified: field mismatch none, 2 activities logged, build green.
 - Migration: `lead_activities`.
 - Add activity (note/call/email/whatsapp/meeting) on lead detail; status changes auto-log an activity.
 - `next_follow_up_date` → "Today" / "Overdue" indicators + a **nav badge** (overdue follow-up count), like the Production Planner alert badge.

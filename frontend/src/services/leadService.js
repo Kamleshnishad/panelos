@@ -14,6 +14,7 @@ export default {
   create(data)             { return api('post', '/api/leads', data) },
   update(id, data)         { return api('put',  `/api/leads/${id}`, data) },
   changeStatus(id, data)   { return api('post', `/api/leads/${id}/status`, data) },
+  addActivity(id, data)    { return api('post', `/api/leads/${id}/activities`, data) },
   remove(id)               { return api('delete', `/api/leads/${id}`) },
 
   users()                  { return api('get',  '/api/users') },

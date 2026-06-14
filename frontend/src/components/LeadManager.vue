@@ -107,6 +107,29 @@
           </div>
         </div>
 
+        <!-- Activity / follow-up timeline -->
+        <div class="d-section">
+          <label class="d-label">Log activity</label>
+          <div class="act-form">
+            <select v-model="actForm.type" class="act-type">
+              <option value="note">Note</option><option value="call">Call</option>
+              <option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="meeting">Meeting</option>
+            </select>
+            <input v-model="actForm.description" class="act-input" placeholder="What happened…" @keyup.enter="addActivity" />
+            <button class="btn btn-primary sm" :disabled="actBusy || !actForm.description" @click="addActivity">Add</button>
+          </div>
+          <div class="timeline">
+            <div v-for="a in (detail.activities || [])" :key="a.id" class="tl-item">
+              <span class="tl-type" :class="a.type">{{ a.type.replace('_', ' ') }}</span>
+              <div class="tl-body">
+                <div class="tl-desc">{{ a.description }}</div>
+                <div class="tl-meta">{{ fmtDateTime(a.activity_date) }}<span v-if="a.user"> · {{ a.user.name }}</span></div>
+              </div>
+            </div>
+            <p v-if="!(detail.activities || []).length" class="tl-empty">No activity yet.</p>
+          </div>
+        </div>
+
         <div class="drawer-foot">
           <button class="btn btn-ghost" @click="openEdit(detail)">Edit</button>
           <button class="btn btn-danger-ghost" @click="removeLead(detail)">Delete</button>
@@ -142,11 +165,14 @@ const form = reactive({ id: null, contact_name: '', company_name: '', phone: '',
 
 const detail = ref(null)
 const busy = ref(false)
+const actForm = reactive({ type: 'note', description: '' })
+const actBusy = ref(false)
 
 const counts = computed(() => allCount.value)
 
 function fmt(n) { return Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }) }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '—' }
+function fmtDateTime(d) { return d ? new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—' }
 function followClass(l) {
   if (!l.next_follow_up_date || ['won', 'lost'].includes(l.status)) return ''
   const days = Math.ceil((new Date(l.next_follow_up_date) - new Date().setHours(0, 0, 0, 0)) / 86400000)
@@ -217,8 +243,20 @@ async function save() {
 }
 
 async function openDetail(l) {
+  Object.assign(actForm, { type: 'note', description: '' })
   try { const res = await leadService.get(l.id); detail.value = res?.data ?? res }
   catch { detail.value = l }
+}
+
+async function addActivity() {
+  if (!actForm.description) return
+  actBusy.value = true
+  try {
+    const res = await leadService.addActivity(detail.value.id, { type: actForm.type, description: actForm.description })
+    detail.value = res?.data ?? res
+    Object.assign(actForm, { type: 'note', description: '' })
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Failed to add activity.') }
+  finally { actBusy.value = false }
 }
 
 async function setStatus(l, status) {
@@ -316,6 +354,20 @@ onMounted(load)
 .d-req { margin: 8px 0; } .d-req p { margin: 3px 0 0; font-size: 13px; color: #444; line-height: 1.5; }
 .d-section { margin: 16px 0; border-top: 1px solid var(--border); padding-top: 14px; }
 .status-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.act-form { display: flex; gap: 6px; margin: 8px 0 12px; }
+.act-type { padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
+.act-input { flex: 1; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+.timeline { display: flex; flex-direction: column; gap: 8px; }
+.tl-item { display: flex; gap: 8px; align-items: flex-start; }
+.tl-type { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; margin-top: 1px; }
+.tl-type.call { background: #e8f5e9; color: #2e7d32; }
+.tl-type.status\ change, .tl-type.status_change { background: var(--primary-tint); color: var(--primary); }
+.tl-type.whatsapp { background: #e8f5e9; color: #128c7e; }
+.tl-body { flex: 1; }
+.tl-desc { font-size: 13px; color: var(--ink); }
+.tl-meta { font-size: 10.5px; color: var(--text-3); margin-top: 1px; }
+.tl-empty { font-size: 12px; color: #aaa; font-style: italic; }
+
 .drawer-foot { display: flex; gap: 10px; justify-content: space-between; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 14px; }
 
 .btn { padding: 8px 16px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }

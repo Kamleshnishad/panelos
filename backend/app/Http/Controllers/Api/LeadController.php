@@ -64,11 +64,29 @@ class LeadController extends Controller
                 'status'      => 'required|in:new,contacted,qualified,quoted,won,lost',
                 'lost_reason' => 'nullable|string|max:255',
             ]);
-            return $this->successResponse($this->leads->changeStatus($lead, $data['status'], $data['lost_reason'] ?? null), 'Status updated');
+            return $this->successResponse($this->leads->changeStatus($lead, $data['status'], $data['lost_reason'] ?? null, $r->user()->id), 'Status updated');
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'STATUS_ERROR', 400);
+        }
+    }
+
+    public function addActivity(Request $r, int $id)
+    {
+        try {
+            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $data = $r->validate([
+                'type'        => 'required|in:note,call,email,whatsapp,meeting',
+                'description' => 'nullable|string|max:2000',
+                'activity_date' => 'nullable|date',
+            ]);
+            $this->leads->addActivity($lead, $data, $r->user()->id);
+            return $this->successResponse($this->leads->getDetails($lead), 'Activity added');
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'ACTIVITY_ERROR', 400);
         }
     }
 
