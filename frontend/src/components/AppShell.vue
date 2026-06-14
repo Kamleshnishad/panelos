@@ -76,6 +76,7 @@
       <main class="content">
         <home-dashboard        v-if="active === 'dashboard'"   @navigate="go" />
         <lead-manager          v-else-if="active === 'leads'" @convert="onLeadConvert" />
+        <customer-manager      v-else-if="active === 'customers'" @open-quotation="openQuotation" @view-orders="go('orders')" />
         <quotation-manager     v-else-if="active === 'quotations'" :open-id="quotationOpenId" :prefill="quotationPrefill" @order-created="go('orders')" />
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />
         <order-manager         v-else-if="active === 'orders'"      @view-quotation="go('quotations')" @view-batch="go('batches')" />
@@ -108,6 +109,7 @@ import leadService from '../services/leadService.js'
 
 import HomeDashboard      from './HomeDashboard.vue'
 import LeadManager        from './LeadManager.vue'
+import CustomerManager    from './CustomerManager.vue'
 import QuotationManager   from './QuotationManager.vue'
 import BoqManager         from './BoqManager.vue'
 import OrderManager       from './OrderManager.vue'
@@ -173,6 +175,7 @@ const nav = [
   { label: 'Main', items: [
     { key: 'dashboard',   label: 'Dashboard',       icon: ic.dashboard },
     { key: 'leads',       label: 'Leads',           icon: ic.lead, badgeDanger: true },
+    { key: 'customers',   label: 'Customers',       icon: ic.users },
     { key: 'quotations',  label: 'Quotations',      icon: ic.quote },
     { key: 'boq',         label: 'BOQ Register',    icon: ic.grid },
     { key: 'orders',      label: 'Orders',          icon: ic.order },
