@@ -92,6 +92,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Quotation actions
     Route::post('/quotations/{id}/send', [QuotationController::class, 'send'])->name('quotations.send');
     Route::post('/quotations/{id}/convert', [QuotationController::class, 'convert'])->name('quotations.convert');
+    Route::post('/quotations/{id}/rates', [QuotationController::class, 'saveRates'])->name('quotations.rates');
     Route::post('/quotations/{id}/accept', [QuotationController::class, 'accept'])->name('quotations.accept');
     Route::post('/quotations/{id}/reject', [QuotationController::class, 'reject'])->name('quotations.reject');
     Route::post('/quotations/{id}/create-order', [QuotationController::class, 'createOrder'])->name('quotations.create-order');

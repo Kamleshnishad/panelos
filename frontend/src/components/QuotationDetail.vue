@@ -99,7 +99,7 @@
           </div>
           <div class="item-total">
             <div class="item-total-sqm">{{ Number(item.total_sqm).toFixed(2) }} SQM</div>
-            <div class="item-total-amt">₹ {{ fmtNum(item.amount) }}</div>
+            <div class="item-total-amt">₹ {{ fmtNum(itemAmt(item)) }}</div>
           </div>
         </div>
 
@@ -116,15 +116,18 @@
               <td>{{ sz.width_mm }}</td>
               <td class="bold">{{ sz.nos }}</td>
               <td class="bold">{{ Number(sz.sqm).toFixed(3) }}</td>
-              <td class="text-right">{{ fmtNum(sz.rate_per_sqm) }}</td>
-              <td class="text-right bold blue">{{ fmtNum(sz.amount) }}</td>
+              <td class="text-right">
+                <input v-if="canEditRates" v-model.number="sz.rate_per_sqm" type="number" min="0" step="5" class="rate-input" />
+                <span v-else>{{ fmtNum(sz.rate_per_sqm) }}</span>
+              </td>
+              <td class="text-right bold blue">{{ fmtNum(lineAmt(sz)) }}</td>
             </tr>
             <tr class="size-total-row">
               <td colspan="2" class="text-right bold">Total</td>
               <td class="bold">{{ item.sizes.reduce((s,z) => s + z.nos, 0) }}</td>
               <td class="bold">{{ Number(item.total_sqm).toFixed(3) }}</td>
               <td></td>
-              <td class="text-right bold blue">{{ fmtNum(item.amount) }}</td>
+              <td class="text-right bold blue">{{ fmtNum(itemAmt(item)) }}</td>
             </tr>
           </tbody>
         </table>
@@ -148,6 +151,12 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Inline rate-entry save bar -->
+    <div v-if="canEditRates" class="rate-save-bar">
+      <span class="rsb-hint">✏️ Enter <strong>Rate (₹/SQM)</strong> in the table above, then save. To add/remove panels use <strong>Edit</strong>.</span>
+      <button class="btn btn-primary" :disabled="savingRates" @click="saveRates">{{ savingRates ? 'Saving…' : '💾 Save Rates' }}</button>
     </div>
 
     <!-- Totals -->
@@ -213,6 +222,33 @@ const actionLoading = ref(false)
 const deleteConfirm = ref(false)
 const pdfLoading = ref(false)
 const boqLoading = ref(false)
+const savingRates = ref(false)
+
+// Rates can be entered inline on draft/sent quotations (the rates-pending workflow).
+const canEditRates = computed(() => ['draft', 'sent'].includes(quotation.value?.status))
+function lineAmt(sz) {
+  return canEditRates.value ? (Number(sz.sqm) * (Number(sz.rate_per_sqm) || 0)) : Number(sz.amount || 0)
+}
+function itemAmt(item) {
+  return (item.sizes || []).reduce((s, z) => s + lineAmt(z), 0)
+}
+
+async function saveRates() {
+  savingRates.value = true
+  try {
+    const rates = []
+    for (const item of (quotation.value.items || [])) {
+      for (const sz of (item.sizes || [])) rates.push({ id: sz.id, rate_per_sqm: Number(sz.rate_per_sqm) || 0 })
+    }
+    const res = await quotationService.saveRates(quotation.value.id, rates)
+    quotation.value = res?.data ?? res
+    toastSuccess('Rates saved.')
+  } catch (e) {
+    toastError(e?.response?.data?.message ?? 'Failed to save rates.')
+  } finally {
+    savingRates.value = false
+  }
+}
 
 async function openPdf() {
   pdfLoading.value = true
@@ -294,6 +330,12 @@ onMounted(load)
 
 <style scoped>
 .qd-wrap { font-family: inherit; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+.rate-input { width: 110px; padding: 6px 8px; border: 1px solid var(--primary); border-radius: 6px; font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.rate-input:focus { outline: none; box-shadow: 0 0 0 2px var(--primary-tint); }
+.rate-save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: var(--surface, #fff); border: 1px solid var(--primary-bd, #c5cae9); border-radius: 10px; padding: 12px 18px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
+.rsb-hint { font-size: 12.5px; color: var(--text-2, #555); }
 
 .qd-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .qd-title { display: flex; align-items: center; gap: 8px; flex: 1; }

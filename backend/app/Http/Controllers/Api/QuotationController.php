@@ -114,6 +114,25 @@ class QuotationController extends Controller
         }
     }
 
+    /** Inline rate entry from the detail page (rates-pending workflow). */
+    public function saveRates(Request $request, int $id)
+    {
+        try {
+            $quotation = Quotation::where('company_id', $request->user()->company_id)
+                ->with('items.sizes')->findOrFail($id);
+            $data = $request->validate([
+                'rates'                => 'required|array|min:1',
+                'rates.*.id'           => 'required|integer',
+                'rates.*.rate_per_sqm' => 'required|numeric|min:0',
+            ]);
+            return $this->successResponse($this->quotationService->updateSizeRates($quotation, $data['rates']), 'Rates saved');
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'RATES_ERROR', 400);
+        }
+    }
+
     public function accept(Request $request, int $id)
     {
         try {

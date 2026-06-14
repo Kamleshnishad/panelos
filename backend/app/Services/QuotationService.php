@@ -137,6 +137,48 @@ class QuotationService
         });
     }
 
+    /**
+     * Inline rate entry from the quotation detail page (rates-pending workflow).
+     * Updates per-size rates, recomputes each item's amount/avg-rate, then totals.
+     * @param array $rates  [ ['id' => sizeId, 'rate_per_sqm' => x], ... ]
+     */
+    public function updateSizeRates(Quotation $quotation, array $rates): Quotation
+    {
+        if (!in_array($quotation->status, ['boq', 'draft', 'sent'])) {
+            throw new \Exception('Rates can only be edited on a BOQ, draft or sent quotation.');
+        }
+
+        return DB::transaction(function () use ($quotation, $rates) {
+            $rateById = [];
+            foreach ($rates as $r) {
+                if (isset($r['id'])) $rateById[(int) $r['id']] = (float) ($r['rate_per_sqm'] ?? 0);
+            }
+
+            $quotation->load('items.sizes');
+            foreach ($quotation->items as $item) {
+                $itemAmount = 0.0;
+                $sqmSum = 0.0;
+                foreach ($item->sizes as $sz) {
+                    if (array_key_exists($sz->id, $rateById)) {
+                        $rate = $rateById[$sz->id];
+                        $sz->rate_per_sqm = $rate;
+                        $sz->amount = (float) $sz->sqm * $rate;   // sqm is a generated column (read-only)
+                        $sz->save();
+                    }
+                    $itemAmount += (float) $sz->amount;
+                    $sqmSum += (float) $sz->sqm;
+                }
+                $item->amount = $itemAmount;
+                $item->rate_per_sqm = $sqmSum > 0 ? $itemAmount / $sqmSum : 0;
+                $item->unit_price = $item->rate_per_sqm;
+                $item->save();
+            }
+
+            $this->recalculate($quotation);
+            return $quotation->fresh('items.sizes', 'items.panelType', 'accessories', 'customer');
+        });
+    }
+
     // ── Revision system ───────────────────────────────────────────────────
 
     public function revise(Quotation $original): Quotation

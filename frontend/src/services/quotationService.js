@@ -46,6 +46,11 @@ export default {
     return api('post', `${BASE}/${id}/convert`)
   },
 
+  // Inline rate entry from the detail page: rates = [{ id, rate_per_sqm }]
+  saveRates(id, rates) {
+    return api('post', `${BASE}/${id}/rates`, { rates })
+  },
+
   accept(id) {
     return api('post', `${BASE}/${id}/accept`)
   },
