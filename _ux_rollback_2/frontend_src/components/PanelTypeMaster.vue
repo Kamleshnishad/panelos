@@ -1,0 +1,260 @@
+<template>
+  <div class="md-section">
+    <div class="md-head">
+      <div class="md-title">
+        <h3>Panel Types</h3>
+        <label class="show-inactive"><input type="checkbox" v-model="showInactive" @change="load" /> Show inactive</label>
+      </div>
+      <button class="btn btn-primary btn-sm" @click="openCreate">+ Add Panel Type</button>
+    </div>
+
+    <div v-if="error" class="error-banner">{{ error }}</div>
+    <div v-if="success" class="success-banner">{{ success }}</div>
+
+    <div v-if="loading" class="loading-row">Loading…</div>
+    <table v-else class="md-table">
+      <thead>
+        <tr>
+          <th style="width:52px">Image</th><th>Code</th><th>Name</th><th>Category</th><th>HSN</th>
+          <th class="text-right">Base Price (₹)</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-if="rows.length === 0"><td colspan="8" class="empty-row">No panel types.</td></tr>
+        <tr v-for="r in rows" :key="r.id" :class="{ inactive: !r.is_active }">
+          <td><img v-if="r.image_url" :src="r.image_url" class="thumb" alt="" /><span v-else class="thumb-ph">—</span></td>
+          <td class="mono bold">{{ r.code }}</td>
+          <td>{{ r.name }}</td>
+          <td><span class="cat-badge">{{ catLabel(r.category) }}</span></td>
+          <td class="muted">{{ r.hsn_code }}</td>
+          <td class="text-right bold">{{ fmtNum(r.base_price) }}</td>
+          <td><span :class="['status-dot', r.is_active ? 'on' : 'off']">{{ r.is_active ? 'Active' : 'Inactive' }}</span></td>
+          <td class="actions">
+            <button class="btn-icon edit" @click="openEdit(r)">Edit</button>
+            <button v-if="r.is_active" class="btn-icon del" @click="confirmDelete(r)">Deactivate</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Modal -->
+    <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>{{ editing ? 'Edit Panel Type' : 'New Panel Type' }}</h3>
+          <button class="btn-close" @click="showModal = false">✕</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-group"><label>Code *</label><input v-model="form.code" placeholder="PUF50" /></div>
+          <div class="form-group full"><label>Name *</label><input v-model="form.name" placeholder="Puff Panel 50mm" /></div>
+          <div class="form-group">
+            <label>Category *</label>
+            <select v-model="form.category">
+              <option value="roof">Roof</option>
+              <option value="wall">Wall</option>
+              <option value="ceiling">Ceiling</option>
+              <option value="cold_room">Cold Room</option>
+            </select>
+          </div>
+          <div class="form-group"><label>HSN Code</label><input v-model="form.hsn_code" placeholder="39259010" /></div>
+          <div class="form-group"><label>Base Price (₹/SQM) *</label><input v-model.number="form.base_price" type="number" min="0" step="0.01" /></div>
+          <div class="form-group full"><label>Description</label><input v-model="form.description" /></div>
+          <div class="form-group" v-if="editing">
+            <label>Status</label>
+            <select v-model="form.is_active"><option :value="true">Active</option><option :value="false">Inactive</option></select>
+          </div>
+        </div>
+
+        <!-- Product image (only after the panel type exists) -->
+        <div class="image-block" v-if="editing">
+          <div class="image-preview"><img v-if="imageUrl" :src="imageUrl" alt="" /><span v-else>No image</span></div>
+          <div class="image-actions">
+            <label class="btn btn-secondary">
+              {{ uploadingImg ? 'Uploading…' : 'Upload Product Image' }}
+              <input type="file" accept="image/*" hidden :disabled="uploadingImg" @change="onImageChange" />
+            </label>
+            <span class="img-hint">Shown on the quotation / proforma PDF. PNG/JPG up to 3 MB.</span>
+          </div>
+        </div>
+        <div class="image-block hint-only" v-else>
+          <span class="img-hint">Save the panel type first, then re-open it to upload a product image.</span>
+        </div>
+
+        <div v-if="modalError" class="error-msg">{{ modalError }}</div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" @click="showModal = false">Cancel</button>
+          <button class="btn btn-primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete confirm -->
+    <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
+      <div class="modal-box sm">
+        <h3>Deactivate Panel Type?</h3>
+        <p><strong>{{ deleteTarget.name }}</strong> will be hidden from new quotations. Existing records are unaffected.</p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" @click="deleteTarget = null">Cancel</button>
+          <button class="btn btn-danger" :disabled="saving" @click="doDelete">Deactivate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import masterDataService from '../services/masterDataService.js'
+
+const rows = ref([])
+const loading = ref(false)
+const error = ref(null)
+const success = ref(null)
+const showInactive = ref(false)
+const showModal = ref(false)
+const editing = ref(false)
+const editId = ref(null)
+const saving = ref(false)
+const modalError = ref(null)
+const deleteTarget = ref(null)
+const imageUrl = ref(null)
+const uploadingImg = ref(false)
+
+const form = reactive({ code: '', name: '', category: 'wall', hsn_code: '39259010', base_price: null, description: '', is_active: true })
+
+async function load() {
+  loading.value = true; error.value = null
+  try {
+    const res = await masterDataService.panelTypes(showInactive.value ? { all: 1 } : {})
+    rows.value = res?.data ?? []
+  } catch (e) { error.value = e?.response?.data?.message ?? 'Failed to load.' }
+  finally { loading.value = false }
+}
+
+function openCreate() {
+  editing.value = false; editId.value = null; modalError.value = null
+  imageUrl.value = null
+  Object.assign(form, { code: '', name: '', category: 'wall', hsn_code: '39259010', base_price: null, description: '', is_active: true })
+  showModal.value = true
+}
+function openEdit(r) {
+  editing.value = true; editId.value = r.id; modalError.value = null
+  imageUrl.value = r.image_url ?? null
+  Object.assign(form, { code: r.code, name: r.name, category: r.category, hsn_code: r.hsn_code, base_price: Number(r.base_price), description: r.description ?? '', is_active: !!r.is_active })
+  showModal.value = true
+}
+
+async function onImageChange(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  uploadingImg.value = true; modalError.value = null
+  try {
+    const res = await masterDataService.uploadPanelTypeImage(editId.value, file)
+    imageUrl.value = (res?.data ?? res)?.image_url ?? imageUrl.value
+    await load()
+  } catch (err) {
+    modalError.value = err?.response?.data?.message ?? 'Failed to upload image.'
+  } finally {
+    uploadingImg.value = false
+    e.target.value = ''
+  }
+}
+
+async function save() {
+  saving.value = true; modalError.value = null
+  try {
+    if (editing.value) await masterDataService.updatePanelType(editId.value, form)
+    else await masterDataService.createPanelType(form)
+    showModal.value = false
+    success.value = editing.value ? 'Panel type updated.' : 'Panel type created.'
+    await load()
+  } catch (e) {
+    modalError.value = e?.response?.data?.message ?? Object.values(e?.response?.data?.errors ?? {}).flat().join(' ') ?? 'Failed to save.'
+  } finally { saving.value = false }
+}
+
+function confirmDelete(r) { deleteTarget.value = r }
+async function doDelete() {
+  saving.value = true
+  try {
+    await masterDataService.deletePanelType(deleteTarget.value.id)
+    deleteTarget.value = null
+    success.value = 'Panel type deactivated.'
+    await load()
+  } catch (e) { error.value = e?.response?.data?.message ?? 'Failed.' }
+  finally { saving.value = false }
+}
+
+function catLabel(c) { return { roof: 'Roof', wall: 'Wall', ceiling: 'Ceiling', cold_room: 'Cold Room' }[c] ?? c }
+function fmtNum(n) { return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+
+onMounted(load)
+</script>
+
+<style scoped>
+.md-section { }
+.md-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+.md-title { display: flex; align-items: center; gap: 14px; }
+.md-title h3 { margin: 0; font-size: 16px; color: var(--primary); }
+.show-inactive { font-size: 12px; color: #888; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+
+.error-banner { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; }
+.success-banner { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; }
+.loading-row { padding: 30px; text-align: center; color: #888; }
+
+.md-table { width: 100%; border-collapse: collapse; font-size: 13px; background: white; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
+.md-table th { background: var(--primary); color: white; padding: 9px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.md-table td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; }
+.md-table tr:last-child td { border-bottom: none; }
+.md-table tr.inactive td { opacity: 0.55; }
+.mono { font-family: monospace; }
+.bold { font-weight: 700; }
+.muted { color: #999; }
+.text-right { text-align: right; }
+.empty-row { text-align: center; padding: 30px; color: #aaa; font-style: italic; }
+
+.cat-badge { background: var(--primary-tint); color: var(--primary); border-radius: 8px; padding: 2px 9px; font-size: 11px; font-weight: 600; }
+.status-dot { font-size: 11px; font-weight: 700; }
+.status-dot.on { color: #2e7d32; }
+.status-dot.off { color: #aaa; }
+.actions { display: flex; gap: 6px; }
+.btn-icon { padding: 4px 10px; border: 1px solid #ddd; background: white; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; }
+.btn-icon.edit { color: var(--primary); border-color: #bbdefb; }
+.btn-icon.del { color: #c62828; border-color: #ef9a9a; }
+
+.btn { padding: 8px 16px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-sm { padding: 6px 13px; font-size: 12px; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost { background: transparent; border: 1px solid #ddd; color: #555; }
+.btn-danger { background: #c62828; color: white; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.modal-box { background: white; border-radius: 12px; padding: 24px 28px; width: 100%; max-width: 560px; box-shadow: 0 12px 48px rgba(0,0,0,0.22); }
+.modal-box.sm { max-width: 400px; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.modal-header h3 { margin: 0; font-size: 17px; color: var(--primary); }
+.modal-box h3 { color: var(--primary); }
+.modal-box p { color: #555; font-size: 14px; margin: 8px 0 16px; line-height: 1.5; }
+.btn-close { background: none; border: none; font-size: 18px; color: #aaa; cursor: pointer; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-group label { font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; }
+.form-group input, .form-group select { padding: 8px 11px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-tint); }
+.error-msg { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
+
+/* Image thumbnails + upload */
+.thumb { width: 38px; height: 38px; object-fit: cover; border-radius: 6px; border: 1px solid #e0e0e0; display: block; }
+.thumb-ph { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 6px; background: #f2f4f7; color: #b0b7c3; font-size: 14px; }
+.image-block { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
+.image-block.hint-only { color: #999; font-size: 12px; }
+.image-preview { width: 76px; height: 76px; border: 2px dashed #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; background: #fafafa; color: #bbb; font-size: 11px; }
+.image-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.image-actions { display: flex; flex-direction: column; gap: 6px; }
+.btn-secondary { background: var(--primary-tint); color: var(--primary); display: inline-block; padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.img-hint { font-size: 11px; color: #aaa; }
+</style>

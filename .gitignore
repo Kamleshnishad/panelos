@@ -1,0 +1,38 @@
+# ── Dependencies ─────────────────────────────
+**/node_modules/
+/backend/vendor/
+
+# ── Build output ─────────────────────────────
+/frontend/dist/
+/frontend-app/dist/
+/backend/public/build/
+/backend/public/hot
+
+# ── Environment & secrets (NEVER commit) ─────
+**/.env
+**/.env.*
+!**/.env.example
+*.key
+/backend/auth.json
+
+# ── Logs ─────────────────────────────────────
+*.log
+/laravel-setup.log
+
+# ── Laravel runtime ──────────────────────────
+/backend/storage/*.key
+/backend/storage/framework/cache/*
+/backend/storage/framework/sessions/*
+/backend/storage/framework/views/*
+/backend/storage/logs/*
+/backend/.phpunit.result.cache
+
+# ── OS / editor ──────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# ── Claude local settings (keep secrets/local state out) ──
+/.claude/settings.local.json
