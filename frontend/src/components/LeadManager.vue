@@ -6,19 +6,75 @@
         <p class="lm-sub">Capture inquiries → follow up → convert to quotation.</p>
       </div>
       <div class="lm-head-actions">
-        <input v-model="search" class="lm-search" placeholder="Search name / company / phone…" @keyup.enter="load" />
+        <div class="view-toggle">
+          <button :class="{ on: view === 'list' }" @click="view = 'list'">List</button>
+          <button :class="{ on: view === 'insights' }" @click="showInsights">📊 Insights</button>
+        </div>
+        <input v-if="view === 'list'" v-model="search" class="lm-search" placeholder="Search name / company / phone…" @keyup.enter="load" />
         <button class="btn btn-primary" @click="openCreate">+ New Lead</button>
         <button class="btn btn-ghost" :disabled="loading" @click="load">↻</button>
       </div>
     </div>
 
+    <!-- Insights dashboard -->
+    <div v-if="view === 'insights'" class="insights">
+      <div v-if="dashLoading" class="lm-loading">Loading insights…</div>
+      <template v-else-if="dash">
+        <div class="kpi-row">
+          <div class="kpi"><label>Total Leads</label><span>{{ dash.total }}</span></div>
+          <div class="kpi"><label>Open</label><span>{{ dash.open }}</span></div>
+          <div class="kpi"><label>Won</label><span class="green">{{ dash.won }}</span></div>
+          <div class="kpi"><label>Lost</label><span class="red">{{ dash.lost }}</span></div>
+          <div class="kpi"><label>Win Rate</label><span>{{ dash.win_rate }}%</span></div>
+        </div>
+
+        <div class="ins-grid">
+          <div class="ins-card">
+            <h4>Funnel</h4>
+            <div v-for="f in dash.funnel" :key="f.status" class="funnel-row">
+              <span class="funnel-label" :class="f.status">{{ f.status }}</span>
+              <div class="funnel-bar-track"><div class="funnel-bar" :class="f.status" :style="{ width: barPct(f.count) + '%' }"></div></div>
+              <span class="funnel-count">{{ f.count }}</span>
+            </div>
+          </div>
+
+          <div class="ins-card">
+            <h4>By Source</h4>
+            <table class="ins-table">
+              <thead><tr><th>Source</th><th class="r">Leads</th><th class="r">Won</th><th class="r">Conv%</th></tr></thead>
+              <tbody>
+                <tr v-for="s in dash.by_source" :key="s.source">
+                  <td>{{ s.source }}</td><td class="r">{{ s.total }}</td><td class="r">{{ s.won }}</td><td class="r">{{ s.conv_pct }}%</td>
+                </tr>
+                <tr v-if="!dash.by_source.length"><td colspan="4" class="muted">No data.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="ins-card">
+            <h4>Follow-ups</h4>
+            <div class="fu-row red"><span>Overdue</span><b>{{ dash.follow_ups.overdue }}</b></div>
+            <div class="fu-row amber"><span>Due today</span><b>{{ dash.follow_ups.today }}</b></div>
+            <div class="fu-row"><span>Next 7 days</span><b>{{ dash.follow_ups.this_week }}</b></div>
+          </div>
+
+          <div class="ins-card">
+            <h4>Top Lost Reasons</h4>
+            <div v-for="r in dash.lost_reasons" :key="r.reason" class="lr-row"><span>{{ r.reason }}</span><b>{{ r.count }}</b></div>
+            <p v-if="!dash.lost_reasons.length" class="muted">No lost leads with reasons.</p>
+          </div>
+        </div>
+      </template>
+    </div>
+
     <!-- Status filter tabs -->
-    <div class="status-tabs">
+    <div v-if="view === 'list'" class="status-tabs">
       <button v-for="s in statusTabs" :key="s.key" :class="['stab', { active: statusFilter === s.key }]" @click="statusFilter = s.key; load()">
         {{ s.label }}<span v-if="counts[s.key]" class="stab-count">{{ counts[s.key] }}</span>
       </button>
     </div>
 
+    <template v-if="view === 'list'">
     <div v-if="loading" class="lm-loading">Loading…</div>
     <p v-else-if="!leads.length" class="empty">No leads here. Click <strong>+ New Lead</strong> to add an inquiry.</p>
 
@@ -37,6 +93,7 @@
         </tr>
       </tbody>
     </table>
+    </template>
 
     <!-- Create / Edit modal -->
     <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
@@ -173,6 +230,22 @@ const detail = ref(null)
 const busy = ref(false)
 const actForm = reactive({ type: 'note', description: '' })
 const actBusy = ref(false)
+
+const view = ref('list')
+const dash = ref(null)
+const dashLoading = ref(false)
+
+async function showInsights() {
+  view.value = 'insights'
+  dashLoading.value = true
+  try { const res = await leadService.dashboard(); dash.value = res?.data ?? res }
+  catch (e) { toastError(e?.response?.data?.message ?? 'Could not load insights.') }
+  finally { dashLoading.value = false }
+}
+function barPct(n) {
+  const max = Math.max(1, ...(dash.value?.funnel || []).map(f => f.count))
+  return Math.round((n / max) * 100)
+}
 
 const counts = computed(() => allCount.value)
 
@@ -323,6 +396,32 @@ onMounted(load)
 .lm-sub { margin: 4px 0 0; font-size: 13px; color: var(--text-2); }
 .lm-head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .lm-search { padding: 8px 12px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; width: 240px; }
+.view-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.view-toggle button { border: none; background: #fff; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; }
+.view-toggle button.on { background: var(--primary); color: #fff; }
+
+.insights { margin-bottom: 8px; }
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; }
+.kpi label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); font-weight: 700; }
+.kpi span { font-size: 24px; font-weight: 800; color: var(--text); }
+.kpi .green { color: #2e7d32; } .kpi .red { color: #c62828; }
+.ins-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ins-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.ins-card h4 { margin: 0 0 12px; font-size: 13px; color: var(--primary); }
+.funnel-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.funnel-label { width: 78px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.funnel-bar-track { flex: 1; height: 14px; background: var(--surface-2); border-radius: 7px; overflow: hidden; }
+.funnel-bar { height: 100%; background: var(--primary); border-radius: 7px; }
+.funnel-bar.won { background: #2e7d32; } .funnel-bar.lost { background: #c62828; }
+.funnel-count { width: 30px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ins-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ins-table th { text-align: left; color: var(--text-3); font-size: 10px; text-transform: uppercase; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.ins-table th.r, .ins-table td.r { text-align: right; }
+.ins-table td { padding: 5px 6px; border-bottom: 1px solid var(--surface-2); }
+.fu-row, .lr-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--surface-2); font-size: 13px; }
+.fu-row.red b { color: #c62828; } .fu-row.amber b { color: #b5740a; }
+@media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } .ins-grid { grid-template-columns: 1fr; } }
 
 .status-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 2px solid #e0e0e0; flex-wrap: wrap; }
 .stab { padding: 8px 16px; border: none; background: none; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }

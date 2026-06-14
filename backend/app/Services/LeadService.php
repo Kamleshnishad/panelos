@@ -164,6 +164,56 @@ class LeadService
             ->count();
     }
 
+    /** Funnel + source conversion + follow-up + lost-reason summary. */
+    public function dashboard(int $companyId): array
+    {
+        $funnel = Lead::where('company_id', $companyId)
+            ->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status')->toArray();
+
+        $order = ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost'];
+        $funnelOut = [];
+        $total = 0;
+        foreach ($order as $s) { $n = (int) ($funnel[$s] ?? 0); $funnelOut[] = ['status' => $s, 'count' => $n]; $total += $n; }
+        $won = (int) ($funnel['won'] ?? 0);
+        $lost = (int) ($funnel['lost'] ?? 0);
+        $closed = $won + $lost;
+
+        $bySource = Lead::where('company_id', $companyId)
+            ->selectRaw('source, count(*) as total, sum(case when status = "won" then 1 else 0 end) as won')
+            ->groupBy('source')->orderByDesc('total')->get()
+            ->map(fn ($r) => [
+                'source'   => $r->source,
+                'total'    => (int) $r->total,
+                'won'      => (int) $r->won,
+                'conv_pct' => $r->total > 0 ? round($r->won / $r->total * 100, 1) : 0,
+            ]);
+
+        $lostReasons = Lead::where('company_id', $companyId)->where('status', 'lost')
+            ->whereNotNull('lost_reason')->where('lost_reason', '!=', '')
+            ->selectRaw('lost_reason, count(*) as c')->groupBy('lost_reason')
+            ->orderByDesc('c')->limit(5)->get()
+            ->map(fn ($r) => ['reason' => $r->lost_reason, 'count' => (int) $r->c]);
+
+        $today = Carbon::today();
+        $openFollow = Lead::where('company_id', $companyId)->whereNotIn('status', ['won', 'lost'])->whereNotNull('next_follow_up_date');
+        $overdue = (clone $openFollow)->whereDate('next_follow_up_date', '<', $today)->count();
+        $dueToday = (clone $openFollow)->whereDate('next_follow_up_date', $today)->count();
+        $thisWeek = (clone $openFollow)->whereDate('next_follow_up_date', '>', $today)
+            ->whereDate('next_follow_up_date', '<=', $today->copy()->addDays(7))->count();
+
+        return [
+            'total'          => $total,
+            'open'           => $total - $closed,
+            'won'            => $won,
+            'lost'           => $lost,
+            'win_rate'       => $closed > 0 ? round($won / $closed * 100, 1) : 0,
+            'funnel'         => $funnelOut,
+            'by_source'      => $bySource,
+            'lost_reasons'   => $lostReasons,
+            'follow_ups'     => ['overdue' => $overdue, 'today' => $dueToday, 'this_week' => $thisWeek],
+        ];
+    }
+
     private function generateLeadNumber(int $companyId): string
     {
         $year = now()->format('Y');

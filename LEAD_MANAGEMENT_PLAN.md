@@ -52,7 +52,8 @@
 - Quotations table untouched — only `leads` stores the link.
 - **Verify** (incl. that quotation flow is unaffected) + commit.
 
-## Phase 4 (optional) — Lead dashboard / reports
+## Phase 4 — Lead dashboard / insights  ✅ DONE
+> `LeadService::dashboard` (funnel by status, win-rate, by-source conversion %, top lost reasons, follow-up overdue/today/7-day) + `GET /leads/dashboard` (registered before /leads/{id}). Frontend: List/Insights toggle in LeadManager → KPI cards + funnel bars + source table + follow-ups + lost reasons. Verified + build green.
 - Funnel counts (new→won), source-wise conversion %, this-week follow-ups, win/loss reasons.
 - Endpoint + a small dashboard section.
 

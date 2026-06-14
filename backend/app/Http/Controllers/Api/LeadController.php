@@ -23,6 +23,11 @@ class LeadController extends Controller
         return $this->successResponse($this->leads->list($this->cid($r), $filters)->get(), 'Leads retrieved');
     }
 
+    public function dashboard(Request $r)
+    {
+        return $this->successResponse($this->leads->dashboard($this->cid($r)), 'Lead dashboard');
+    }
+
     public function show(Request $r, int $id)
     {
         try {

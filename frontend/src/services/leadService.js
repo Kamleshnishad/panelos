@@ -10,6 +10,7 @@ function api(method, url, data = null, params = null) {
 
 export default {
   list(params = {})        { return api('get',  '/api/leads', null, params) },
+  dashboard()              { return api('get',  '/api/leads/dashboard') },
   get(id)                  { return api('get',  `/api/leads/${id}`) },
   create(data)             { return api('post', '/api/leads', data) },
   update(id, data)         { return api('put',  `/api/leads/${id}`, data) },

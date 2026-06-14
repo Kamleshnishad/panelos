@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
+    Route::get('/leads/dashboard', [\App\Http\Controllers\Api\LeadController::class, 'dashboard'])->name('leads.dashboard');
     Route::post('/leads', [\App\Http\Controllers\Api\LeadController::class, 'store'])->name('leads.store');
     Route::get('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'show'])->name('leads.show');
     Route::put('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'update'])->name('leads.update');
