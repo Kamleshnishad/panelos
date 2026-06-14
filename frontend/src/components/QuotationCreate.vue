@@ -1047,23 +1047,27 @@ async function loadForEdit() {
 
 // ── Mount ─────────────────────────────────────────────────────────
 onMounted(async () => {
+  // Reference data — loaded resiliently: a failure in ANY of these must NOT
+  // abort the function (otherwise loadForEdit never runs and the edit form
+  // shows blank). Each call swallows its own error.
   const [custRes, ptRes, accRes, stateCode] = await Promise.all([
-    quotationService.customers(),
-    quotationService.panelTypes(),
-    quotationService.accessories(),
-    quotationService.getCompanyStateCode(),
+    quotationService.customers().catch(() => null),
+    quotationService.panelTypes().catch(() => null),
+    quotationService.accessories().catch(() => null),
+    quotationService.getCompanyStateCode().catch(() => null),
   ])
   customers.value         = custRes?.data?.data ?? custRes?.data ?? []
   panelTypes.value        = ptRes?.data?.data   ?? ptRes?.data   ?? []
   masterAccessories.value = accRes?.data?.data  ?? accRes?.data  ?? []
   companyStateCode.value  = stateCode
 
+  // Load the quotation being edited (loadForEdit has its own try/catch + toast).
   if (isEdit.value) await loadForEdit()
-  // Lead → quotation: prefill the customer
-  if (!isEdit.value && props.prefillCustomerId) {
+  else if (props.prefillCustomerId) {
     form.customer_id = props.prefillCustomerId
     onCustomerChange()
   }
+
   // Start dirty-tracking only after initial data/edit load settles.
   await nextTick()
   watch([form, panelRows, accessories_rows], () => { dirty.value = true }, { deep: true })
