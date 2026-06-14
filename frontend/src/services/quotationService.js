@@ -63,8 +63,8 @@ export default {
     return api('post', `${BASE}/${id}/revise`)
   },
 
-  createOrder(id) {
-    return api('post', `${BASE}/${id}/create-order`)
+  createOrder(id, opts = {}) {
+    return api('post', `${BASE}/${id}/create-order`, opts)
   },
 
   // PDF — fetched as a blob so the Bearer token is sent (Sanctum ignores ?token=)

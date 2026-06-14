@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Quotation;
+use App\Models\Customer;
+use App\Services\CreditService;
 use App\Services\OrderService;
 use App\Services\QuotationPdfService;
 use App\Services\QuotationService;
@@ -20,6 +22,7 @@ class QuotationController extends Controller
         private QuotationService    $quotationService,
         private QuotationPdfService $pdfService,
         private OrderService        $orderService,
+        private CreditService       $creditService,
     ) {}
 
     public function index(Request $request)
@@ -171,6 +174,26 @@ class QuotationController extends Controller
             if ($quotation->status !== 'accepted') {
                 return $this->errorResponse([], 'Quotation must be accepted first', 'INVALID_STATUS', 400);
             }
+
+            // Credit-limit guard. Admins may override; non-admins are always blocked.
+            $customer = Customer::where('company_id', $request->user()->company_id)
+                ->find($quotation->customer_id);
+            if ($customer) {
+                $credit   = $this->creditService->status($customer, (float) $quotation->total_amount);
+                $override = $request->boolean('override_credit_limit') && $request->user()->isAdmin();
+                if (!$credit['within_limit'] && !$override) {
+                    return $this->errorResponse(
+                        $credit,
+                        "Credit limit exceeded for {$customer->name}. Outstanding ₹" . number_format($credit['outstanding'], 2)
+                            . " + this order ₹" . number_format($credit['new_order'], 2)
+                            . " would exceed the ₹" . number_format($credit['credit_limit'], 2)
+                            . " limit by ₹" . number_format($credit['over_by'], 2) . '.',
+                        'CREDIT_LIMIT_EXCEEDED',
+                        422
+                    );
+                }
+            }
+
             $order = $this->orderService->createFromQuotation($quotation);
             return $this->createdResponse($order, 'Order created', 201);
         } catch (\Exception $e) {

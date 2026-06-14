@@ -12,17 +12,62 @@ class SmsService
     protected $client;
     protected $twilioPhone;
     protected $enabled;
+    protected $whatsappEnabled;
+    protected $whatsappFrom;
 
     public function __construct()
     {
         $this->enabled = config('services.twilio.enabled', false);
+        $this->whatsappEnabled = config('services.twilio.whatsapp_enabled', false);
+        $this->whatsappFrom = config('services.twilio.whatsapp_from');
 
-        if ($this->enabled) {
+        if ($this->enabled || $this->whatsappEnabled) {
             $accountSid = config('services.twilio.account_sid');
             $authToken = config('services.twilio.auth_token');
             $this->twilioPhone = config('services.twilio.from_number');
 
             $this->client = new Client($accountSid, $authToken);
+        }
+    }
+
+    public function isWhatsappEnabled(): bool
+    {
+        return (bool) $this->whatsappEnabled;
+    }
+
+    /**
+     * Send a payment reminder over WhatsApp (Twilio whatsapp: channel).
+     * Pluggable — no-op with a clear message until TWILIO_WHATSAPP_ENABLED=true
+     * and a whatsapp_from number are configured.
+     */
+    public function sendPaymentReminderWhatsApp(Invoice $invoice, $companyId, $phoneNumber = null)
+    {
+        if (!$this->whatsappEnabled) {
+            return ['success' => false, 'message' => 'WhatsApp service not enabled'];
+        }
+
+        try {
+            $phone = $phoneNumber ?? $this->getCustomerPhone($invoice);
+            if (!$phone) {
+                return ['success' => false, 'message' => 'No WhatsApp number available'];
+            }
+
+            $remainingDue = $this->calculateRemainingDue($invoice->id);
+            $daysOverdue  = max(0, now()->diffInDays($invoice->due_date));
+            $message      = $this->formatPaymentReminderMessage($invoice, $remainingDue, $daysOverdue);
+
+            $result = $this->client->messages->create(
+                'whatsapp:' . $phone,
+                ['from' => 'whatsapp:' . $this->whatsappFrom, 'body' => $message]
+            );
+
+            $this->logSms($companyId, $invoice->id, 'payment_reminder_whatsapp', $phone, $message, true);
+
+            return ['success' => true, 'message_id' => $result->sid, 'status' => $result->status];
+        } catch (\Exception $e) {
+            Log::error('Failed to send payment reminder WhatsApp', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+            $this->logSms($companyId, $invoice->id, 'payment_reminder_whatsapp', $phoneNumber ?? 'unknown', '', false, $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 

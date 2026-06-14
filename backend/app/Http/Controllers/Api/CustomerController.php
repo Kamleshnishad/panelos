@@ -47,6 +47,20 @@ class CustomerController extends Controller
         }
     }
 
+    /** Live credit status — outstanding vs limit (optionally incl. a prospective order). */
+    public function creditStatus(Request $request, $id)
+    {
+        try {
+            $companyId = auth()->user()->company_id;
+            $customer = Customer::where('company_id', $companyId)->findOrFail($id);
+            $data = app(\App\Services\CreditService::class)
+                ->status($customer, (float) $request->query('order_total', 0));
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
     public function store(Request $request)
     {
         $companyId = auth()->user()->company_id;

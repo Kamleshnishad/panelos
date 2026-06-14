@@ -213,7 +213,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import quotationService from '../services/quotationService.js'
-import { toastSuccess, toastError } from '../services/ui.js'
+import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
+import authService from '../services/authService.js'
 
 const props = defineProps({ quotationId: { type: Number, required: true } })
 const emit = defineEmits(['back', 'edit', 'view', 'order-created'])
@@ -325,6 +326,29 @@ async function action(type) {
     else if (type === 'create-order') { const res = await quotationService.createOrder(quotation.value.id); emit('order-created', res?.data?.id ?? res?.id); return }
     await load()
   } catch (e) {
+    // Credit-limit guard: offer override to admins, else show the block reason.
+    if (type === 'create-order' && e?.response?.data?.error_code === 'CREDIT_LIMIT_EXCEEDED') {
+      actionLoading.value = false
+      const msg = e.response.data.message
+      const u = authService.currentUser()
+      const isAdmin = !!(u?.is_admin || u?.is_company_admin || u?.is_super_admin)
+      if (!isAdmin) { toastError(msg + ' Ask an admin to approve.'); return }
+      const ok = await confirmDialog({
+        title: 'Credit limit exceeded',
+        message: msg + '\n\nOverride and create the order anyway?',
+        confirmLabel: 'Override & create', cancelLabel: 'Cancel', danger: true,
+      })
+      if (!ok) return
+      actionLoading.value = true
+      try {
+        const res = await quotationService.createOrder(quotation.value.id, { override_credit_limit: true })
+        emit('order-created', res?.data?.id ?? res?.id)
+        return
+      } catch (e2) {
+        toastError(e2?.response?.data?.message ?? 'Failed to create order.')
+      } finally { actionLoading.value = false }
+      return
+    }
     toastError(e?.response?.data?.message ?? `Failed to ${type}.`)
   } finally {
     actionLoading.value = false

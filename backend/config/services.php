@@ -46,6 +46,9 @@ return [
         'account_sid' => env('TWILIO_ACCOUNT_SID'),
         'auth_token' => env('TWILIO_AUTH_TOKEN'),
         'from_number' => env('TWILIO_FROM_NUMBER'),
+        // WhatsApp (Twilio whatsapp: channel) — enable when a sender is provisioned
+        'whatsapp_enabled' => env('TWILIO_WHATSAPP_ENABLED', false),
+        'whatsapp_from' => env('TWILIO_WHATSAPP_FROM'),
     ],
 
 ];

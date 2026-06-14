@@ -81,8 +81,8 @@ class PaymentReminderService
             foreach ($reminders as $reminder) {
                 $invoice = $reminder->invoice;
 
-                // Check if invoice is paid
-                if ($invoice->isPaid()) {
+                // Check if invoice is paid (is_paid is an accessor, not a method)
+                if (!$invoice || $invoice->is_paid) {
                     $reminder->update(['is_paid' => true]);
                     $results['updated_schedule']++;
                     continue;
