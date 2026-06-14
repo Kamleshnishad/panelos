@@ -103,6 +103,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders/{id}', [OrderController::class, 'show'])->name('orders.show');
     Route::put('/orders/{id}', [OrderController::class, 'update'])->name('orders.update');
 
+    // Production Planning (advisory — run grouping + "take this first" alerts)
+    Route::get('/production/planning', [\App\Http\Controllers\Api\ProductionPlanningController::class, 'index'])->name('production.planning');
+
     // Production Batches CRUD
     Route::get('/batches', [ProductionBatchController::class, 'index'])->name('batches.index');
     Route::post('/orders/{orderId}/batches', [ProductionBatchController::class, 'createFromOrder'])->name('batches.create');

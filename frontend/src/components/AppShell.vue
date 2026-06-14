@@ -79,6 +79,7 @@
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />
         <order-manager         v-else-if="active === 'orders'"      @view-quotation="go('quotations')" @view-batch="go('batches')" />
         <batch-manager         v-else-if="active === 'batches'"     @view-order="go('orders')" />
+        <production-planner     v-else-if="active === 'planner'"     @view-order="go('orders')" />
         <qc-dashboard          v-else-if="active === 'qc'"          @view-batch="go('batches')" />
         <stock-manager         v-else-if="active === 'stock'" />
         <dispatch-manager      v-else-if="active === 'dispatches'"  @view-batch="go('batches')" />
@@ -98,12 +99,14 @@ import { ref, computed, onMounted } from 'vue'
 import authService from '../services/authService.js'
 import dashboardService from '../services/dashboardService.js'
 import companyService from '../services/companyService.js'
+import productionService from '../services/productionService.js'
 
 import HomeDashboard      from './HomeDashboard.vue'
 import QuotationManager   from './QuotationManager.vue'
 import BoqManager         from './BoqManager.vue'
 import OrderManager       from './OrderManager.vue'
 import BatchManager       from './BatchManager.vue'
+import ProductionPlanner  from './ProductionPlanner.vue'
 import QcDashboard        from './QcDashboard.vue'
 import StockManager       from './StockManager.vue'
 import DispatchManager    from './DispatchManager.vue'
@@ -136,6 +139,7 @@ const ic = {
   quote:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 2v6h6M9 13h6M9 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   order:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m3 7 9-4 9 4-9 4-9-4Zm0 0v10l9 4 9-4V7" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
   factory:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 21V9l6 4V9l6 4V5l6 16H3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+  plan:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3h6v3H9zM6 6h12v15H6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   qc:         '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   stock:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M3 7.5 12 12m0 0 9-4.5M12 12v9" stroke="currentColor" stroke-width="2"/></svg>',
   truck:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 6h11v9H3zM14 9h4l3 3v3h-7" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.8" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="17.5" r="1.8" stroke="currentColor" stroke-width="2"/></svg>',
@@ -154,6 +158,7 @@ const nav = [
     { key: 'boq',         label: 'BOQ Register',    icon: ic.grid },
     { key: 'orders',      label: 'Orders',          icon: ic.order },
     { key: 'batches',     label: 'Production',       icon: ic.factory },
+    { key: 'planner',     label: 'Production Plan',  icon: ic.plan, badgeDanger: true },
     { key: 'qc',          label: 'Quality Control', icon: ic.qc },
   ]},
   { label: 'Inventory', items: [
@@ -204,6 +209,10 @@ onMounted(async () => {
       receivables: k.overdue_invoice_count || 0,
     }
     alertCount.value = (d?.alerts ?? []).length
+  } catch { /* ignore */ }
+  try {
+    const p = (await productionService.planning())?.data ?? {}
+    if (p?.summary?.alert_count) badges.value = { ...badges.value, planner: p.summary.alert_count }
   } catch { /* ignore */ }
   try {
     const c = (await companyService.get())?.data ?? {}
