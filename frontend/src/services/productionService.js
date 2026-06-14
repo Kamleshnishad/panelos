@@ -19,7 +19,9 @@ export default {
   listRuns(filters = {}) { return api('get', '/api/production/runs', null, filters) },
   getRun(id)        { return api('get',    `/api/production/runs/${id}`) },
   runMaterialRequirement(id) { return api('get', `/api/production/runs/${id}/material-requirement`) },
+  runMaterialUsage(id)       { return api('get', `/api/production/runs/${id}/material-usage`) },
+  wastageReport(params = {}) { return api('get', '/api/production/wastage-report', null, params) },
   startRun(id, force = false) { return api('post', `/api/production/runs/${id}/start`, { force }) },
-  completeRun(id)   { return api('post',   `/api/production/runs/${id}/complete`) },
+  completeRun(id, actuals = []) { return api('post', `/api/production/runs/${id}/complete`, { actuals }) },
   cancelRun(id)     { return api('delete', `/api/production/runs/${id}`) },
 }

@@ -5,7 +5,32 @@
         <h2>Production Runs</h2>
         <p class="pr-sub">Grouped multi-order production. One run = same-spec orders together.</p>
       </div>
-      <button class="btn btn-ghost" :disabled="loading" @click="load">↻ Refresh</button>
+      <div class="hdr-actions">
+        <button class="btn btn-ghost" @click="toggleWastage">📊 Wastage Report</button>
+        <button class="btn btn-ghost" :disabled="loading" @click="load">↻ Refresh</button>
+      </div>
+    </div>
+
+    <!-- Wastage report -->
+    <div v-if="wastageOpen" class="wastage-panel">
+      <div v-if="wastageLoading" class="mat-loading">Loading wastage report…</div>
+      <template v-else-if="wastage">
+        <div class="mat-head"><strong>Material Wastage (actual vs standard)</strong>
+          <span class="wr-count">{{ wastage.count }} usage record(s)</span></div>
+        <table class="mat-table" v-if="wastage.lines.length">
+          <thead><tr><th>Material</th><th class="r">Standard</th><th class="r">Actual</th><th class="r">Wastage</th><th class="r">%</th></tr></thead>
+          <tbody>
+            <tr v-for="(l,i) in wastage.lines" :key="i">
+              <td>{{ l.material }}</td>
+              <td class="r mono">{{ fmt(l.standard) }} {{ l.unit }}</td>
+              <td class="r mono">{{ fmt(l.actual) }} {{ l.unit }}</td>
+              <td class="r mono" :class="l.wastage > 0 ? 'neg' : 'pos'">{{ fmt(l.wastage) }} {{ l.unit }}</td>
+              <td class="r mono" :class="l.wastage_pct > 0 ? 'neg' : 'pos'">{{ l.wastage_pct }}%</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="mat-empty">No completed runs with recorded actuals yet.</p>
+      </template>
     </div>
 
     <div v-if="loading" class="pr-loading">Loading…</div>
@@ -24,7 +49,7 @@
           <div class="rh-actions">
             <button class="btn btn-ghost sm" @click="toggleMaterial(run)">📦 Material</button>
             <button v-if="run.status === 'draft'" class="btn btn-primary sm" :disabled="busy === run.id" @click="act(run, 'start')">▶ Start</button>
-            <button v-if="run.status === 'in_progress'" class="btn btn-primary sm" :disabled="busy === run.id" @click="act(run, 'complete')">✓ Complete</button>
+            <button v-if="run.status === 'in_progress'" class="btn btn-primary sm" :disabled="busy === run.id" @click="openComplete(run)">✓ Complete</button>
             <button v-if="run.status === 'draft'" class="btn btn-danger sm" :disabled="busy === run.id" @click="act(run, 'cancel')">Cancel</button>
           </div>
         </div>
@@ -81,6 +106,33 @@
         </table>
       </div>
     </template>
+
+    <!-- Complete run modal: record actual material consumed -->
+    <div v-if="completeRunObj" class="modal-overlay" @click.self="completeRunObj = null">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>Complete Run {{ completeRunObj.run_no }}</h3>
+          <button class="btn-close" @click="completeRunObj = null">✕</button>
+        </div>
+        <p class="modal-hint">Enter actual material consumed (default = issued). Difference adjusts stock and records wastage.</p>
+        <div v-if="completeLoading" class="mat-loading">Loading…</div>
+        <table v-else-if="completeUsages.length" class="mat-table">
+          <thead><tr><th>Material</th><th class="r">Issued</th><th class="r">Actual</th></tr></thead>
+          <tbody>
+            <tr v-for="u in completeUsages" :key="u.id">
+              <td>{{ u.material_name }}</td>
+              <td class="r mono">{{ fmt(u.issued_qty) }} {{ u.unit }}</td>
+              <td class="r"><input v-model.number="u._actual" type="number" min="0" step="0.01" class="act-input" /> {{ u.unit }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="mat-empty">No material was issued for this run.</p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" @click="completeRunObj = null">Cancel</button>
+          <button class="btn btn-primary" :disabled="completing" @click="doComplete">{{ completing ? 'Completing…' : '✓ Complete Run' }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -97,6 +149,15 @@ const runs = ref([])
 const matOpen = ref(null)
 const matLoading = ref(false)
 const matReq = ref({})
+
+const wastageOpen = ref(false)
+const wastageLoading = ref(false)
+const wastage = ref(null)
+
+const completeRunObj = ref(null)
+const completeUsages = ref([])
+const completeLoading = ref(false)
+const completing = ref(false)
 
 function fmt(n) { return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '' }
@@ -131,6 +192,51 @@ async function toggleMaterial(run) {
   } finally {
     matLoading.value = false
   }
+}
+
+async function toggleWastage() {
+  if (wastageOpen.value) { wastageOpen.value = false; return }
+  wastageOpen.value = true
+  wastageLoading.value = true
+  try {
+    const res = await productionService.wastageReport()
+    wastage.value = res?.data ?? res
+  } catch (e) {
+    toastError(e?.response?.data?.message ?? 'Could not load wastage report.')
+    wastageOpen.value = false
+  } finally { wastageLoading.value = false }
+}
+
+async function openComplete(run) {
+  completeRunObj.value = run
+  completeUsages.value = []
+  completeLoading.value = true
+  try {
+    const res = await productionService.runMaterialUsage(run.id)
+    const rows = res?.data ?? res ?? []
+    completeUsages.value = rows.map(u => ({ ...u, _actual: Number(u.issued_qty) }))
+  } catch (e) {
+    toastError(e?.response?.data?.message ?? 'Could not load material usage.')
+  } finally { completeLoading.value = false }
+}
+
+async function doComplete() {
+  const run = completeRunObj.value
+  if (!run) return
+  completing.value = true
+  try {
+    const actuals = completeUsages.value.map(u => ({ id: u.id, actual_qty: u._actual }))
+    await productionService.completeRun(run.id, actuals)
+    toastSuccess(`Run ${run.run_no} completed.`)
+    completeRunObj.value = null
+    matReq.value = { ...matReq.value, [run.id]: undefined }
+    if (wastageOpen.value) {
+      try { wastage.value = (await productionService.wastageReport())?.data ?? wastage.value } catch { /* ignore */ }
+    }
+    await load()
+  } catch (e) {
+    toastError(e?.response?.data?.message ?? 'Could not complete run.')
+  } finally { completing.value = false }
 }
 
 async function act(run, action) {
@@ -242,6 +348,20 @@ defineExpose({ reload: load })
 .mat-empty { text-align: center; color: #aaa; font-style: italic; }
 .mat-note { font-size: 10.5px; color: var(--text-3); margin: 6px 0 0; line-height: 1.4; }
 .mono { font-variant-numeric: tabular-nums; }
+
+.hdr-actions { display: flex; gap: 8px; }
+.wastage-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.wr-count { font-size: 11px; color: var(--text-3); }
+.neg { color: #c62828; } .pos { color: #2e7d32; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.modal-box { background: white; border-radius: 12px; padding: 22px 26px; width: 100%; max-width: 540px; box-shadow: 0 12px 48px rgba(0,0,0,0.22); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.modal-header h3 { margin: 0; font-size: 17px; color: var(--primary); }
+.modal-hint { font-size: 12px; color: var(--text-2); margin-bottom: 12px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.act-input { width: 90px; padding: 5px 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; text-align: right; }
+.btn-close { background: none; border: none; font-size: 18px; color: #aaa; cursor: pointer; }
 
 @media (max-width: 900px) { .pr-wrap { padding: 16px 16px 40px; } }
 </style>

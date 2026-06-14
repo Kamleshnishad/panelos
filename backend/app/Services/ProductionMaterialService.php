@@ -127,4 +127,103 @@ class ProductionMaterialService
     {
         return ProductionMaterialUsage::where('run_id', $run->id)->get();
     }
+
+    /**
+     * Record actual consumed quantities (entered at completion). Updates each
+     * usage row's actual_qty + real wastage%, and reconciles stock by the
+     * difference vs what was issued at start (so inventory stays truthful).
+     * @param array $actuals  [ ['id'=>, 'actual_qty'=>], ... ]
+     */
+    public function recordActuals(ProductionRun $run, array $actuals): void
+    {
+        if (empty($actuals)) return;
+
+        DB::transaction(function () use ($run, $actuals) {
+            $companyId = $run->company_id;
+            foreach ($actuals as $a) {
+                $id = $a['id'] ?? null;
+                if ($id === null || !array_key_exists('actual_qty', $a) || $a['actual_qty'] === null) continue;
+
+                $usage = ProductionMaterialUsage::where('id', $id)
+                    ->where('run_id', $run->id)->where('company_id', $companyId)->first();
+                if (!$usage) continue;
+
+                $actual = (float) $a['actual_qty'];
+                $issued = (float) $usage->issued_qty;
+                $std    = (float) $usage->standard_qty;
+                $delta  = $actual - $issued;   // +ve = consumed more than issued
+
+                // Reconcile stock by the difference
+                if ($usage->stock_id && abs($delta) > 0.001) {
+                    $note = 'Run ' . $run->run_no . ' actual reconciliation';
+                    if ($delta > 0) {
+                        $this->removeCapped($usage->material_kind, $usage->stock_id, $delta, $note, $companyId);
+                    } else {
+                        $this->addBack($usage->material_kind, $usage->stock_id, -$delta, $note, $companyId);
+                    }
+                }
+
+                $usage->update([
+                    'actual_qty'  => $actual,
+                    'wastage_pct' => $std > 0 ? round(($actual - $std) / $std * 100, 2) : 0,
+                ]);
+            }
+        });
+    }
+
+    private function removeCapped(string $kind, int $stockId, float $qty, string $note, int $companyId): void
+    {
+        $model = $this->modelFor($kind);
+        $row = $model::where('company_id', $companyId)->find($stockId);
+        if (!$row) return;
+        $take = min($qty, (float) $row->quantity_in_stock);
+        if ($take <= 0) return;
+        if ($kind === 'coil')          $this->stock->removeCoilStock($stockId, $take, $note, $companyId);
+        elseif ($kind === 'chemical')  $this->stock->removeChemicalStock($stockId, $take, $note, $companyId);
+        else                           $this->stock->removeConsumableStock($stockId, $take, $note, $companyId);
+    }
+
+    private function addBack(string $kind, int $stockId, float $qty, string $note, int $companyId): void
+    {
+        if ($qty <= 0) return;
+        if ($kind === 'coil')          $this->stock->addCoilStock($stockId, $qty, $note, $companyId);
+        elseif ($kind === 'chemical')  $this->stock->addChemicalStock($stockId, $qty, null, null, null, $note, $companyId);
+        else                           $this->stock->addConsumableStock($stockId, $qty, $note, $companyId);
+    }
+
+    private function modelFor(string $kind): string
+    {
+        return $kind === 'coil' ? CoilStock::class : ($kind === 'chemical' ? ChemicalStock::class : ConsumableStock::class);
+    }
+
+    /** Wastage summary (actual vs standard) across runs in a date range. */
+    public function wastageReport(int $companyId, ?string $from, ?string $to): array
+    {
+        $q = ProductionMaterialUsage::where('company_id', $companyId)->whereNotNull('actual_qty');
+        if ($from) $q->whereDate('created_at', '>=', $from);
+        if ($to)   $q->whereDate('created_at', '<=', $to);
+        $rows = $q->get();
+
+        $byMaterial = [];
+        foreach ($rows as $r) {
+            $key = $r->material_name;
+            if (!isset($byMaterial[$key])) {
+                $byMaterial[$key] = ['material' => $key, 'unit' => $r->unit, 'kind' => $r->material_kind,
+                    'standard' => 0.0, 'actual' => 0.0, 'runs' => 0];
+            }
+            $byMaterial[$key]['standard'] += (float) $r->standard_qty;
+            $byMaterial[$key]['actual']   += (float) $r->actual_qty;
+            $byMaterial[$key]['runs']     += 1;
+        }
+
+        $lines = array_values(array_map(function ($m) {
+            $m['standard'] = round($m['standard'], 2);
+            $m['actual']   = round($m['actual'], 2);
+            $m['wastage']  = round($m['actual'] - $m['standard'], 2);
+            $m['wastage_pct'] = $m['standard'] > 0 ? round(($m['actual'] - $m['standard']) / $m['standard'] * 100, 2) : 0;
+            return $m;
+        }, $byMaterial));
+
+        return ['lines' => $lines, 'count' => $rows->count()];
+    }
 }

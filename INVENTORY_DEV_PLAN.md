@@ -65,7 +65,8 @@ auto-consume → wastage → valuation. Built on existing `coil_stocks` /
 
 ---
 
-## Phase 3 — Actual vs Standard wastage  ✅ medium
+## Phase 3 — Actual vs Standard wastage  ✅ DONE
+> Done: `ProductionMaterialService::recordActuals` (sets actual_qty + real wastage%, **reconciles stock** by issued↔actual delta) + `wastageReport`; `complete($run,$actuals)`; endpoints `GET runs/{id}/material-usage`, `GET production/wastage-report`. Frontend: Complete opens actuals modal (issued pre-filled), header "📊 Wastage Report" panel. Verified: actual coil +10 → stock −10, polyol −5 → stock +5; wastage Coil 4.27%, Polyol 5.00%; report 2 lines.
 **Backend**
 - [ ] Run/batch complete pe operator `actual_qty` daale → `production_material_usages` update → real wastage% = (actual−standard)/standard.
 - [ ] Endpoint `GET /reports/material-wastage` (per run / per period / per material).

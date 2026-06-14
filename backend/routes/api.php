@@ -113,6 +113,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/production/runs/{id}/start', [\App\Http\Controllers\Api\ProductionRunController::class, 'start'])->name('runs.start');
     Route::post('/production/runs/{id}/complete', [\App\Http\Controllers\Api\ProductionRunController::class, 'complete'])->name('runs.complete');
     Route::get('/production/runs/{id}/material-requirement', [\App\Http\Controllers\Api\ProductionRunController::class, 'materialRequirement'])->name('runs.material');
+    Route::get('/production/runs/{id}/material-usage', [\App\Http\Controllers\Api\ProductionRunController::class, 'materialUsage'])->name('runs.usage');
+    Route::get('/production/wastage-report', [\App\Http\Controllers\Api\ProductionRunController::class, 'wastageReport'])->name('production.wastage');
     Route::delete('/production/runs/{id}', [\App\Http\Controllers\Api\ProductionRunController::class, 'destroy'])->name('runs.cancel');
 
     // Material / BOM settings (per company)

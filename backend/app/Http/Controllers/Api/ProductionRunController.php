@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ProductionRun;
 use App\Services\ProductionRunService;
 use App\Services\MaterialBomService;
+use App\Services\ProductionMaterialService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +18,7 @@ class ProductionRunController extends Controller
     public function __construct(
         private ProductionRunService $runService,
         private MaterialBomService $bomService,
+        private ProductionMaterialService $materialService,
     ) {}
 
     /** Advisory raw-material requirement for a run + stock availability. */
@@ -91,7 +93,39 @@ class ProductionRunController extends Controller
 
     public function complete(Request $request, int $id)
     {
-        return $this->action($request, $id, fn($run) => $this->runService->complete($run), 'Run completed');
+        try {
+            $run = ProductionRun::where('company_id', $request->user()->company_id)->findOrFail($id);
+            $actuals = $request->input('actuals', []);
+            return $this->successResponse($this->runService->complete($run, is_array($actuals) ? $actuals : []), 'Run completed');
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'RUN_COMPLETE_ERROR', 400);
+        }
+    }
+
+    /** Material usage rows for a run (issued + actual) — for the complete form. */
+    public function materialUsage(Request $request, int $id)
+    {
+        try {
+            $run = ProductionRun::where('company_id', $request->user()->company_id)->findOrFail($id);
+            return $this->successResponse($this->materialService->usageForRun($run), 'Material usage retrieved');
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'USAGE_ERROR', 400);
+        }
+    }
+
+    /** Wastage summary (actual vs standard) across runs in a date range. */
+    public function wastageReport(Request $request)
+    {
+        try {
+            $data = $this->materialService->wastageReport(
+                $request->user()->company_id,
+                $request->query('from'),
+                $request->query('to'),
+            );
+            return $this->successResponse($data, 'Wastage report generated');
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'WASTAGE_ERROR', 400);
+        }
     }
 
     public function destroy(Request $request, int $id)

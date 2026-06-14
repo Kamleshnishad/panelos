@@ -86,13 +86,18 @@ class ProductionRunService
         });
     }
 
-    /** Complete the run: every in_progress child batch goes to qc_pending. */
-    public function complete(ProductionRun $run): ProductionRun
+    /**
+     * Complete the run: optionally record actual material consumed (reconciles
+     * stock + real wastage), then move every in_progress child batch to qc_pending.
+     */
+    public function complete(ProductionRun $run, array $actuals = []): ProductionRun
     {
         if ($run->status !== 'in_progress') {
             throw new \Exception('Only a run in progress can be completed.');
         }
-        return DB::transaction(function () use ($run) {
+        return DB::transaction(function () use ($run, $actuals) {
+            $this->materialService->recordActuals($run, $actuals);
+
             foreach ($run->batches as $batch) {
                 if ($batch->status === 'in_progress') {
                     $this->batchService->completeBatch($batch, []);
