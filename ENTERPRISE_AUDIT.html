@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PanelOS — Enterprise Readiness Audit</title>
+<style>
+  :root{--blue:#2B50E0;--blue2:#2140C0;--tint:#EEF1FE;--ink:#15181E;--muted:#5B6472;--line:#E4E7EC;
+        --green:#2e7d32;--green-bg:#e8f5e9;--amber:#b5740a;--amber-bg:#fff8e1;--red:#c62828;--red-bg:#fff5f5;--surf2:#f5f7fb;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif;color:var(--ink);background:#eef0f5;line-height:1.55;padding:24px;}
+  .sheet{max-width:1080px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:14px;padding:38px 46px 56px;box-shadow:0 6px 28px rgba(0,0,0,.07);}
+  h1{font-size:27px;color:var(--blue);letter-spacing:-.02em;}
+  h2{font-size:19px;color:var(--blue);margin:34px 0 12px;padding-top:14px;border-top:2px solid var(--blue);}
+  h3{font-size:15px;color:var(--ink);margin:18px 0 8px;}
+  p,li{font-size:13.5px;color:#2d333d;}
+  ul{margin:6px 0 6px 20px;} li{margin:3px 0;}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--blue);padding-bottom:16px;}
+  .top .sub{font-size:13px;color:var(--muted);margin-top:4px;}
+  .top .brand{text-align:right;font-size:11.5px;color:var(--muted);} .top .brand b{color:var(--ink);font-size:14px;}
+  .lead{font-size:14px;background:var(--tint);border:1px solid #D6DEFB;border-radius:10px;padding:14px 18px;margin-top:16px;}
+
+  .toc{background:var(--surf2);border:1px solid var(--line);border-radius:10px;padding:14px 20px;margin-top:18px;column-count:2;column-gap:30px;}
+  .toc a{font-size:12.8px;color:var(--blue);text-decoration:none;display:block;padding:2px 0;}
+  .toc a:hover{text-decoration:underline;}
+
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.6px;}
+  th{background:var(--blue);color:#fff;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.3px;}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tr:nth-child(even) td{background:#fafbff;}
+
+  .pill{display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
+  .p0{background:var(--red-bg);color:var(--red);border:1px solid #f3b4b4;}
+  .p1{background:var(--amber-bg);color:var(--amber);border:1px solid #ffe082;}
+  .p2{background:var(--tint);color:var(--blue);border:1px solid #c5cae9;}
+  .done{background:var(--green-bg);color:var(--green);border:1px solid #aed8b0;}
+  .gap{background:var(--red-bg);color:var(--red);border:1px solid #f3b4b4;}
+  .part{background:var(--amber-bg);color:var(--amber);border:1px solid #ffe082;}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0;}
+  .card{border:1px solid var(--line);border-radius:10px;padding:13px 16px;background:#fff;}
+  .card h4{font-size:13.5px;color:var(--blue);margin-bottom:5px;}
+  .card p{font-size:12.5px;color:#3a4150;}
+
+  .score{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0;}
+  .scell{border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center;}
+  .scell .n{font-size:26px;font-weight:800;color:var(--blue);}
+  .scell .l{font-size:10.5px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:.4px;}
+  .bar{height:9px;background:#e6e9f2;border-radius:6px;overflow:hidden;margin-top:6px;}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--blue2));}
+
+  .note{font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;}
+  .foot{margin-top:28px;border-top:1px solid var(--line);padding-top:12px;font-size:11px;color:var(--muted);text-align:center;}
+  .printbtn{position:fixed;top:18px;right:18px;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(43,80,224,.4);}
+  @media print{body{background:#fff;padding:0;}.sheet{box-shadow:none;border:none;max-width:none;padding:14px 18px;}.printbtn{display:none;}table,.card,.scell{break-inside:avoid;}h2{break-after:avoid;}}
+</style>
+</head>
+<body>
+<button class="printbtn" onclick="window.print()">🖨 Print / Save PDF</button>
+<div class="sheet">
+
+  <div class="top">
+    <div>
+      <h1>PanelOS — Enterprise Readiness Audit</h1>
+      <div class="sub">Full-system audit + roadmap to an enterprise-grade, sellable product for PUF/PIR panel manufacturers</div>
+    </div>
+    <div class="brand"><b>PanelOS</b><br>UMA Signature PUF Panel<br>15 Jun 2026 · v1 audit</div>
+  </div>
+
+  <p class="lead"><b>Bottom line:</b> PanelOS already covers the full order-to-cash + production lifecycle (50 data models, 35 services, ~60 screens) — far ahead of typical SME tools. To become <b>enterprise-grade and a sellable product</b>, the gaps are not more modules but <b>depth</b>: role-based access &amp; approvals, audit trail, statutory compliance (e-Invoice/e-Way Bill), notifications/WhatsApp, returns &amp; credit notes, multi-plant, performance/security hardening, and a few manufacturing-specific tools (capacity scheduling, cutting optimisation, barcode traceability). This document lists <b>every</b> pain point and the exact change to fix it, prioritised.</p>
+
+  <!-- TOC -->
+  <div class="toc">
+    <a href="#scorecard">1. Maturity Scorecard</a>
+    <a href="#built">2. What's Already Built</a>
+    <a href="#pains">3. Business Pain Points → Software Solutions (deep)</a>
+    <a href="#enterprise">4. Enterprise Capability Gaps (cross-cutting)</a>
+    <a href="#modules">5. Module-by-Module Deepening</a>
+    <a href="#compliance">6. Compliance &amp; Finance (GST / e-Invoice / e-Way / Tally)</a>
+    <a href="#tech">7. Technical &amp; Architecture Hardening</a>
+    <a href="#product">8. Product / SaaS Readiness (sell to other factories)</a>
+    <a href="#roadmap">9. Prioritised Roadmap (Now / Next / Later)</a>
+  </div>
+
+  <!-- 1 SCORECARD -->
+  <h2 id="scorecard">1. Maturity Scorecard</h2>
+  <div class="score">
+    <div class="scell"><div class="n">85%</div><div class="l">Core lifecycle</div><div class="bar"><i style="width:85%"></i></div></div>
+    <div class="scell"><div class="n">45%</div><div class="l">Compliance</div><div class="bar"><i style="width:45%"></i></div></div>
+    <div class="scell"><div class="n">40%</div><div class="l">Access &amp; Governance</div><div class="bar"><i style="width:40%"></i></div></div>
+    <div class="scell"><div class="n">35%</div><div class="l">Enterprise Ops</div><div class="bar"><i style="width:35%"></i></div></div>
+  </div>
+  <table>
+    <tr><th>Dimension</th><th>State</th><th>Summary</th></tr>
+    <tr><td>Order-to-cash (BOQ→Quote→Order→Production→Dispatch→Invoice→Payment)</td><td><span class="pill done">Strong</span></td><td>End-to-end working, incl. BOQ-first flow, inline pricing, PDFs.</td></tr>
+    <tr><td>Production planning &amp; inventory</td><td><span class="pill done">Strong</span></td><td>Changeover-aware run grouping, BOM auto-consume, wastage, procurement, valuation.</td></tr>
+    <tr><td>CRM (Leads, Customer 360)</td><td><span class="pill done">Good</span></td><td>Lead funnel + 360 profile with RFM/repeat frequency.</td></tr>
+    <tr><td>Finance (GST, payments, Stripe, reminders, reports)</td><td><span class="pill part">Partial</span></td><td>Present but missing e-Invoice/e-Way, credit notes, Tally, bank reconciliation.</td></tr>
+    <tr><td>Access control, approvals, audit trail</td><td><span class="pill gap">Weak</span></td><td>Roles exist but no granular permissions/approvals/audit log.</td></tr>
+    <tr><td>Notifications &amp; mobility (WhatsApp, in-app, shop-floor)</td><td><span class="pill gap">Weak</span></td><td>SMS/email exist; no WhatsApp, no in-app centre, no mobile/PWA.</td></tr>
+    <tr><td>Security, performance, DevOps, backups</td><td><span class="pill part">Partial</span></td><td>Sanctum auth + multi-tenant; needs 2FA, audit, queues, backups, monitoring.</td></tr>
+  </table>
+
+  <!-- 2 BUILT -->
+  <h2 id="built">2. What's Already Built (don't rebuild — deepen)</h2>
+  <div class="cards">
+    <div class="card"><h4>Sales &amp; CRM</h4><p>Leads + activity + convert; Customer 360 (RFM, repeat); BOQ register; Quotations (BOQ-first, inline rates, revisions, PDF templates).</p></div>
+    <div class="card"><h4>Production</h4><p>Orders → batches → stages → QC → cutting schedule; Production Planner (changeover grouping + alerts); multi-order Runs.</p></div>
+    <div class="card"><h4>Inventory &amp; Procurement</h4><p>Coil/Chemical/Consumable stock, BOM engine, auto-consume on run start, actual-vs-standard wastage, suppliers + PO + receive, valuation.</p></div>
+    <div class="card"><h4>Dispatch &amp; Finance</h4><p>Dispatch + challan; Invoices; Payments incl. Stripe gateway + reminders; GST config/HSN/tax breakdown; receivables aging; reports.</p></div>
+    <div class="card"><h4>Intelligence</h4><p>Demand &amp; inventory forecasting, ML forecast + anomaly detection, sales metrics, trend analysis, dashboards.</p></div>
+    <div class="card"><h4>Platform</h4><p>Multi-tenant (company-scoped), Sanctum auth, roles, company settings, document-template library, SMS/email services.</p></div>
+  </div>
+  <p class="note">Inventory: 50 models · 35 services · 29 API controllers · 64 migrations · ~60 screens. The foundation is product-grade; the work below is about turning a strong app into a defensible enterprise product.</p>
+
+  <!-- 3 PAIN POINTS -->
+  <h2 id="pains">3. Business Pain Points → Software Solutions (the deep list)</h2>
+  <p>Real-world PUF/PIR panel manufacturing pain points, what PanelOS does today, and the exact enhancement to fully kill the pain.</p>
+  <table>
+    <tr><th style="width:20%">Pain point</th><th>Today in PanelOS</th><th>Enhancement to fully solve</th><th>Pri</th></tr>
+    <tr><td><b>Pricing delay &amp; errors</b> (BOQ→quote, raw-material volatility)</td><td>BOQ-first flow, inline rates, suggested-rate engine</td><td>Rate-card master + auto-revision on coil/chem price change; discount approval workflow; quote validity auto-expiry alerts</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Line changeover waste</b> (wall→roof→wall)</td><td>Production Planner groups same-spec; "take first" alerts; Runs</td><td>Machine/shift capacity scheduling (Gantt); auto-sequence optimiser w/ due-date weighting; changeover-time &amp; scrap cost model</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Raw material wastage &amp; stockouts</b></td><td>BOM consume on run, actual-vs-standard wastage, reorder alerts</td><td>Material availability check BEFORE scheduling; coil/foam demand forecast → auto-PO; batch/lot traceability of chemicals into panels</td><td><span class="pill p0">P0</span></td></tr>
+    <tr><td><b>Cutting / offcut loss</b> (panels &lt;2000mm doubled)</td><td>DL flag (doubled-length), cutting schedule</td><td>Cutting-plan optimiser (nesting by coil length, minimise offcut); offcut/remnant inventory; yield % per run</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Qty disputes</b> (ordered vs actual supplied, wastage/overlap)</td><td>Actual qty on dispatch, wastage capture</td><td>"Tentative vs actual" billing reconciliation on the invoice; signed delivery proof (ePOD); variance report</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Delivery delays &amp; transport coordination</b></td><td>Dispatch + expected delivery date</td><td>Transporter master + freight tracking, vehicle/driver, LR no.; delivery SLA dashboard; customer delivery notifications</td><td><span class="pill p2">P2</span></td></tr>
+    <tr><td><b>Lead leakage &amp; slow follow-up</b></td><td>Leads + follow-up date + overdue badge + activities</td><td>WhatsApp auto follow-up; lead SLA + escalation; round-robin assignment; web "Get a quote" form → auto-lead</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Payment collection / high receivables</b></td><td>Receivables aging, reminders (SMS/email), Stripe link</td><td>WhatsApp payment reminders + UPI link; credit-limit block on new orders; auto-dunning schedule; PDC/cheque tracking</td><td><span class="pill p0">P0</span></td></tr>
+    <tr><td><b>GST / e-Way Bill / e-Invoice compliance</b></td><td>GST config, HSN, CGST/SGST/IGST on docs</td><td><b>e-Invoice (IRN+QR)</b> &amp; <b>e-Way Bill</b> auto-generation via GSP API; GSTR-1/3B export; TCS handling</td><td><span class="pill p0">P0</span></td></tr>
+    <tr><td><b>Damaged-in-transit / returns / replacements</b></td><td>—</td><td>Returns &amp; replacement module; <b>Credit/Debit notes</b>; warranty claim tracking (12-mo); scrap re-grind inventory</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Owner has no real-time visibility</b></td><td>Dashboards, reports, analytics</td><td>Role-based executive dashboard; KPI targets vs actual; daily WhatsApp/email digest; drill-downs</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Multi-plant / multi-godown stock confusion</b></td><td>Single stock pool</td><td>Multi-warehouse/plant stock + transfers; per-location valuation &amp; reorder</td><td><span class="pill p2">P2</span></td></tr>
+    <tr><td><b>Dealer / distributor management</b> (tiered pricing)</td><td>Customer types (retail/wholesale/distributor)</td><td>Dealer portal (place orders, see status, ledger); tier price lists; dealer-wise targets &amp; schemes</td><td><span class="pill p2">P2</span></td></tr>
+    <tr><td><b>Shop-floor data entry friction</b></td><td>Desktop screens</td><td>Mobile/PWA + barcode/QR: scan run → log production/QC/dispatch on the floor; offline capture</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Document chaos</b> (PI/BOQ/challan/invoice formats)</td><td>Template library (choose + preview)</td><td>More designs; bulk/email send; digital signature &amp; company stamp; WhatsApp document delivery</td><td><span class="pill p2">P2</span></td></tr>
+    <tr><td><b>Accounting double-entry (Tally)</b></td><td>Invoices/payments inside app</td><td>Tally/Busy export (XML), bank statement reconciliation, ledgers, day-book</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>No accountability / disputes on "who changed what"</b></td><td>—</td><td>Full <b>audit trail</b> (every create/update/delete with user+timestamp+before/after)</td><td><span class="pill p0">P0</span></td></tr>
+    <tr><td><b>Machine breakdown / maintenance</b></td><td>—</td><td>Machine master + preventive maintenance schedule + downtime log (feeds capacity planning)</td><td><span class="pill p2">P2</span></td></tr>
+    <tr><td><b>Quality rejections &amp; root cause</b></td><td>QC pass/fail per batch</td><td>Defect categories, rejection %, root-cause/CAPA, QC by stage, certificate of conformance PDF</td><td><span class="pill p2">P2</span></td></tr>
+  </table>
+
+  <!-- 4 ENTERPRISE GAPS -->
+  <h2 id="enterprise">4. Enterprise Capability Gaps (cross-cutting)</h2>
+  <table>
+    <tr><th style="width:22%">Capability</th><th>Why it matters</th><th>What to build</th><th>Pri</th></tr>
+    <tr><td><b>RBAC + permissions</b></td><td>Sales shouldn't see costing/margins; floor can't edit prices; data security &amp; trust</td><td>Granular permission matrix per role (module × action); field-level masking (cost/margin); enforce on API + UI</td><td><span class="pill p0">P0</span></td></tr>
+    <tr><td><b>Approval workflows</b></td><td>Control discounts, credit, POs, write-offs</td><td>Configurable approvals: discount &gt; X%, PO &gt; ₹Y, credit-limit override, payment write-off → manager approve/reject + log</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Audit trail</b></td><td>Compliance, dispute resolution, accountability</td><td>Generic activity-log (model events) — actor, action, entity, before/after JSON, IP, timestamp; viewer + filters</td><td><span class="pill p0">P0</span></td></tr>
+    <tr><td><b>Notification centre + WhatsApp</b></td><td>Fast follow-up, fewer missed actions; WhatsApp is the channel in India</td><td>In-app notification centre; WhatsApp Business API for quotes/PI/reminders/dispatch updates; per-event, per-channel prefs</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Document management</b></td><td>Attach POs, drawings, payment proofs, GST docs to records</td><td>File attachments per entity (S3-style storage), versioning, preview</td><td><span class="pill p2">P2</span></td></tr>
+    <tr><td><b>Data import / export &amp; bulk ops</b></td><td>Onboarding, migration, mass updates</td><td>CSV/Excel import (customers, panel types, stock, leads); bulk export everywhere; templates &amp; validation</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Reporting / BI depth</b></td><td>Decision-making; sellability</td><td>Report builder, scheduled reports, role dashboards, KPI targets, export to Excel/PDF, margin &amp; profitability per order/customer/product</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Global search &amp; saved filters</b></td><td>Speed for daily users</td><td>Cross-entity search (quote/order/customer/invoice no.); saved views per user</td><td><span class="pill p2">P2</span></td></tr>
+  </table>
+
+  <!-- 5 MODULES -->
+  <h2 id="modules">5. Module-by-Module Deepening</h2>
+  <table>
+    <tr><th style="width:16%">Module</th><th>Deepen with</th></tr>
+    <tr><td><b>Quotation/BOQ</b></td><td>Rate-card master + auto-revision; multi-currency (export); margin view (cost vs price) for managers only; e-sign acceptance; quote→order approval; version compare; "lost reason" analytics.</td></tr>
+    <tr><td><b>Orders</b></td><td>Order acknowledgement PDF; partial fulfilment; amendment with audit; production-readiness checklist (advance received? material available?); delivery schedule per line.</td></tr>
+    <tr><td><b>Production</b></td><td>Capacity/shift scheduling (Gantt), machine master + OEE, cutting-plan optimiser, real-time run status board, shop-floor mobile, barcode per panel bundle, yield/scrap analytics.</td></tr>
+    <tr><td><b>Inventory</b></td><td>Multi-warehouse + transfers; lot/batch traceability; coil remnant inventory; min-max + EOQ auto-PO; physical stock-take/cycle count; ABC analysis; stock ageing.</td></tr>
+    <tr><td><b>Procurement</b></td><td>PO approval; vendor rating &amp; price history; GRN with QC; landed cost; vendor portal; 3-way match (PO/GRN/bill).</td></tr>
+    <tr><td><b>Dispatch</b></td><td>Transporter master, LR/vehicle, freight, multi-order load planning, e-Way Bill, ePOD (signature/photo), live delivery status to customer.</td></tr>
+    <tr><td><b>Invoice/Finance</b></td><td>e-Invoice (IRN/QR), credit/debit notes, advance receipts &amp; adjustment, PDC tracking, bank reconciliation, Tally export, customer ledger, profitability.</td></tr>
+    <tr><td><b>CRM</b></td><td>WhatsApp; web lead-capture form; lead scoring + SLA; activities timeline everywhere; customer portal; AMC/warranty register.</td></tr>
+  </table>
+
+  <!-- 6 COMPLIANCE -->
+  <h2 id="compliance">6. Compliance &amp; Finance</h2>
+  <ul>
+    <li><span class="pill p0">P0</span> <b>e-Invoice (IRN + signed QR)</b> — mandatory above turnover thresholds; integrate a GSP/IRP API; print IRN+QR on invoice.</li>
+    <li><span class="pill p0">P0</span> <b>e-Way Bill</b> — auto-generate for dispatch &gt; ₹50,000; transporter/vehicle, Part-A/B; cancel/extend.</li>
+    <li><span class="pill p1">P1</span> <b>GST returns</b> — GSTR-1 &amp; 3B data export (JSON/Excel); HSN summary; B2B/B2C split. (TCS u/s 206C(1H) is repealed Apr-2025 — keep out.)</li>
+    <li><span class="pill p1">P1</span> <b>Credit/Debit notes</b> — for returns, rate diff, short supply; linked to invoice; GST-compliant.</li>
+    <li><span class="pill p1">P1</span> <b>Tally/Busy integration</b> — export vouchers (sales, receipts, purchases) so accountants stop double-entering.</li>
+    <li><span class="pill p2">P2</span> <b>Bank reconciliation</b> — import statement, match payments, flag unreconciled.</li>
+  </ul>
+
+  <!-- 7 TECH -->
+  <h2 id="tech">7. Technical &amp; Architecture Hardening</h2>
+  <table>
+    <tr><th style="width:20%">Area</th><th>Action</th><th>Pri</th></tr>
+    <tr><td><b>Security</b></td><td>2FA/OTP login, password policy + rotation, API rate-limiting, encrypt sensitive fields (bank/GSTIN), session management &amp; forced logout, role-based field masking, dependency/vuln scanning</td><td><span class="pill p0">P0</span></td></tr>
+    <tr><td><b>Audit &amp; data integrity</b></td><td>Audit log (above); soft-delete + restore UI; DB constraints &amp; FK review; tenant-scope test coverage (the company_id/decimal-as-string class of bugs needs guard tests)</td><td><span class="pill p0">P0</span></td></tr>
+    <tr><td><b>Performance &amp; scale</b></td><td>Queue workers (PDF/email/SMS/e-invoice async), Redis cache for dashboards/lists, DB indexing review, pagination everywhere, eager-load audit (N+1), image/CDN for PDFs</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Reliability / DevOps</b></td><td>Automated DB backups + tested restore, staging env, CI/CD pipeline, error tracking (Sentry), uptime monitoring, structured logging</td><td><span class="pill p0">P0</span></td></tr>
+    <tr><td><b>Architecture</b></td><td>Introduce client-side routing (deep links/bookmarks — currently Manager-pattern v-if), API versioning, OpenAPI docs, consistent API envelope, automated test suite (feature + unit)</td><td><span class="pill p1">P1</span></td></tr>
+    <tr><td><b>Frontend robustness</b></td><td>Global error boundary + toast (the decimal-as-string crash class), form validation library, accessibility pass, design-token consistency, loading/empty/error states everywhere</td><td><span class="pill p2">P2</span></td></tr>
+  </table>
+
+  <!-- 8 PRODUCT -->
+  <h2 id="product">8. Product / SaaS Readiness (sell to other PUF factories)</h2>
+  <p>PanelOS is already multi-tenant — a strong base to sell as a product to other panel manufacturers. To productise:</p>
+  <div class="cards">
+    <div class="card"><h4>Self-serve onboarding</h4><p>Company sign-up wizard, guided setup (panel types, GST, branding), sample data, import.</p></div>
+    <div class="card"><h4>Subscription &amp; billing</h4><p>Plans/tiers, feature flags per plan, usage limits, in-app billing, trials. (Stripe already present.)</p></div>
+    <div class="card"><h4>Super-admin console</h4><p>Manage tenants, modules on/off, view-as-client, audit, support tools.</p></div>
+    <div class="card"><h4>Configurability</h4><p>Custom fields, configurable workflows/statuses, per-tenant document templates &amp; numbering (already started).</p></div>
+    <div class="card"><h4>Integrations</h4><p>WhatsApp, Tally, GSP (e-invoice), payment gateways, IndiaMART/Justdial lead webhooks, Zapier/REST API.</p></div>
+    <div class="card"><h4>Trust &amp; scale</h4><p>SLAs, data isolation proof, backups, security posture, documentation &amp; in-app help.</p></div>
+  </div>
+
+  <!-- 9 ROADMAP -->
+  <h2 id="roadmap">9. Prioritised Roadmap</h2>
+  <h3>🚀 NOW (P0 — foundation &amp; compliance, do first)</h3>
+  <ul>
+    <li>Audit trail (every change logged) + soft-delete/restore.</li>
+    <li>RBAC: granular permissions + cost/margin field masking (sales vs admin).</li>
+    <li>e-Invoice (IRN/QR) + e-Way Bill auto-generation.</li>
+    <li>Material availability check before run scheduling + low-stock → auto-PO suggestion.</li>
+    <li>Credit-limit block + WhatsApp/UPI payment reminders (cut receivables).</li>
+    <li>Security: 2FA, rate-limiting, encrypt sensitive fields; automated backups + staging.</li>
+  </ul>
+  <h3>⏭ NEXT (P1 — depth &amp; efficiency)</h3>
+  <ul>
+    <li>Approval workflows (discount/PO/credit/write-off).</li>
+    <li>Returns + Credit/Debit notes; Tally export.</li>
+    <li>Production capacity/shift scheduling (Gantt) + cutting-plan optimiser + yield analytics.</li>
+    <li>WhatsApp + in-app notification centre; web lead-capture form.</li>
+    <li>Profitability/margin reporting; data import/export; KPI dashboards with targets.</li>
+    <li>Shop-floor mobile/PWA + barcode/QR traceability.</li>
+  </ul>
+  <h3>🔮 LATER (P2 — scale &amp; productise)</h3>
+  <ul>
+    <li>Multi-warehouse/plant + transfers; lot traceability.</li>
+    <li>Dealer &amp; customer portals; vendor portal + 3-way match.</li>
+    <li>Transporter management + ePOD + live delivery tracking.</li>
+    <li>Machine maintenance/OEE; QC defect/CAPA + certificates.</li>
+    <li>SaaS: onboarding wizard, plans/billing, super-admin console, marketplace integrations.</li>
+    <li>Bank reconciliation; global search &amp; saved views; report builder.</li>
+  </ul>
+
+  <p class="note"><b>Suggested sequencing principle:</b> First make it <i>trustworthy</i> (audit, RBAC, security, backups) and <i>compliant</i> (e-invoice/e-way), then <i>efficient</i> (scheduling, returns, WhatsApp, reporting), then <i>scalable/sellable</i> (multi-plant, portals, SaaS). Each item is independent and additive — exactly how we've been shipping.</p>
+
+  <div class="foot">PanelOS Enterprise Readiness Audit · Confidential · 15 Jun 2026 · Generated for UMA Signature PUF Panel / Digital Web Weaver</div>
+</div>
+</body>
+</html>
