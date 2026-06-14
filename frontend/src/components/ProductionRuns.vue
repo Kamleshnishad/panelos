@@ -3,7 +3,7 @@
     <div class="pr-header">
       <div>
         <h2>Production Runs</h2>
-        <p class="pr-sub">Grouped multi-order production. Ek run = same-spec orders ek saath.</p>
+        <p class="pr-sub">Grouped multi-order production. One run = same-spec orders together.</p>
       </div>
       <button class="btn btn-ghost" :disabled="loading" @click="load">↻ Refresh</button>
     </div>
@@ -12,7 +12,7 @@
 
     <template v-else>
       <p v-if="!runs.length" class="empty">
-        Abhi koi run nahi. <a href="#" @click.prevent="$emit('go-planner')">Production Plan</a> se "Create Run" karo.
+        No runs yet. Go to <a href="#" @click.prevent="$emit('go-planner')">Production Plan</a> and click "Create Run".
       </p>
 
       <div v-for="run in runs" :key="run.id" class="run-card" :class="run.status">
@@ -34,7 +34,7 @@
           <span><b>{{ run.batches?.length || 0 }}</b> orders</span>
           <span><b>{{ fmt(run.planned_sqm) }}</b> SQM planned</span>
           <span v-if="run.started_at">Started {{ fmtDate(run.started_at) }}</span>
-          <span v-if="run.completed_at">Done {{ fmtDate(run.completed_at) }}</span>
+          <span v-if="run.completed_at">Completed {{ fmtDate(run.completed_at) }}</span>
         </div>
 
         <table class="ord-table">
@@ -81,7 +81,7 @@ async function load() {
     const rank = { in_progress: 0, draft: 1, completed: 2, cancelled: 3 }
     runs.value = [...list].sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))
   } catch (e) {
-    toastError(e?.response?.data?.message ?? 'Runs load nahi hue.')
+    toastError(e?.response?.data?.message ?? 'Could not load runs.')
   } finally {
     loading.value = false
   }
@@ -89,21 +89,21 @@ async function load() {
 
 async function act(run, action) {
   const labels = {
-    start:    { t: 'Run start karein?', m: 'Saare child batches production mein chale jaayenge.', c: 'Start' },
-    complete: { t: 'Run complete karein?', m: 'Saare batches QC ke liye chale jaayenge.', c: 'Complete' },
-    cancel:   { t: 'Run cancel karein?', m: 'Draft batches hat jaayenge, orders wapas pending ho jaayenge.', c: 'Cancel run', danger: true },
+    start:    { t: 'Start run?', m: 'All child batches will move into production.', c: 'Start', done: 'started' },
+    complete: { t: 'Complete run?', m: 'All batches will move to QC.', c: 'Complete', done: 'completed' },
+    cancel:   { t: 'Cancel run?', m: 'Draft batches will be removed and orders returned to pending.', c: 'Cancel run', danger: true, done: 'cancelled' },
   }[action]
-  const ok = await confirmDialog({ title: labels.t, message: labels.m, confirmLabel: labels.c, cancelLabel: 'Nahi', danger: !!labels.danger })
+  const ok = await confirmDialog({ title: labels.t, message: labels.m, confirmLabel: labels.c, cancelLabel: 'No', danger: !!labels.danger })
   if (!ok) return
   busy.value = run.id
   try {
     if (action === 'start') await productionService.startRun(run.id)
     else if (action === 'complete') await productionService.completeRun(run.id)
     else await productionService.cancelRun(run.id)
-    toastSuccess(`Run ${run.run_no} ${action} ho gaya.`)
+    toastSuccess(`Run ${run.run_no} ${labels.done}.`)
     await load()
   } catch (e) {
-    toastError(e?.response?.data?.message ?? 'Action fail hua.')
+    toastError(e?.response?.data?.message ?? 'Action failed.')
   } finally {
     busy.value = null
   }

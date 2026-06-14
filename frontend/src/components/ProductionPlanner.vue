@@ -3,7 +3,7 @@
     <div class="pp-header">
       <div>
         <h2>Production Planner</h2>
-        <p class="pp-sub">Same-spec jobs ek saath chalao — kam changeover, kam material waste.</p>
+        <p class="pp-sub">Run same-spec jobs together — fewer changeovers, less material waste.</p>
       </div>
       <button class="btn btn-ghost" :disabled="loading" @click="load">↻ Refresh</button>
     </div>
@@ -20,7 +20,7 @@
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="pp-loading">Plan ban raha hai…</div>
+    <div v-if="loading" class="pp-loading">Building plan…</div>
 
     <template v-else-if="plan">
       <!-- ALERTS: "is job ko pehle lo" -->
@@ -36,12 +36,12 @@
           <div class="alert-metric">{{ fmt(a.total_sqm) }}<small>SQM</small></div>
         </div>
       </section>
-      <div v-else class="pp-noalert">✓ Koi urgent action nahi — sequence neeche recommended hai.</div>
+      <div v-else class="pp-noalert">✓ No urgent action — recommended sequence below.</div>
 
       <!-- RECOMMENDED RUN SEQUENCE -->
       <section class="pp-runs">
         <h3>Recommended Run Sequence</h3>
-        <p v-if="!plan.groups.length" class="empty">Koi pending order production ke liye nahi hai.</p>
+        <p v-if="!plan.groups.length" class="empty">No pending orders for production.</p>
 
         <div v-for="g in plan.groups" :key="g.signature" class="run-card" :class="{ running: g.matches_running, overdue: g.is_overdue }">
           <div class="run-rail">
@@ -51,12 +51,12 @@
             <div class="run-top">
               <div class="run-label">{{ g.label }}</div>
               <div class="run-badges">
-                <span v-if="g.matches_running" class="rb rb-run">🔁 Line par chal raha</span>
+                <span v-if="g.matches_running" class="rb rb-run">🔁 On the line</span>
                 <span v-if="g.order_count > 1" class="rb rb-merge">⛓ {{ g.order_count }} orders merge</span>
                 <span v-if="g.is_overdue" class="rb rb-over">⚠ Overdue</span>
                 <span v-else-if="g.due_soon" class="rb rb-soon">⏱ Due {{ g.days_to_due }}d</span>
                 <button class="btn-run" :disabled="creating === g.signature" @click="createRun(g)">
-                  {{ creating === g.signature ? 'Ban raha…' : '▶ Create Run' }}
+                  {{ creating === g.signature ? 'Creating…' : '▶ Create Run' }}
                 </button>
               </div>
             </div>
@@ -88,8 +88,8 @@
         </div>
       </section>
 
-      <p class="pp-foot">Phase 1: yeh sirf recommendation hai. Aap orders open kar ke production batch banao.
-        (Phase 2 mein ek hi run multiple orders ka seedha yahin se banega.)</p>
+      <p class="pp-foot">This is a recommendation. Click "Create Run" on a group to start a single
+        production run covering all its orders. Final sequencing is your call.</p>
     </template>
   </div>
 </template>
@@ -108,7 +108,7 @@ const creating = ref(null)
 function fmt(n) { return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 function tagLabel(t) {
-  return { running_match: 'Pehle lo', merge_pending: 'Merge', overdue: 'Overdue' }[t] || t
+  return { running_match: 'Take first', merge_pending: 'Merge', overdue: 'Overdue' }[t] || t
 }
 function dueClass(d) {
   if (!d) return ''
@@ -124,7 +124,7 @@ async function load() {
     const res = await productionService.planning()
     plan.value = res?.data ?? res
   } catch (e) {
-    toastError(e?.response?.data?.message ?? 'Plan load nahi hua.')
+    toastError(e?.response?.data?.message ?? 'Could not load plan.')
   } finally {
     loading.value = false
   }
@@ -133,9 +133,9 @@ async function load() {
 async function createRun(g) {
   const orderIds = g.orders.map(o => o.order_id)
   const ok = await confirmDialog({
-    title: 'Production Run banayein?',
-    message: `${g.order_count} order(s) ka ek hi run banega (${fmt(g.total_sqm)} SQM). Ye orders production mein chale jaayenge.`,
-    confirmLabel: 'Haan, Run banao',
+    title: 'Create production run?',
+    message: `${g.order_count} order(s) will be combined into one run (${fmt(g.total_sqm)} SQM). These orders will move into production.`,
+    confirmLabel: 'Yes, create run',
     cancelLabel: 'Cancel',
   })
   if (!ok) return
@@ -147,11 +147,11 @@ async function createRun(g) {
       label: g.label,
     })
     const run = res?.data ?? res
-    toastSuccess(`Run ${run.run_no} ban gaya — ${g.order_count} order(s).`)
+    toastSuccess(`Run ${run.run_no} created — ${g.order_count} order(s).`)
     emit('view-runs')
     await load()
   } catch (e) {
-    toastError(e?.response?.data?.message ?? 'Run nahi bana.')
+    toastError(e?.response?.data?.message ?? 'Could not create run.')
   } finally {
     creating.value = null
   }

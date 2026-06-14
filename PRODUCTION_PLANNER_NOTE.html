@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Production Planner — Client Note</title>
+<style>
+  :root { --blue:#2B50E0; --blue-tint:#EEF1FE; --ink:#15181E; --muted:#5B6472; --line:#E4E7EC;
+          --green:#2e7d32; --green-bg:#e8f5e9; --amber:#b5740a; --amber-bg:#fff8e1; --red:#c62828; --red-bg:#fff5f5; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color:var(--ink); background:#f3f4f8; line-height:1.5; padding:24px; }
+  .sheet { max-width:900px; margin:0 auto; background:#fff; border:1px solid var(--line); border-radius:12px;
+           padding:34px 40px 40px; box-shadow:0 6px 24px rgba(0,0,0,.06); }
+
+  .top { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid var(--blue);
+         padding-bottom:14px; margin-bottom:18px; }
+  .top h1 { font-size:23px; color:var(--blue); letter-spacing:-.02em; }
+  .top .sub { font-size:12.5px; color:var(--muted); margin-top:3px; }
+  .top .brand { text-align:right; font-size:11px; color:var(--muted); }
+  .top .brand b { color:var(--ink); font-size:13px; }
+
+  h2 { font-size:15px; color:var(--blue); margin:22px 0 10px; padding-bottom:5px; border-bottom:1px solid var(--line); }
+  p { font-size:13px; color:#2d333d; }
+  .lead { font-size:13.5px; background:var(--blue-tint); border:1px solid #D6DEFB; border-radius:8px; padding:12px 16px; }
+
+  /* Cases */
+  .case { border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:12px; }
+  .case .tag { display:inline-block; font-size:10.5px; font-weight:700; color:#fff; background:var(--blue);
+               border-radius:20px; padding:2px 11px; margin-bottom:8px; letter-spacing:.3px; }
+  .case h3 { font-size:14px; margin-bottom:8px; }
+  .ba { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .box { border-radius:8px; padding:9px 12px; font-size:12.2px; }
+  .box.before { background:var(--red-bg); border:1px solid #f3c3c3; }
+  .box.after  { background:var(--green-bg); border:1px solid #aed8b0; }
+  .box .lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; margin-bottom:3px; }
+  .box.before .lbl { color:var(--red); } .box.after .lbl { color:var(--green); }
+  .win { margin-top:9px; font-size:12px; font-weight:600; color:var(--green); }
+  .win::before { content:"➡ "; }
+
+  /* two-column lists */
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .card { border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .card.good { background:#fbfffb; border-color:#cfe9d1; }
+  .card.warn { background:#fffdf5; border-color:#f0e3b8; }
+  .card h4 { font-size:13.5px; margin-bottom:8px; }
+  .card.good h4 { color:var(--green); } .card.warn h4 { color:var(--amber); }
+  ul { list-style:none; }
+  li { font-size:12.4px; padding:5px 0 5px 20px; position:relative; border-bottom:1px dashed #eef0f4; }
+  li:last-child { border-bottom:none; }
+  .good li::before { content:"✓"; color:var(--green); font-weight:800; position:absolute; left:0; }
+  .warn li::before { content:"!"; color:var(--amber); font-weight:800; position:absolute; left:2px; }
+  li b { color:var(--ink); }
+
+  .bottom { margin-top:20px; background:var(--blue); color:#fff; border-radius:10px; padding:16px 20px; }
+  .bottom .lbl { font-size:10.5px; font-weight:800; letter-spacing:1px; opacity:.85; text-transform:uppercase; }
+  .bottom p { color:#fff; font-size:14px; margin-top:5px; font-weight:500; }
+
+  .foot { margin-top:18px; font-size:10.5px; color:var(--muted); text-align:center; }
+
+  .printbtn { position:fixed; top:18px; right:18px; background:var(--blue); color:#fff; border:none;
+              border-radius:8px; padding:10px 16px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(43,80,224,.4); }
+  @media print {
+    body { background:#fff; padding:0; }
+    .sheet { box-shadow:none; border:none; border-radius:0; max-width:none; padding:18px 22px; }
+    .printbtn { display:none; }
+    .case, .card { break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<button class="printbtn" onclick="window.print()">🖨 Print / Save PDF</button>
+
+<div class="sheet">
+
+  <div class="top">
+    <div>
+      <h1>Production Planner — Smart Job Grouping</h1>
+      <div class="sub">Same-type panels ek saath banao — waste & setup-time bachao, delivery date bhi sambhalo</div>
+    </div>
+    <div class="brand">
+      <b>PanelOS</b><br>UMA Signature PUF Panel<br>Production Module
+    </div>
+  </div>
+
+  <p class="lead"><b>Problem:</b> Continuous PUF line par jab Wall → Roof → Wall aise alag-alag spec ek ke baad ek chalte hain,
+  toh har baar machine ka setup badalna padta hai (roller/coil/foam) — isse <b>time bhi jaata hai aur material bhi waste</b> hota hai.
+  Yeh feature batata hai ki <b>kaun se same panel ek saath banane chahiye</b>, aur "is job ko pehle lo" ka alert bhi deta hai.</p>
+
+  <h2>Real Cases — kaise kaam karta hai</h2>
+
+  <div class="case">
+    <span class="tag">Case 1 · Wall → Roof → Wall</span>
+    <h3>Same panel beech mein toot raha tha</h3>
+    <div class="ba">
+      <div class="box before"><div class="lbl">Pehle (manual)</div>
+        Wall order banaya → Roof order aaya (setup change) → phir same Wall order (<b>dobara setup</b>). = 2 changeover, double waste.</div>
+      <div class="box after"><div class="lbl">Ab (system)</div>
+        System bolta hai "dono Wall ek saath": Wall + Wall, phir Roof. = sirf <b>1 changeover</b>.</div>
+    </div>
+    <div class="win">Ek extra setup + uska scrap bach gaya.</div>
+  </div>
+
+  <div class="case">
+    <span class="tag">Case 2 · Alag customers, same panel</span>
+    <h3>3 customers ne same 50mm wall (RAL 9002) manga</h3>
+    <div class="ba">
+      <div class="box before"><div class="lbl">Pehle</div>
+        Teeno order alag-alag din/time pe bante, har baar coil set hota.</div>
+      <div class="box after"><div class="lbl">Ab</div>
+        System "Merge" alert deta hai → ek hi run mein teeno. <b>Billing/challan har customer ka alag</b> hi rehta hai.</div>
+    </div>
+    <div class="win">3 setup ki jagah 1 setup. Customers ko koi farak nahi.</div>
+  </div>
+
+  <div class="case">
+    <span class="tag">Case 3 · "Is job ko pehle lo"</span>
+    <h3>Jo abhi line par chal raha, usi se match aaya</h3>
+    <div class="ba">
+      <div class="box before"><div class="lbl">Pehle</div>
+        Naya order list mein neeche pada rehta, baad mein alag setup karke banta.</div>
+      <div class="box after"><div class="lbl">Ab</div>
+        Red alert + menu badge: "Ye abhi chal rahe job se match karta hai — abhi line mein add karo."</div>
+    </div>
+    <div class="win">Chalu run mein add → zero extra setup.</div>
+  </div>
+
+  <div class="case">
+    <span class="tag">Case 4 · Delivery date safety</span>
+    <h3>Grouping ke chakkar mein koi order late na ho</h3>
+    <div class="ba">
+      <div class="box before"><div class="lbl">Risk</div>
+        Saare wall group kar diye, par ek roof ki delivery date nikalne wali thi.</div>
+      <div class="box after"><div class="lbl">System</div>
+        Overdue / "jaldi due" orders ko 🔴 highlight karta hai — planner balance kar leta hai.</div>
+    </div>
+    <div class="win">Efficiency + on-time delivery, dono.</div>
+  </div>
+
+  <h2>Faayde aur Dhyaan dene wali baatein</h2>
+  <div class="cols">
+    <div class="card good">
+      <h4>✅ Faayde</h4>
+      <ul>
+        <li><b>Material waste kam</b> — same spec saath, kam coil/foam/profile changeover scrap.</li>
+        <li><b>Zyada production</b> — setup-time bachta hai, line zyada chalti hai.</li>
+        <li><b>Auto alert</b> — "pehle lo" / "merge karo" system khud batata hai, yaad rakhna nahi padta.</li>
+        <li><b>Delivery safe</b> — overdue/urgent orders highlight.</li>
+        <li><b>Ek click run</b> — multi-order production ek saath, billing alag.</li>
+        <li><b>Accounts pe asar nahi</b> — invoice/challan/GST/QC pehle jaisa.</li>
+      </ul>
+    </div>
+    <div class="card warn">
+      <h4>⚠️ Dhyaan dene wali baatein</h4>
+      <ul>
+        <li><b>Decision insaan ka</b> — system suggestion deta hai, production khud start nahi karta.</li>
+        <li><b>Sahi data zaroori</b> — order mein spec (color/thickness/RAL) galat ho toh grouping galat.</li>
+        <li><b>Ek order = ek batch (abhi)</b> — ek hi order mein wall+roof ho toh poora order saath aata hai.</li>
+        <li><b>Start ke baad cancel nahi</b> — sirf draft run cancel hota hai.</li>
+        <li><b>Ek line maan ke</b> — multiple machines ka alag schedule abhi nahi.</li>
+        <li><b>Coil-stock / time estimate</b> abhi isme nahi (aage add ho sakta hai).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="lbl">Bottom line</div>
+    <p>System aapko batayega ki kaun se same-type panel ek saath banane chahiye — jisse coil/foam ka waste aur
+    machine ka setup-time bachega, aur saath hi delivery date bhi miss na ho. <b>Final decision aapka, system sirf
+    sabse samajhdaar suggestion dega.</b></p>
+  </div>
+
+  <div class="foot">PanelOS — Production Planning Module · Confidential · For internal & client discussion</div>
+
+</div>
+</body>
+</html>

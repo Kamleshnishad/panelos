@@ -183,8 +183,8 @@ class ProductionPlanningService
                 $alerts[] = [
                     'type'     => 'running_match',
                     'severity' => 'high',
-                    'title'    => 'Yeh job abhi line par chal rahe spec se match karta hai',
-                    'message'  => "{$g['label']} — Order(s) {$orderNos}. Ise abhi line mein add karo; alag se dobara setup + material waste bachega.",
+                    'title'    => 'Matches a job already on the line',
+                    'message'  => "{$g['label']} — Order(s) {$orderNos}. Add to the current run now to avoid a second setup and material waste.",
                     'signature'=> $g['signature'],
                     'order_count' => $g['order_count'],
                     'total_sqm'   => $g['total_sqm'],
@@ -193,8 +193,8 @@ class ProductionPlanningService
                 $alerts[] = [
                     'type'     => 'merge_pending',
                     'severity' => 'medium',
-                    'title'    => 'Same panel — ek saath produce karo',
-                    'message'  => "{$g['order_count']} orders ({$orderNos}) ka panel bilkul same hai ({$g['label']}). Ek hi run mein chalao — ek changeover bachega.",
+                    'title'    => 'Same panel — produce together',
+                    'message'  => "{$g['order_count']} orders ({$orderNos}) have an identical panel ({$g['label']}). Run them together to save a changeover.",
                     'signature'=> $g['signature'],
                     'order_count' => $g['order_count'],
                     'total_sqm'   => $g['total_sqm'],
@@ -203,8 +203,8 @@ class ProductionPlanningService
                 $alerts[] = [
                     'type'     => 'overdue',
                     'severity' => 'high',
-                    'title'    => 'Delivery date nikal gayi',
-                    'message'  => "Order {$orderNos} ({$g['label']}) ki delivery date past ho chuki hai. Ise priority pe lo.",
+                    'title'    => 'Delivery date passed',
+                    'message'  => "Order {$orderNos} ({$g['label']}) is past its delivery date. Prioritise it.",
                     'signature'=> $g['signature'],
                     'order_count' => $g['order_count'],
                     'total_sqm'   => $g['total_sqm'],
