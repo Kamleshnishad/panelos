@@ -63,6 +63,12 @@ class ProcurementController extends Controller
         return $this->successResponse($this->proc->purchasableItems($this->cid($r)), 'Purchasable items retrieved');
     }
 
+    /** Ready-to-create PO item rows for every stock item at/below reorder level. */
+    public function reorderSuggestion(Request $r)
+    {
+        return $this->successResponse($this->proc->reorderSuggestion($this->cid($r)), 'Reorder suggestion computed');
+    }
+
     // Purchase Orders
     public function index(Request $r)
     {

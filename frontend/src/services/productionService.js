@@ -20,6 +20,7 @@ export default {
   getRun(id)        { return api('get',    `/api/production/runs/${id}`) },
   runMaterialRequirement(id) { return api('get', `/api/production/runs/${id}/material-requirement`) },
   runMaterialUsage(id)       { return api('get', `/api/production/runs/${id}/material-usage`) },
+  runPoSuggestion(id)        { return api('get', `/api/production/runs/${id}/po-suggestion`) },
   wastageReport(params = {}) { return api('get', '/api/production/wastage-report', null, params) },
   startRun(id, force = false) { return api('post', `/api/production/runs/${id}/start`, { force }) },
   completeRun(id, actuals = []) { return api('post', `/api/production/runs/${id}/complete`, { actuals }) },

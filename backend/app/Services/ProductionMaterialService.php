@@ -129,6 +129,51 @@ class ProductionMaterialService
     }
 
     /**
+     * Build a draft-PO suggestion to cover a run's material shortage.
+     * Resolves each short BOM line back to a real stock row (so the PO can
+     * target it) and proposes the shortfall quantity at the row's last cost.
+     * Lines with no matching stock row yet are returned under 'unresolved'.
+     */
+    public function poSuggestionForRun(ProductionRun $run): array
+    {
+        $req = $this->bom->requirementForRun($run);
+        $items = [];
+        $unresolved = [];
+
+        foreach (collect($req['lines'])->where('ok', false) as $l) {
+            $qty = round((float) $l['short_by'], 2);
+            if ($qty <= 0) continue;
+
+            $row = $this->resolveRows($l['material_kind'], $l['ref'], $run->company_id)->first();
+            if (!$row) {
+                $unresolved[] = [
+                    'label'  => $l['label'],
+                    'qty'    => $qty,
+                    'unit'   => $l['unit'],
+                    'reason' => 'No matching stock item exists yet — create the stock item first, then re-check.',
+                ];
+                continue;
+            }
+
+            $items[] = [
+                'material_kind' => $l['material_kind'],
+                'stock_id'      => $row->id,
+                'item_name'     => $l['label'],
+                'unit'          => $l['unit'],
+                'quantity'      => $qty,
+                'rate'          => (float) ($row->unit_cost ?? 0),
+            ];
+        }
+
+        return [
+            'run_no'       => $run->run_no,
+            'has_shortage' => !$req['all_ok'],
+            'items'        => $items,
+            'unresolved'   => $unresolved,
+        ];
+    }
+
+    /**
      * Record actual consumed quantities (entered at completion). Updates each
      * usage row's actual_qty + real wastage%, and reconciles stock by the
      * difference vs what was issued at start (so inventory stays truthful).

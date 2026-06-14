@@ -76,6 +76,12 @@
                 <tr v-if="!matReq[run.id].lines.length"><td colspan="4" class="mat-empty">No computable material (panel specs incomplete).</td></tr>
               </tbody>
             </table>
+            <div v-if="!matReq[run.id].all_ok" class="mat-po-actions">
+              <button class="btn btn-primary sm" :disabled="poBusy === run.id" @click="createShortagePo(run)">
+                {{ poBusy === run.id ? 'Creating…' : '🛒 Create draft PO for shortage' }}
+              </button>
+              <span class="mat-po-hint">Generates a purchase order for the short quantities — review &amp; assign a supplier in Procurement.</span>
+            </div>
             <p class="mat-note" v-for="(n, i) in matReq[run.id].notes" :key="'n'+i">• {{ n }}</p>
           </template>
         </div>
@@ -139,6 +145,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import productionService from '../services/productionService.js'
+import procurementService from '../services/procurementService.js'
 import { toastError, toastSuccess, confirmDialog } from '../services/ui.js'
 
 defineEmits(['view-order', 'go-planner'])
@@ -149,6 +156,7 @@ const runs = ref([])
 const matOpen = ref(null)
 const matLoading = ref(false)
 const matReq = ref({})
+const poBusy = ref(null)
 
 const wastageOpen = ref(false)
 const wastageLoading = ref(false)
@@ -191,6 +199,34 @@ async function toggleMaterial(run) {
     matOpen.value = null
   } finally {
     matLoading.value = false
+  }
+}
+
+async function createShortagePo(run) {
+  poBusy.value = run.id
+  try {
+    const res = await productionService.runPoSuggestion(run.id)
+    const sug = res?.data ?? res ?? {}
+    const items = sug.items ?? []
+    const unresolved = sug.unresolved ?? []
+    if (!items.length) {
+      toastError(unresolved.length
+        ? `No PO created — no stock item exists yet for: ${unresolved.map(u => u.label).join(', ')}. Create the stock item first.`
+        : 'Nothing short to order.')
+      return
+    }
+    const po = await procurementService.createPO({
+      notes: `Auto-generated for material shortage — run ${run.run_no}`,
+      items,
+    })
+    const poNo = po?.data?.po_no ?? po?.po_no ?? ''
+    let msg = `Draft PO ${poNo} created for ${items.length} item(s). Assign a supplier in Procurement.`
+    if (unresolved.length) msg += ` (${unresolved.length} item(s) skipped — no stock item yet.)`
+    toastSuccess(msg)
+  } catch (e) {
+    toastError(e?.response?.data?.message ?? 'Could not create PO.')
+  } finally {
+    poBusy.value = null
   }
 }
 
@@ -347,6 +383,8 @@ defineExpose({ reload: load })
 .mat-badge.short { background: #ffebee; color: #c62828; }
 .mat-empty { text-align: center; color: #aaa; font-style: italic; }
 .mat-note { font-size: 10.5px; color: var(--text-3); margin: 6px 0 0; line-height: 1.4; }
+.mat-po-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.mat-po-hint { font-size: 11px; color: var(--text-3); }
 .mono { font-variant-numeric: tabular-nums; }
 
 .hdr-actions { display: flex; gap: 8px; }

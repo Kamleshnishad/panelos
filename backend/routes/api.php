@@ -137,6 +137,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/production/runs/{id}/complete', [\App\Http\Controllers\Api\ProductionRunController::class, 'complete'])->name('runs.complete');
     Route::get('/production/runs/{id}/material-requirement', [\App\Http\Controllers\Api\ProductionRunController::class, 'materialRequirement'])->name('runs.material');
     Route::get('/production/runs/{id}/material-usage', [\App\Http\Controllers\Api\ProductionRunController::class, 'materialUsage'])->name('runs.usage');
+    Route::get('/production/runs/{id}/po-suggestion', [\App\Http\Controllers\Api\ProductionRunController::class, 'poSuggestion'])->name('runs.po.suggest');
     Route::get('/production/wastage-report', [\App\Http\Controllers\Api\ProductionRunController::class, 'wastageReport'])->name('production.wastage');
     Route::delete('/production/runs/{id}', [\App\Http\Controllers\Api\ProductionRunController::class, 'destroy'])->name('runs.cancel');
 
@@ -150,6 +151,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/suppliers/{id}', [\App\Http\Controllers\Api\ProcurementController::class, 'updateSupplier'])->name('suppliers.update');
     Route::get('/procurement/purchasable', [\App\Http\Controllers\Api\ProcurementController::class, 'purchasable'])->name('procurement.purchasable');
     Route::get('/procurement/valuation', [\App\Http\Controllers\Api\ProcurementController::class, 'valuation'])->name('procurement.valuation');
+    Route::get('/procurement/reorder-suggestion', [\App\Http\Controllers\Api\ProcurementController::class, 'reorderSuggestion'])->name('procurement.reorder');
     Route::get('/purchase-orders', [\App\Http\Controllers\Api\ProcurementController::class, 'index'])->name('po.list');
     Route::post('/purchase-orders', [\App\Http\Controllers\Api\ProcurementController::class, 'store'])->name('po.create');
     Route::get('/purchase-orders/{id}', [\App\Http\Controllers\Api\ProcurementController::class, 'show'])->name('po.show');

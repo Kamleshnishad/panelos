@@ -32,6 +32,17 @@ class ProductionRunController extends Controller
         }
     }
 
+    /** Draft-PO suggestion covering a run's material shortage. */
+    public function poSuggestion(Request $request, int $id)
+    {
+        try {
+            $run = ProductionRun::where('company_id', $request->user()->company_id)->findOrFail($id);
+            return $this->successResponse($this->materialService->poSuggestionForRun($run), 'PO suggestion computed');
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'PO_SUGGEST_ERROR', 400);
+        }
+    }
+
     public function index(Request $request)
     {
         try {

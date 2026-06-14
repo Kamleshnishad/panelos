@@ -60,6 +60,53 @@ class ProcurementService
         return $coils->concat($chem)->concat($cons)->values()->all();
     }
 
+    /**
+     * Reorder suggestion: every stock item at/below its reorder level (coil,
+     * chemical, consumable), shaped as ready-to-create PO item rows. Suggested
+     * quantity tops the item back up to ~2× reorder level (min = the shortfall).
+     */
+    public function reorderSuggestion(int $companyId): array
+    {
+        $items = [];
+
+        foreach (CoilStock::where('company_id', $companyId)
+            ->where('quantity_in_stock', '<=', DB::raw('reorder_level'))->with('panelType')->get() as $c) {
+            $items[] = $this->reorderRow('coil', $c->id,
+                'Coil — ' . ($c->panelType->name ?? ('Panel #' . $c->panel_type_id)),
+                'kg', $c->quantity_in_stock, $c->reorder_level, $c->unit_cost);
+        }
+        foreach (ChemicalStock::where('company_id', $companyId)
+            ->where('quantity_in_stock', '<=', DB::raw('reorder_level'))->get() as $c) {
+            $items[] = $this->reorderRow('chemical', $c->id, $c->name,
+                $c->unit, $c->quantity_in_stock, $c->reorder_level, $c->unit_cost);
+        }
+        foreach (ConsumableStock::where('company_id', $companyId)
+            ->where('quantity_in_stock', '<=', DB::raw('reorder_level'))->get() as $c) {
+            $items[] = $this->reorderRow('consumable', $c->id, $c->name,
+                $c->unit, $c->quantity_in_stock, $c->reorder_level, $c->unit_cost);
+        }
+
+        return ['items' => $items, 'count' => count($items)];
+    }
+
+    private function reorderRow(string $kind, int $id, string $name, string $unit, $onHand, $reorder, $unitCost): array
+    {
+        $onHand  = (float) $onHand;
+        $reorder = (float) $reorder;
+        $target  = max($reorder * 2, $reorder + 1);          // top up to ~2× reorder
+        $qty     = round(max($target - $onHand, $reorder), 2); // never less than one reorder qty
+        return [
+            'material_kind' => $kind,
+            'stock_id'      => $id,
+            'item_name'     => $name,
+            'unit'          => $unit,
+            'quantity'      => $qty,
+            'rate'          => (float) ($unitCost ?? 0),
+            'on_hand'       => round($onHand, 2),
+            'reorder_level' => round($reorder, 2),
+        ];
+    }
+
     // ── Purchase Orders ──────────────────────────────────────────────────
     public function listPurchaseOrders(int $companyId, array $filters = [])
     {

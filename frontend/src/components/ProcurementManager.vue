@@ -9,6 +9,7 @@
         <div class="val-card" v-if="valuation">
           <label>Stock Value</label><span>₹ {{ fmt(valuation.total) }}</span>
         </div>
+        <button class="btn btn-warn" :disabled="suggesting" @click="openReorderSuggestion">{{ suggesting ? '…' : '⚠ Suggest Reorder' }}</button>
         <button class="btn btn-primary" @click="openCreate">+ New PO</button>
         <button class="btn btn-ghost" :disabled="loading" @click="load">↻</button>
       </div>
@@ -190,6 +191,7 @@ const suppliers = ref([])
 
 const showCreate = ref(false)
 const saving = ref(false)
+const suggesting = ref(false)
 const createError = ref(null)
 let _k = 1
 const form = reactive({ supplier_id: null, order_date: new Date().toISOString().slice(0, 10), expected_date: '', tax_pct: 18, notes: '', items: [] })
@@ -238,6 +240,33 @@ function openCreate() {
 }
 
 function addLine() { form.items.push({ _key: _k++, _pick: '', material_kind: '', stock_id: null, item_name: '', unit: 'kg', quantity: null, rate: null }) }
+
+async function openReorderSuggestion() {
+  suggesting.value = true
+  createError.value = null
+  try {
+    await loadRefs()   // need purchasable to match the line picker
+    const res = await procurementService.reorderSuggestion()
+    const sug = res?.data ?? res ?? {}
+    const items = sug.items ?? []
+    if (!items.length) { toastSuccess('All stock is above reorder level — nothing to reorder.'); return }
+    Object.assign(form, {
+      supplier_id: null, order_date: new Date().toISOString().slice(0, 10), expected_date: '',
+      tax_pct: 18, notes: 'Reorder — items at/below reorder level', items: [],
+    })
+    items.forEach(it => {
+      const pick = purchasable.value.findIndex(p => p.material_kind === it.material_kind && p.stock_id === it.stock_id)
+      form.items.push({
+        _key: _k++, _pick: pick >= 0 ? pick : '',
+        material_kind: it.material_kind, stock_id: it.stock_id, item_name: it.item_name,
+        unit: it.unit, quantity: it.quantity, rate: it.rate || null,
+      })
+    })
+    showCreate.value = true
+  } catch (e) {
+    toastError(e?.response?.data?.message ?? 'Could not load reorder suggestion.')
+  } finally { suggesting.value = false }
+}
 
 function onPick(line) {
   const p = purchasable.value[line._pick]
@@ -410,6 +439,8 @@ onMounted(load)
 .btn-primary { background: var(--primary); color: #fff; } .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-ghost { background: transparent; border: 1px solid #ddd; color: #555; }
 .btn-add { background: #e8f5e9; color: #2e7d32; }
+.btn-warn { background: #fff8e1; color: #b5740a; border: 1px solid #ffe082; }
+.btn-warn:disabled { opacity: 0.5; cursor: not-allowed; }
 .error-msg { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
 
 @media (max-width: 900px) { .pm-wrap { padding: 16px 16px 40px; } }

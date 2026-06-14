@@ -13,6 +13,7 @@ export default {
   createSupplier(data)     { return api('post', '/api/suppliers', data) },
   updateSupplier(id, data) { return api('put',  `/api/suppliers/${id}`, data) },
   purchasable()            { return api('get',  '/api/procurement/purchasable') },
+  reorderSuggestion()      { return api('get',  '/api/procurement/reorder-suggestion') },
   valuation()              { return api('get',  '/api/procurement/valuation') },
 
   listPOs(params = {})     { return api('get',  '/api/purchase-orders', null, params) },
