@@ -10,7 +10,9 @@
 
 This project is on GitHub (private): **https://github.com/Kamleshnishad/panelos**
 
-**Save your work (do this often — especially before any risky change):**
+**Easiest way — double-click [`backup.bat`](backup.bat)**, type a short message, press Enter. It commits everything and pushes to GitHub for you.
+
+**Or do it manually (especially before any risky change):**
 ```bash
 git add -A
 git commit -m "describe what changed"
