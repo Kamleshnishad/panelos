@@ -971,6 +971,7 @@ async function save(mode) {
 
 // ── Load for edit ─────────────────────────────────────────────────
 async function loadForEdit() {
+  try {
   const res = await quotationService.get(props.editId)
   const q = res?.data ?? res
   form.customer_id      = q.customer_id
@@ -1039,6 +1040,9 @@ async function loadForEdit() {
   }))
 
   recalcTotals()
+  } catch (e) {
+    toastError('Could not load quotation for editing: ' + (e?.response?.data?.message ?? e?.message ?? 'unknown error'))
+  }
 }
 
 // ── Mount ─────────────────────────────────────────────────────────

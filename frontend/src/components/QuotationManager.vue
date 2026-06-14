@@ -13,6 +13,7 @@
     <!-- Create / Edit view -->
     <quotation-create
       v-else-if="view === 'create' || view === 'edit'"
+      :key="view === 'edit' ? 'edit-' + editId : 'create-' + (createPrefill.customer_id || 'new')"
       :edit-id="editId"
       :prefill-customer-id="createPrefill.customer_id"
       :lead-id="createPrefill.lead_id"
