@@ -52,6 +52,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users/{id}/reset-password', [\App\Http\Controllers\Api\UserController::class, 'resetPassword'])->name('users.reset-password');
     Route::get('/roles', [\App\Http\Controllers\Api\UserController::class, 'roles'])->name('roles.index');
 
+    // Document Templates (PDF template library)
+    Route::get('/document-templates', [\App\Http\Controllers\Api\DocumentTemplateController::class, 'index'])->name('doc-templates.index');
+    Route::put('/document-templates', [\App\Http\Controllers\Api\DocumentTemplateController::class, 'update'])->name('doc-templates.update');
+    Route::get('/document-templates/preview', [\App\Http\Controllers\Api\DocumentTemplateController::class, 'preview'])->name('doc-templates.preview');
+
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     Route::get('/leads/dashboard', [\App\Http\Controllers\Api\LeadController::class, 'dashboard'])->name('leads.dashboard');

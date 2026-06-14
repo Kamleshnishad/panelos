@@ -40,7 +40,13 @@ Abhi har doc ka **ek hi hardcoded blade** hai. Feature = us ek ko "default templ
 - Refactor QuotationPdfService (quotation + boq) & InvoiceService(pdf) to `viewFor(...)` with current views as fallback.
 - **Verify existing PDFs byte-identical** (default still = classic). Commit.
 
-### Phase 2 — Settings API + UI
+### Phase 2 — Settings API + UI  ✅ DONE
+> DocumentTemplateController (index/update/preview) + routes /document-templates. Frontend DocumentTemplates.vue (per doc-type cards, current highlighted, Apply) + "Doc Templates" nav under Settings. Verified list/apply.
+
+### Phase 3 — Preview  ✅ DONE (combined with Phase 2)
+> `GET /document-templates/preview?doc_type=&template=` streams the PDF rendered with that template using the latest real record (reuses QuotationPdfService/InvoiceService with a view override; "create a record first" if none). Frontend fetches as blob → opens in new tab.
+
+### Phase 2 — Settings API + UI (orig)
 - `GET /document-templates` (registry + current selection), `PUT /document-templates` (save {doc_type, template_key}).
 - Frontend "Document Templates" screen (under Settings): per doc-type cards (name + desc), current highlighted, **Apply**.
 

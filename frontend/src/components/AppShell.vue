@@ -90,6 +90,7 @@
         <accounts-receivable   v-else-if="active === 'receivables'" @view-invoice="go('invoices')" />
         <business-reports      v-else-if="active === 'reports'" />
         <company-settings      v-else-if="active === 'company'" />
+        <document-templates    v-else-if="active === 'doctemplates'" />
         <master-data-manager   v-else-if="active === 'master'" />
         <user-management       v-else-if="active === 'users'" />
       </main>
@@ -121,6 +122,7 @@ import InvoiceManager     from './InvoiceManager.vue'
 import AccountsReceivable from './AccountsReceivable.vue'
 import BusinessReports    from './BusinessReports.vue'
 import CompanySettings    from './CompanySettings.vue'
+import DocumentTemplates  from './DocumentTemplates.vue'
 import MasterDataManager  from './MasterDataManager.vue'
 import UserManagement     from './UserManagement.vue'
 
@@ -191,6 +193,7 @@ const nav = [
   ]},
   { label: 'Settings', items: [
     { key: 'company',     label: 'Company',         icon: ic.building },
+    { key: 'doctemplates',label: 'Doc Templates',   icon: ic.quote },
     { key: 'master',      label: 'Master Data',     icon: ic.grid },
     { key: 'users',       label: 'Users & Roles',   icon: ic.users },
   ]},
