@@ -360,12 +360,16 @@ onMounted(load)
 </script>
 
 <style scoped>
-.qd-wrap { font-family: inherit; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.qd-wrap { font-family: inherit; max-width: none; margin: 0; display: flex; flex-direction: column; gap: 18px; padding-bottom: 84px; }
 
 .rate-input { width: 110px; padding: 6px 8px; border: 1px solid var(--primary); border-radius: 6px; font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
 .rate-input:focus { outline: none; box-shadow: 0 0 0 2px var(--primary-tint); }
-.rate-save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  background: var(--surface, #fff); border: 1px solid var(--primary-bd, #c5cae9); border-radius: 10px; padding: 12px 18px; box-shadow: 0 -4px 20px rgba(0,0,0,0.10); }
+/* Fixed bottom action bar — always visible while entering rates (spans the
+   content area to the right of the sidebar). */
+.rate-save-bar { position: fixed; left: 252px; right: 0; bottom: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  background: var(--surface, #fff); border-top: 2px solid var(--primary); padding: 12px 28px; box-shadow: 0 -4px 20px rgba(0,0,0,0.12); }
+@media (max-width: 860px) { .rate-save-bar { left: 0; padding: 12px 16px; } }
 .rsb-live { display: flex; gap: 24px; flex-wrap: wrap; }
 .rsb-item { display: flex; flex-direction: column; font-size: 14px; font-weight: 700; color: var(--ink, #15181E); font-variant-numeric: tabular-nums; }
 .rsb-item label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3, #888); margin-bottom: 1px; }
