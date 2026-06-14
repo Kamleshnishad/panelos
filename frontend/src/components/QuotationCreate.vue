@@ -825,7 +825,7 @@ const totals = reactive({
 
 function recalcTotals() {
   const panelSub = panelRows.value.reduce((s, row) => s + rowTotalAmount(row), 0)
-  const accSub = accessories_rows.value.reduce((s, a) => s + (a.amount || 0), 0)
+  const accSub = accessories_rows.value.reduce((s, a) => s + (Number(a.amount) || 0), 0)
   const subtotal = panelSub + accSub
   const discAmt = subtotal * ((form.discount_pct || 0) / 100)
   const taxable = subtotal - discAmt
@@ -855,9 +855,11 @@ function recalcTotals() {
 }
 
 // ── Row helpers ───────────────────────────────────────────────────
-function rowTotalSqm(row) { return row.sizes.reduce((s, sz) => s + (sz.sqm || 0), 0) }
-function rowTotalNos(row) { return row.sizes.reduce((s, sz) => s + (sz.nos || 0), 0) }
-function rowTotalAmount(row) { return row.sizes.reduce((s, sz) => s + (sz.amount || 0), 0) }
+// NOTE: backend decimal casts serialize as STRINGS ("4000.0000"); always coerce
+// with Number() or `0 + "x"` becomes string concatenation and totals.toFixed crashes.
+function rowTotalSqm(row) { return row.sizes.reduce((s, sz) => s + (Number(sz.sqm) || 0), 0) }
+function rowTotalNos(row) { return row.sizes.reduce((s, sz) => s + (Number(sz.nos) || 0), 0) }
+function rowTotalAmount(row) { return row.sizes.reduce((s, sz) => s + (Number(sz.amount) || 0), 0) }
 function rowAvgRate(row) {
   const sqm = rowTotalSqm(row)
   if (!sqm) return '0.00'
@@ -997,16 +999,16 @@ async function loadForEdit() {
             && (item.bottom_surface ?? 'PLAIN') === (item.top_surface ?? 'PLAIN'),
     panel_type_id: item.panel_type_id,
     application: item.application || '',
-    thickness: item.thickness,
+    thickness: Number(item.thickness) || 50,
     density_type: item.density_type || 'PUF',
-    density_kgm3: item.density_kgm3 || 40,
+    density_kgm3: Number(item.density_kgm3) || 40,
     top_skin_material: item.top_skin_material || 'PPGI',
-    top_skin_thickness: item.top_skin_thickness || 0.40,
+    top_skin_thickness: Number(item.top_skin_thickness) || 0.40,
     top_color: item.top_color || 'Off White',
     top_color_ral: item.top_color_ral || '',
     top_surface: item.top_surface || 'PLAIN',
     bottom_skin_material: item.bottom_skin_material || 'PPGI',
-    bottom_skin_thickness: item.bottom_skin_thickness || 0.40,
+    bottom_skin_thickness: Number(item.bottom_skin_thickness) || 0.40,
     bottom_color: item.bottom_color || 'Off White',
     bottom_color_ral: item.bottom_color_ral || '',
     bottom_surface: item.bottom_surface || 'PLAIN',
@@ -1016,12 +1018,12 @@ async function loadForEdit() {
     hsn_code: item.hsn_code || '39259010',
     sizes: (item.sizes || []).map(sz => ({
       _key: _keySeq++,
-      length_mm: sz.length_mm,
+      length_mm: Number(sz.length_mm) || 0,
       width_mm: 1000,
-      nos: sz.nos,
-      sqm: sz.sqm ?? (sz.length_mm / 1000) * sz.nos,
-      rate_per_sqm: sz.rate_per_sqm || 0,
-      amount: sz.amount || 0,
+      nos: Number(sz.nos) || 0,
+      sqm: Number(sz.sqm) || (Number(sz.length_mm) / 1000) * Number(sz.nos),
+      rate_per_sqm: Number(sz.rate_per_sqm) || 0,
+      amount: Number(sz.amount) || 0,
     })),
   }))
 
@@ -1030,10 +1032,10 @@ async function loadForEdit() {
     type:         a.pivot?.type || 'standard',
     accessory_id: a.id,
     description:  a.description || a.name,
-    qty:          a.pivot?.quantity || 1,
+    qty:          Number(a.pivot?.quantity) || 1,
     unit:         a.unit || 'NOS',
-    rate:         a.pivot?.unit_price || 0,
-    amount:       a.pivot?.amount || 0,
+    rate:         Number(a.pivot?.unit_price) || 0,
+    amount:       Number(a.pivot?.amount) || 0,
     door_type:    a.pivot?.door_type  || null,
     door_width:   a.pivot?.door_width  || null,
     door_height:  a.pivot?.door_height || null,
