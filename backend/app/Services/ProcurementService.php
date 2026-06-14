@@ -32,6 +32,12 @@ class ProcurementService
         ]);
     }
 
+    public function updateSupplier(Supplier $supplier, array $data): Supplier
+    {
+        $supplier->update(collect($data)->only(['name', 'phone', 'gstin', 'email', 'address'])->toArray());
+        return $supplier->fresh();
+    }
+
     /** All stock rows that can be put on a PO line. */
     public function purchasableItems(int $companyId): array
     {

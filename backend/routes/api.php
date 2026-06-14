@@ -124,6 +124,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Procurement (suppliers, purchase orders, goods receipt, valuation)
     Route::get('/suppliers', [\App\Http\Controllers\Api\ProcurementController::class, 'suppliers'])->name('suppliers.list');
     Route::post('/suppliers', [\App\Http\Controllers\Api\ProcurementController::class, 'storeSupplier'])->name('suppliers.create');
+    Route::put('/suppliers/{id}', [\App\Http\Controllers\Api\ProcurementController::class, 'updateSupplier'])->name('suppliers.update');
     Route::get('/procurement/purchasable', [\App\Http\Controllers\Api\ProcurementController::class, 'purchasable'])->name('procurement.purchasable');
     Route::get('/procurement/valuation', [\App\Http\Controllers\Api\ProcurementController::class, 'valuation'])->name('procurement.valuation');
     Route::get('/purchase-orders', [\App\Http\Controllers\Api\ProcurementController::class, 'index'])->name('po.list');

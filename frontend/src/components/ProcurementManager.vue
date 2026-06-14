@@ -14,27 +14,58 @@
       </div>
     </div>
 
-    <div v-if="loading" class="pm-loading">Loading…</div>
-    <p v-else-if="!pos.length" class="empty">No purchase orders yet. Click <strong>+ New PO</strong>.</p>
+    <div class="proc-tabs">
+      <button :class="['ptab', { active: tab === 'pos' }]" @click="tab = 'pos'">Purchase Orders</button>
+      <button :class="['ptab', { active: tab === 'suppliers' }]" @click="tab = 'suppliers'; loadSuppliers()">Suppliers / Vendors</button>
+    </div>
 
-    <table v-else class="po-table">
-      <thead>
-        <tr><th>PO No</th><th>Supplier</th><th>Date</th><th class="r">Total</th><th>Status</th><th></th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="po in pos" :key="po.id">
-          <td class="mono bold">{{ po.po_no }}</td>
-          <td>{{ po.supplier?.name || '—' }}</td>
-          <td>{{ fmtDate(po.order_date) }}</td>
-          <td class="r mono">₹ {{ fmt(po.total) }}</td>
-          <td><span class="po-status" :class="po.status">{{ po.status }}</span></td>
-          <td class="r">
-            <button v-if="po.status !== 'received' && po.status !== 'cancelled'" class="btn btn-add sm" @click="openReceive(po)">Receive</button>
-            <button v-if="po.status !== 'received' && po.status !== 'cancelled'" class="btn btn-ghost sm" @click="doCancel(po)">Cancel</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Purchase Orders tab -->
+    <template v-if="tab === 'pos'">
+      <div v-if="loading" class="pm-loading">Loading…</div>
+      <p v-else-if="!pos.length" class="empty">No purchase orders yet. Click <strong>+ New PO</strong>.</p>
+      <table v-else class="po-table">
+        <thead>
+          <tr><th>PO No</th><th>Supplier</th><th>Date</th><th class="r">Total</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="po in pos" :key="po.id">
+            <td class="mono bold">{{ po.po_no }}</td>
+            <td>{{ po.supplier?.name || '—' }}</td>
+            <td>{{ fmtDate(po.order_date) }}</td>
+            <td class="r mono">₹ {{ fmt(po.total) }}</td>
+            <td><span class="po-status" :class="po.status">{{ po.status }}</span></td>
+            <td class="r">
+              <button v-if="po.status !== 'received' && po.status !== 'cancelled'" class="btn btn-add sm" @click="openReceive(po)">Receive</button>
+              <button v-if="po.status !== 'received' && po.status !== 'cancelled'" class="btn btn-ghost sm" @click="doCancel(po)">Cancel</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </template>
+
+    <!-- Suppliers tab -->
+    <template v-else>
+      <div class="sup-toolbar">
+        <h3>Vendors</h3>
+        <button class="btn btn-primary" @click="openSupplier()">+ Add Vendor</button>
+      </div>
+      <p v-if="!suppliers.length" class="empty">No vendors yet. Click <strong>+ Add Vendor</strong>.</p>
+      <table v-else class="po-table">
+        <thead>
+          <tr><th>Name</th><th>Phone</th><th>GSTIN</th><th>Email</th><th>Address</th><th></th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="s in suppliers" :key="s.id">
+            <td class="bold">{{ s.name }}</td>
+            <td>{{ s.phone || '—' }}</td>
+            <td class="mono">{{ s.gstin || '—' }}</td>
+            <td>{{ s.email || '—' }}</td>
+            <td>{{ s.address || '—' }}</td>
+            <td class="r"><button class="btn btn-ghost sm" @click="openSupplier(s)">Edit</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </template>
 
     <!-- Create PO modal -->
     <div v-if="showCreate" class="modal-overlay" @click.self="showCreate = false">
@@ -49,7 +80,7 @@
                 <option :value="null">— Select —</option>
                 <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
               </select>
-              <button type="button" class="btn btn-ghost sm" @click="showSupplier = true">+ New</button>
+              <button type="button" class="btn btn-ghost sm" @click="openSupplier()">+ New</button>
             </div>
           </div>
           <div class="form-group"><label>Order Date</label><input v-model="form.order_date" type="date" /></div>
@@ -94,18 +125,21 @@
       </div>
     </div>
 
-    <!-- New supplier modal -->
+    <!-- Add / edit supplier modal -->
     <div v-if="showSupplier" class="modal-overlay" @click.self="showSupplier = false">
       <div class="modal-box">
-        <div class="modal-header"><h3>New Supplier</h3><button class="btn-close" @click="showSupplier = false">✕</button></div>
+        <div class="modal-header"><h3>{{ newSup.id ? 'Edit Vendor' : 'New Vendor' }}</h3><button class="btn-close" @click="showSupplier = false">✕</button></div>
         <div class="form-group"><label>Name *</label><input v-model="newSup.name" /></div>
         <div class="form-row">
           <div class="form-group flex-1"><label>Phone</label><input v-model="newSup.phone" /></div>
           <div class="form-group flex-1"><label>GSTIN</label><input v-model="newSup.gstin" /></div>
         </div>
+        <div class="form-group"><label>Email</label><input v-model="newSup.email" type="email" /></div>
+        <div class="form-group"><label>Address</label><input v-model="newSup.address" /></div>
+        <div v-if="supError" class="error-msg">{{ supError }}</div>
         <div class="modal-actions">
           <button class="btn btn-ghost" @click="showSupplier = false">Cancel</button>
-          <button class="btn btn-primary" :disabled="!newSup.name" @click="saveSupplier">Add</button>
+          <button class="btn btn-primary" :disabled="!newSup.name || supSaving" @click="saveSupplier">{{ supSaving ? 'Saving…' : (newSup.id ? 'Save' : 'Add') }}</button>
         </div>
       </div>
     </div>
@@ -160,8 +194,11 @@ const createError = ref(null)
 let _k = 1
 const form = reactive({ supplier_id: null, order_date: new Date().toISOString().slice(0, 10), expected_date: '', tax_pct: 18, notes: '', items: [] })
 
+const tab = ref('pos')
 const showSupplier = ref(false)
-const newSup = reactive({ name: '', phone: '', gstin: '' })
+const supSaving = ref(false)
+const supError = ref(null)
+const newSup = reactive({ id: null, name: '', phone: '', gstin: '', email: '', address: '' })
 
 const receivePO = ref(null)
 const recvLines = ref([])
@@ -231,15 +268,38 @@ async function savePO() {
   } finally { saving.value = false }
 }
 
-async function saveSupplier() {
+async function loadSuppliers() {
   try {
-    const res = await procurementService.createSupplier({ ...newSup })
-    const s = res?.data ?? res
-    suppliers.value.push(s); form.supplier_id = s.id
+    const res = await procurementService.suppliers()
+    suppliers.value = res?.data ?? res ?? []
+  } catch { /* ignore */ }
+}
+
+function openSupplier(s = null) {
+  supError.value = null
+  if (s) Object.assign(newSup, { id: s.id, name: s.name, phone: s.phone || '', gstin: s.gstin || '', email: s.email || '', address: s.address || '' })
+  else Object.assign(newSup, { id: null, name: '', phone: '', gstin: '', email: '', address: '' })
+  showSupplier.value = true
+}
+
+async function saveSupplier() {
+  supSaving.value = true; supError.value = null
+  try {
+    const payload = { name: newSup.name, phone: newSup.phone || null, gstin: newSup.gstin || null, email: newSup.email || null, address: newSup.address || null }
+    if (newSup.id) {
+      await procurementService.updateSupplier(newSup.id, payload)
+      toastSuccess('Vendor updated.')
+    } else {
+      const res = await procurementService.createSupplier(payload)
+      const s = res?.data ?? res
+      form.supplier_id = s.id   // auto-select if adding during PO
+      toastSuccess('Vendor added.')
+    }
     showSupplier.value = false
-    Object.assign(newSup, { name: '', phone: '', gstin: '' })
-    toastSuccess('Supplier added.')
-  } catch (e) { toastError(e?.response?.data?.message ?? 'Failed to add supplier.') }
+    await loadSuppliers()
+  } catch (e) {
+    supError.value = e?.response?.data?.message ?? 'Failed to save vendor.'
+  } finally { supSaving.value = false }
 }
 
 async function openReceive(po) {
@@ -293,6 +353,13 @@ onMounted(load)
 .val-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 16px; text-align: right; }
 .val-card label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); font-weight: 700; }
 .val-card span { font-size: 18px; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+
+.proc-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 2px solid #e0e0e0; }
+.ptab { padding: 9px 18px; border: none; background: none; font-size: 14px; font-weight: 600; color: #888; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.ptab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.ptab:hover:not(.active) { color: #333; }
+.sup-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sup-toolbar h3 { margin: 0; font-size: 16px; color: var(--primary); }
 
 .pm-loading { text-align: center; padding: 60px; color: #888; }
 .empty { text-align: center; color: #aaa; font-style: italic; padding: 40px; }
