@@ -71,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Customer Management
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+    Route::get('/customers/{id}/profile', [CustomerController::class, 'profile'])->name('customers.profile');
     Route::get('/customers/{id}', [CustomerController::class, 'show'])->name('customers.show');
     Route::put('/customers/{id}', [CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{id}', [CustomerController::class, 'destroy'])->name('customers.destroy');

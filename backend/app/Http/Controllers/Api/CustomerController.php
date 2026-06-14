@@ -34,6 +34,19 @@ class CustomerController extends Controller
         return response()->json(['success' => true, 'data' => $customer]);
     }
 
+    /** Customer 360 profile — KPIs, repeat frequency, RFM segment + all related records. */
+    public function profile($id)
+    {
+        try {
+            $companyId = auth()->user()->company_id;
+            $customer = Customer::where('company_id', $companyId)->findOrFail($id);
+            $data = app(\App\Services\CustomerProfileService::class)->profile($customer);
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
     public function store(Request $request)
     {
         $companyId = auth()->user()->company_id;
