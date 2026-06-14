@@ -13,6 +13,7 @@ function api(method, url, data = null, params = null) {
 export default {
   // Coil stock
   getCoils(params = {})            { return api('get',  '/api/stock/coils',           null, params) },
+  createCoil(data)                 { return api('post', '/api/stock/coils',           data) },
   getCoil(id)                      { return api('get',  `/api/stock/coils/${id}`) },
   addCoil(id, data)                { return api('post', `/api/stock/coils/${id}/add`,    data) },
   removeCoil(id, data)             { return api('post', `/api/stock/coils/${id}/remove`, data) },
@@ -27,6 +28,15 @@ export default {
   removeChemical(id, data)         { return api('post', `/api/stock/chemicals/${id}/remove`, data) },
   adjustChemical(id, data)         { return api('post', `/api/stock/chemicals/${id}/adjust`, data) },
   updateChemicalReorder(id, level) { return api('post', `/api/stock/chemicals/${id}/reorder`, { reorder_level: level }) },
+
+  // Consumables (oil/film/tape/packaging)
+  getConsumables(params = {})      { return api('get',  '/api/stock/consumables',              null, params) },
+  getConsumable(id)                { return api('get',  `/api/stock/consumables/${id}`) },
+  createConsumable(data)           { return api('post', '/api/stock/consumables',              data) },
+  addConsumable(id, data)          { return api('post', `/api/stock/consumables/${id}/add`,    data) },
+  removeConsumable(id, data)       { return api('post', `/api/stock/consumables/${id}/remove`, data) },
+  adjustConsumable(id, data)       { return api('post', `/api/stock/consumables/${id}/adjust`, data) },
+  updateConsumableReorder(id, level) { return api('post', `/api/stock/consumables/${id}/reorder`, { reorder_level: level }) },
 
   // Transactions
   getTransactions(params = {})     { return api('get',  '/api/stock/transactions', null, params) },

@@ -153,6 +153,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Stock Management
     Route::get('/stock/coils', [StockController::class, 'getCoilInventory'])->name('stock.coils.list');
+    Route::post('/stock/coils', [StockController::class, 'createCoil'])->name('stock.coils.create');
     Route::get('/stock/coils/{id}', [StockController::class, 'getCoilDetail'])->name('stock.coils.show');
     Route::post('/stock/coils/{id}/add', [StockController::class, 'addCoilStock'])->name('stock.coils.add');
     Route::post('/stock/coils/{id}/remove', [StockController::class, 'removeCoilStock'])->name('stock.coils.remove');
@@ -166,6 +167,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/stock/chemicals/{id}/remove', [StockController::class, 'removeChemicalStock'])->name('stock.chemicals.remove');
     Route::post('/stock/chemicals/{id}/adjust', [StockController::class, 'adjustChemicalStock'])->name('stock.chemicals.adjust');
     Route::post('/stock/chemicals/{id}/reorder', [StockController::class, 'updateChemicalReorder'])->name('stock.chemicals.reorder');
+
+    // Consumables (oil/film/tape/packaging)
+    Route::get('/stock/consumables', [StockController::class, 'getConsumableInventory'])->name('stock.consumables.list');
+    Route::post('/stock/consumables', [StockController::class, 'createConsumable'])->name('stock.consumables.create');
+    Route::get('/stock/consumables/{id}', [StockController::class, 'getConsumableDetail'])->name('stock.consumables.show');
+    Route::post('/stock/consumables/{id}/add', [StockController::class, 'addConsumableStock'])->name('stock.consumables.add');
+    Route::post('/stock/consumables/{id}/remove', [StockController::class, 'removeConsumableStock'])->name('stock.consumables.remove');
+    Route::post('/stock/consumables/{id}/adjust', [StockController::class, 'adjustConsumableStock'])->name('stock.consumables.adjust');
+    Route::post('/stock/consumables/{id}/reorder', [StockController::class, 'updateConsumableReorder'])->name('stock.consumables.reorder');
 
     Route::get('/stock/transactions', [StockController::class, 'getTransactions'])->name('stock.transactions.list');
     Route::get('/stock/transactions/{id}', [StockController::class, 'getTransaction'])->name('stock.transactions.show');

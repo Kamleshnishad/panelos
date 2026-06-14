@@ -13,8 +13,10 @@ class CoilStock extends BaseModel
     protected $fillable = [
         'company_id',
         'coil_id',
+        'panel_type_id',
         'quantity_in_stock',
         'reorder_level',
+        'unit_cost',
         'last_stock_in',
         'last_stock_out'
     ];
@@ -22,6 +24,7 @@ class CoilStock extends BaseModel
     protected $casts = [
         'quantity_in_stock' => 'decimal:2',
         'reorder_level' => 'decimal:2',
+        'unit_cost' => 'decimal:2',
         'last_stock_in' => 'datetime',
         'last_stock_out' => 'datetime'
     ];

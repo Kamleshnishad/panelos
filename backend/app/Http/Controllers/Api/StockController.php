@@ -318,6 +318,151 @@ class StockController extends Controller
         }
     }
 
+    public function createCoil(Request $request)
+    {
+        try {
+            $companyId = auth()->user()->company_id;
+
+            $validated = $request->validate([
+                'panel_type_id' => 'required|integer|exists:panel_types,id',
+                'reorder_level' => 'nullable|numeric|min:0',
+                'unit_cost'     => 'nullable|numeric|min:0',
+            ]);
+
+            // One coil-stock row per panel type
+            $exists = CoilStock::where('company_id', $companyId)
+                ->where('panel_type_id', $validated['panel_type_id'])->first();
+            if ($exists) {
+                return $this->apiResponse(false, null, 'Coil stock for this panel type already exists.', 422);
+            }
+
+            $stock = CoilStock::create([
+                'company_id'        => $companyId,
+                'panel_type_id'     => $validated['panel_type_id'],
+                'quantity_in_stock' => 0,
+                'reorder_level'     => $validated['reorder_level'] ?? 0,
+                'unit_cost'         => $validated['unit_cost'] ?? 0,
+            ]);
+
+            return $this->apiResponse(true, $stock->load('panelType'), 'Coil stock created successfully', 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->apiResponse(false, $e->errors(), 'Validation failed', 422);
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 400);
+        }
+    }
+
+    // ── Consumables (oil/film/tape/packaging) ────────────────────────────
+
+    public function getConsumableInventory(Request $request)
+    {
+        try {
+            $companyId = auth()->user()->company_id;
+
+            $query = \App\Models\ConsumableStock::where('company_id', $companyId)->orderBy('name', 'asc');
+
+            if ($request->has('low_stock')) {
+                $query->whereColumn('quantity_in_stock', '<=', 'reorder_level');
+            }
+            if ($request->filled('category')) {
+                $query->where('category', $request->input('category'));
+            }
+            if ($request->has('search')) {
+                $query->where('name', 'like', '%' . $request->input('search') . '%');
+            }
+
+            $items = $query->paginate($request->input('per_page', 20), ['*'], 'page', $request->input('page', 1));
+            return $this->apiResponse(true, $items, 'Consumable inventory retrieved successfully');
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 500);
+        }
+    }
+
+    public function getConsumableDetail($id)
+    {
+        try {
+            $stock = \App\Models\ConsumableStock::where('company_id', auth()->user()->company_id)
+                ->with('transactions')->findOrFail($id);
+            return $this->apiResponse(true, $stock, 'Consumable detail retrieved successfully');
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 404);
+        }
+    }
+
+    public function createConsumable(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'name'          => 'required|string|max:120',
+                'category'      => 'nullable|string|max:50',
+                'unit'          => 'required|string|max:20',
+                'reorder_level' => 'nullable|numeric|min:0',
+                'unit_cost'     => 'nullable|numeric|min:0',
+            ]);
+
+            $stock = \App\Models\ConsumableStock::create([
+                'company_id'        => auth()->user()->company_id,
+                'name'              => $validated['name'],
+                'category'          => $validated['category'] ?? null,
+                'unit'              => $validated['unit'],
+                'quantity_in_stock' => 0,
+                'reorder_level'     => $validated['reorder_level'] ?? 0,
+                'unit_cost'         => $validated['unit_cost'] ?? 0,
+            ]);
+
+            return $this->apiResponse(true, $stock, 'Consumable created successfully', 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->apiResponse(false, $e->errors(), 'Validation failed', 422);
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 400);
+        }
+    }
+
+    public function addConsumableStock(Request $request, $id)
+    {
+        try {
+            $request->validate(['quantity' => 'required|numeric|min:0.01', 'notes' => 'nullable|string']);
+            $stock = $this->stockService->addConsumableStock($id, $request->input('quantity'), $request->input('notes'), auth()->user()->company_id);
+            return $this->apiResponse(true, $stock, 'Consumable stock added successfully', 201);
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 400);
+        }
+    }
+
+    public function removeConsumableStock(Request $request, $id)
+    {
+        try {
+            $request->validate(['quantity' => 'required|numeric|min:0.01', 'notes' => 'nullable|string']);
+            $stock = $this->stockService->removeConsumableStock($id, $request->input('quantity'), $request->input('notes'), auth()->user()->company_id);
+            return $this->apiResponse(true, $stock, 'Consumable stock removed successfully');
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 400);
+        }
+    }
+
+    public function adjustConsumableStock(Request $request, $id)
+    {
+        try {
+            $request->validate(['new_quantity' => 'required|numeric|min:0', 'reason' => 'required|string']);
+            $stock = $this->stockService->adjustConsumableStock($id, $request->input('new_quantity'), $request->input('reason'), auth()->user()->company_id);
+            return $this->apiResponse(true, $stock, 'Consumable stock adjusted successfully');
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 400);
+        }
+    }
+
+    public function updateConsumableReorder(Request $request, $id)
+    {
+        try {
+            $request->validate(['reorder_level' => 'required|numeric|min:0']);
+            $stock = \App\Models\ConsumableStock::where('company_id', auth()->user()->company_id)->findOrFail($id);
+            $stock->update(['reorder_level' => $request->input('reorder_level')]);
+            return $this->apiResponse(true, $stock, 'Reorder level updated');
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 400);
+        }
+    }
+
     public function getTransactions(Request $request)
     {
         try {

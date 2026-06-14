@@ -18,6 +18,7 @@ class ChemicalStock extends BaseModel
         'quantity_in_stock',
         'unit',
         'reorder_level',
+        'unit_cost',
         'batch_number',
         'expiry_date',
         'last_stock_in',

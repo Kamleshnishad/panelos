@@ -159,6 +159,74 @@ class StockService
         });
     }
 
+    // ── Consumables (oil/film/tape/packaging) ────────────────────────────
+
+    public function addConsumableStock($stockId, $quantity, $notes = null, $companyId = null)
+    {
+        return DB::transaction(function () use ($stockId, $quantity, $notes, $companyId) {
+            $companyId = $companyId ?? auth()->user()->company_id;
+
+            $stock = \App\Models\ConsumableStock::where('company_id', $companyId)->findOrFail($stockId);
+
+            $stock->update([
+                'quantity_in_stock' => $stock->quantity_in_stock + $quantity,
+                'last_stock_in'     => now(),
+            ]);
+
+            $this->createTransaction($stock, 'in', $quantity, $stock->unit, null, $notes);
+            $this->checkAndCreateConsumableAlert($stock);
+
+            return $stock;
+        });
+    }
+
+    public function removeConsumableStock($stockId, $quantity, $notes = null, $companyId = null)
+    {
+        return DB::transaction(function () use ($stockId, $quantity, $notes, $companyId) {
+            $companyId = $companyId ?? auth()->user()->company_id;
+
+            $stock = \App\Models\ConsumableStock::where('company_id', $companyId)->findOrFail($stockId);
+
+            if ($stock->quantity_in_stock < $quantity) {
+                throw new \Exception('Insufficient consumable stock. Available: ' . $stock->quantity_in_stock);
+            }
+
+            $stock->update([
+                'quantity_in_stock' => $stock->quantity_in_stock - $quantity,
+                'last_stock_out'    => now(),
+            ]);
+
+            $this->createTransaction($stock, 'out', $quantity, $stock->unit, null, $notes);
+            $this->checkAndCreateConsumableAlert($stock);
+
+            return $stock;
+        });
+    }
+
+    public function adjustConsumableStock($stockId, $newQuantity, $reason, $companyId = null)
+    {
+        return DB::transaction(function () use ($stockId, $newQuantity, $reason, $companyId) {
+            $companyId = $companyId ?? auth()->user()->company_id;
+
+            $stock = \App\Models\ConsumableStock::where('company_id', $companyId)->findOrFail($stockId);
+
+            $quantity = abs($newQuantity - $stock->quantity_in_stock);
+            $stock->update(['quantity_in_stock' => $newQuantity]);
+
+            $this->createTransaction($stock, 'adjustment', $quantity, $stock->unit, null, "Adjustment: {$reason}");
+            $this->checkAndCreateConsumableAlert($stock);
+
+            return $stock;
+        });
+    }
+
+    private function checkAndCreateConsumableAlert($stock)
+    {
+        if ($stock->isLowStock()) {
+            LowStockAlert::createIfNeeded('consumable', $stock->id, $stock->quantity_in_stock, $stock->reorder_level);
+        }
+    }
+
     public function getStockLevel($itemType, $itemId, $companyId = null)
     {
         $companyId = $companyId ?? auth()->user()->company_id;

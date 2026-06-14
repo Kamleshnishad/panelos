@@ -4,6 +4,7 @@
     <div class="stock-tabs">
       <button :class="['stock-tab', { active: tab === 'coils' }]"     @click="tab = 'coils'">Coil Stock</button>
       <button :class="['stock-tab', { active: tab === 'chemicals' }]" @click="tab = 'chemicals'">Chemical Stock</button>
+      <button :class="['stock-tab', { active: tab === 'consumables' }]" @click="tab = 'consumables'">Consumables</button>
       <button :class="['stock-tab', { active: tab === 'log' }]"       @click="tab = 'log'">Transaction Log</button>
       <button :class="['stock-tab', { active: tab === 'alerts' }]"    @click="tab = 'alerts'">
         Alerts
@@ -11,9 +12,10 @@
       </button>
     </div>
 
-    <coil-stock      v-if="tab === 'coils'" />
-    <chemical-stock  v-else-if="tab === 'chemicals'" />
-    <transaction-log v-else-if="tab === 'log'" />
+    <coil-stock        v-if="tab === 'coils'" />
+    <chemical-stock    v-else-if="tab === 'chemicals'" />
+    <consumable-stock  v-else-if="tab === 'consumables'" />
+    <transaction-log   v-else-if="tab === 'log'" />
 
     <!-- Alerts -->
     <div v-else-if="tab === 'alerts'" class="alerts-panel">
@@ -51,6 +53,7 @@
 import { ref, onMounted } from 'vue'
 import CoilStock      from './CoilStock.vue'
 import ChemicalStock  from './ChemicalStock.vue'
+import ConsumableStock from './ConsumableStock.vue'
 import TransactionLog from './TransactionLog.vue'
 import stockService   from '../services/stockService.js'
 
