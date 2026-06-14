@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: panelos_app
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_NAME="PanelOS"
+      - APP_URL=http://localhost
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=panelos_dev
+      - DB_USERNAME=panelos_user
+      - DB_PASSWORD=panelos_secret
+      - CACHE_STORE=redis
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=redis_secret
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+      - SESSION_DRIVER=cookie
+    volumes:
+      - ./:/app
+    ports:
+      - "9000:9000"
+    networks:
+      - panelos_network
+    depends_on:
+      - mysql
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mysql:
+    image: mysql:8.0
+    container_name: panelos_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: panelos_dev
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_USER: panelos_user
+      MYSQL_PASSWORD: panelos_secret
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'no'
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      - panelos_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "panelos_user", "-ppanelos_secret"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: panelos_redis
+    restart: unless-stopped
+    command: redis-server --requirepass redis_secret --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - panelos_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:alpine
+    container_name: panelos_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/app
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+    networks:
+      - panelos_network
+    depends_on:
+      - app
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  node:
+    image: node:18-alpine
+    container_name: panelos_node
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./:/app
+    ports:
+      - "5173:5173"
+    networks:
+      - panelos_network
+    command: npm run dev
+    profiles:
+      - frontend
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  panelos_network:
+    driver: bridge
