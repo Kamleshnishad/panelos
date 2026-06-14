@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Order extends BaseModel
 {
+    use \App\Traits\Auditable;
     use HasFactory, SoftDeletes;
 
     protected $fillable = [

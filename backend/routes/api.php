@@ -57,6 +57,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/document-templates', [\App\Http\Controllers\Api\DocumentTemplateController::class, 'update'])->name('doc-templates.update');
     Route::get('/document-templates/preview', [\App\Http\Controllers\Api\DocumentTemplateController::class, 'preview'])->name('doc-templates.preview');
 
+    // Audit Log (admin only)
+    Route::get('/audit-logs', [\App\Http\Controllers\Api\AuditLogController::class, 'index'])->name('audit.index');
+
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     Route::get('/leads/dashboard', [\App\Http\Controllers\Api\LeadController::class, 'dashboard'])->name('leads.dashboard');

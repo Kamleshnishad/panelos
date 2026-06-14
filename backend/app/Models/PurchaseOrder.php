@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseOrder extends BaseModel
 {
+    use \App\Traits\Auditable;
     use SoftDeletes;
 
     protected $fillable = [

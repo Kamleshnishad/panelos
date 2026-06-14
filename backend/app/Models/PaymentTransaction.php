@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class PaymentTransaction extends Model
 {
+    use \App\Traits\Auditable;
     protected $table = 'payment_transactions';
 
     public $timestamps = false;

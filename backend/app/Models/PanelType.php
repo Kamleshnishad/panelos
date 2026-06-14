@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class PanelType extends BaseModel
 {
+    use \App\Traits\Auditable;
     use HasFactory, HasImageDataUri;
 
     protected $imageField = 'image';

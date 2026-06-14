@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Customer extends BaseModel
 {
+    use \App\Traits\Auditable;
     use HasFactory;
 
     protected $fillable = [

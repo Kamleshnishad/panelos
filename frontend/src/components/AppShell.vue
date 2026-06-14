@@ -21,6 +21,7 @@
           <div class="nav-group-label">{{ group.label }}</div>
           <button
             v-for="item in group.items"
+            v-show="!item.admin || isAdmin"
             :key="item.key"
             :class="['nav-item', { active: active === item.key }]"
             @click="go(item.key)"
@@ -92,6 +93,7 @@
         <business-reports      v-else-if="active === 'reports'" />
         <company-settings      v-else-if="active === 'company'" />
         <document-templates    v-else-if="active === 'doctemplates'" />
+        <audit-log             v-else-if="active === 'audit'" />
         <master-data-manager   v-else-if="active === 'master'" />
         <user-management       v-else-if="active === 'users'" />
       </main>
@@ -125,6 +127,7 @@ import AccountsReceivable from './AccountsReceivable.vue'
 import BusinessReports    from './BusinessReports.vue'
 import CompanySettings    from './CompanySettings.vue'
 import DocumentTemplates  from './DocumentTemplates.vue'
+import AuditLog           from './AuditLog.vue'
 import MasterDataManager  from './MasterDataManager.vue'
 import UserManagement     from './UserManagement.vue'
 
@@ -199,6 +202,7 @@ const nav = [
     { key: 'doctemplates',label: 'Doc Templates',   icon: ic.quote },
     { key: 'master',      label: 'Master Data',     icon: ic.grid },
     { key: 'users',       label: 'Users & Roles',   icon: ic.users },
+    { key: 'audit',       label: 'Audit Log',       icon: ic.qc, admin: true },
   ]},
 ]
 
@@ -210,6 +214,7 @@ const initials = computed(() => {
   return n.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 })
 const roleLabel = computed(() => user.value?.is_super_admin ? 'Super Admin' : (user.value?.is_company_admin ? 'Company Admin' : 'User'))
+const isAdmin = computed(() => !!(user.value?.is_company_admin || user.value?.is_super_admin))
 
 function go(key) { quotationOpenId.value = null; quotationPrefill.value = null; active.value = key; mobileOpen.value = false }
 

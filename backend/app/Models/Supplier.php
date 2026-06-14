@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Supplier extends BaseModel
 {
+    use \App\Traits\Auditable;
     use SoftDeletes;
 
     protected $fillable = ['company_id', 'name', 'phone', 'gstin', 'email', 'address'];
