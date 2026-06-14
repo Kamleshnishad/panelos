@@ -14,7 +14,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ProductionRunService
 {
-    public function __construct(private ProductionBatchService $batchService) {}
+    public function __construct(
+        private ProductionBatchService $batchService,
+        private ProductionMaterialService $materialService,
+    ) {}
 
     /**
      * Build a run from a set of pending orders (the planner's group).
@@ -58,13 +61,21 @@ class ProductionRunService
         });
     }
 
-    /** Start the whole run: every draft child batch goes in_progress. */
-    public function start(ProductionRun $run): ProductionRun
+    /**
+     * Start the whole run: issue raw material from stock (deduct), then move
+     * every draft child batch to in_progress. If stock is short and $force is
+     * false, the whole thing rolls back and nothing is started.
+     */
+    public function start(ProductionRun $run, bool $force = false): ProductionRun
     {
         if ($run->status !== 'draft') {
             throw new \Exception('Only a draft run can be started.');
         }
-        return DB::transaction(function () use ($run) {
+        return DB::transaction(function () use ($run, $force) {
+            // 1. Consume raw material first (throws on shortage unless forced).
+            $this->materialService->issueForRun($run, $force);
+
+            // 2. Start child batches + the run.
             foreach ($run->batches as $batch) {
                 if ($batch->status === 'draft') {
                     $this->batchService->startProduction($batch);

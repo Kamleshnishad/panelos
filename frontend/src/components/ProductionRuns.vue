@@ -143,10 +143,33 @@ async function act(run, action) {
   if (!ok) return
   busy.value = run.id
   try {
-    if (action === 'start') await productionService.startRun(run.id)
-    else if (action === 'complete') await productionService.completeRun(run.id)
-    else await productionService.cancelRun(run.id)
+    if (action === 'start') {
+      try {
+        await productionService.startRun(run.id, false)
+      } catch (err) {
+        // Stock short → offer override
+        const msg = err?.response?.data?.message ?? ''
+        if (/insufficient stock/i.test(msg)) {
+          busy.value = null
+          const force = await confirmDialog({
+            title: 'Stock is short',
+            message: msg + '\n\nStart anyway (override)? Available stock will be consumed.',
+            confirmLabel: 'Start anyway',
+            cancelLabel: 'Cancel',
+            danger: true,
+          })
+          if (!force) return
+          busy.value = run.id
+          await productionService.startRun(run.id, true)
+        } else { throw err }
+      }
+    } else if (action === 'complete') {
+      await productionService.completeRun(run.id)
+    } else {
+      await productionService.cancelRun(run.id)
+    }
     toastSuccess(`Run ${run.run_no} ${labels.done}.`)
+    matReq.value = { ...matReq.value, [run.id]: undefined }   // invalidate cached requirement
     await load()
   } catch (e) {
     toastError(e?.response?.data?.message ?? 'Action failed.')

@@ -80,7 +80,13 @@ class ProductionRunController extends Controller
 
     public function start(Request $request, int $id)
     {
-        return $this->action($request, $id, fn($run) => $this->runService->start($run), 'Run started');
+        try {
+            $run = ProductionRun::where('company_id', $request->user()->company_id)->findOrFail($id);
+            $result = $this->runService->start($run, $request->boolean('force'));
+            return $this->successResponse($result, 'Run started');
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'RUN_START_ERROR', 400);
+        }
     }
 
     public function complete(Request $request, int $id)

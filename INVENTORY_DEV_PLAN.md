@@ -47,7 +47,8 @@ auto-consume → wastage → valuation. Built on existing `coil_stocks` /
 
 ---
 
-## Phase 2 — Production auto-consume (CORE, careful)  ⚠ risky
+## Phase 2 — Production auto-consume (CORE, careful)  ✅ DONE
+> Done: `production_material_usages` table+model; `ProductionMaterialService::issueForRun(run, force)` (BOM → FIFO-capped deduct via StockService → usage rows; blocks on shortage unless force); hooked into `ProductionRunService::start($run,$force)`; controller `start` takes `force`; **DispatchService coil allocation + deduction removed** (no double-count — raw coil now consumed at production). Frontend: Start → on shortage shows override confirm. Verified: no-force blocks, force deducts coil −808.55 / polyol −105, 4 usage rows, run in_progress; dev stock restored.
 **DB**
 - [ ] `production_material_usages` (id, company_id, run_id nullable, batch_id nullable, material_kind[coil/chemical/consumable], stock_id, material_name, unit, standard_qty, issued_qty, actual_qty nullable, wastage_pct, created_by, timestamps, **softDeletes**).
 **Backend**

@@ -19,7 +19,7 @@ export default {
   listRuns(filters = {}) { return api('get', '/api/production/runs', null, filters) },
   getRun(id)        { return api('get',    `/api/production/runs/${id}`) },
   runMaterialRequirement(id) { return api('get', `/api/production/runs/${id}/material-requirement`) },
-  startRun(id)      { return api('post',   `/api/production/runs/${id}/start`) },
+  startRun(id, force = false) { return api('post', `/api/production/runs/${id}/start`, { force }) },
   completeRun(id)   { return api('post',   `/api/production/runs/${id}/complete`) },
   cancelRun(id)     { return api('delete', `/api/production/runs/${id}`) },
 }

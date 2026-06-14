@@ -81,7 +81,8 @@ class MaterialBomService
             }
             $coilByType[$ptId]['kg'] += $coilKg;
 
-            $foam = $area * ((float) $it->thickness / 1000) * (float) $it->density_kgm3 * $overpack;
+            // Standard foam (no overpack/wastage yet — applied at line build)
+            $foam = $area * ((float) $it->thickness / 1000) * (float) $it->density_kgm3;
             $polyol += $foam / (1 + $ratio);
             $iso    += $foam * $ratio / (1 + $ratio);
 
@@ -93,40 +94,35 @@ class MaterialBomService
             $tape += $nos * $tapePer;
         }
 
-        // Apply wastage
-        foreach ($coilByType as $k => $v) { $coilByType[$k]['kg'] = $v['kg'] * $wCoil; }
-        $polyol *= $wChem; $iso *= $wChem;
-        $film *= $wCons; $tape *= $wCons;
-
-        // Build lines with stock availability
+        // Build lines: required = standard × factors (overpack on foam; wastage per kind)
         $lines = [];
 
         foreach ($coilByType as $ptId => $v) {
             if ($v['kg'] <= 0) continue;
             $available = (float) CoilStock::where('company_id', $companyId)
                 ->where('panel_type_id', $ptId)->value('quantity_in_stock');
-            $lines[] = $this->line('coil', 'Coil — ' . $v['name'], $v['kg'], 'kg', $available);
+            $lines[] = $this->line('coil', 'Coil — ' . $v['name'], $v['kg'], $v['kg'] * $wCoil, 'kg', $available, $ptId);
         }
 
         if ($polyol > 0) {
             $available = (float) ChemicalStock::where('company_id', $companyId)
                 ->where('category', 'Polyol')->sum('quantity_in_stock');
-            $lines[] = $this->line('chemical', 'Polyol', $polyol, 'kg', $available);
+            $lines[] = $this->line('chemical', 'Polyol', $polyol, $polyol * $overpack * $wChem, 'kg', $available, 'Polyol');
         }
         if ($iso > 0) {
             $available = (float) ChemicalStock::where('company_id', $companyId)
                 ->where('category', 'Isocyanate')->sum('quantity_in_stock');
-            $lines[] = $this->line('chemical', 'Isocyanate (MDI)', $iso, 'kg', $available);
+            $lines[] = $this->line('chemical', 'Isocyanate (MDI)', $iso, $iso * $overpack * $wChem, 'kg', $available, 'Isocyanate');
         }
         if ($film > 0) {
             $available = (float) ConsumableStock::where('company_id', $companyId)
                 ->where('category', 'film')->sum('quantity_in_stock');
-            $lines[] = $this->line('consumable', 'Protective Film', $film, 'sqm', $available);
+            $lines[] = $this->line('consumable', 'Protective Film', $film, $film * $wCons, 'sqm', $available, 'film');
         }
         if ($tape > 0) {
             $available = (float) ConsumableStock::where('company_id', $companyId)
                 ->where('category', 'tape')->sum('quantity_in_stock');
-            $lines[] = $this->line('consumable', 'Sealant Tape', $tape, 'm', $available);
+            $lines[] = $this->line('consumable', 'Sealant Tape', $tape, $tape * $wCons, 'm', $available, 'tape');
         }
 
         $allOk = collect($lines)->every(fn ($l) => $l['ok']);
@@ -144,16 +140,20 @@ class MaterialBomService
         ];
     }
 
-    private function line(string $kind, string $label, float $required, string $unit, float $available): array
+    private function line(string $kind, string $label, float $standard, float $required, string $unit, float $available, $ref): array
     {
         $required = round($required, 2);
+        $standard = round($standard, 2);
         return [
             'material_kind' => $kind,
+            'ref'           => $ref,          // panel_type_id (coil) or category string
             'label'         => $label,
+            'standard'      => $standard,
             'required'      => $required,
             'available'     => round($available, 2),
             'unit'          => $unit,
             'short_by'      => $available >= $required ? 0 : round($required - $available, 2),
+            'wastage_pct'   => $standard > 0 ? round(($required / $standard - 1) * 100, 2) : 0,
             'ok'            => $available >= $required,
         ];
     }
