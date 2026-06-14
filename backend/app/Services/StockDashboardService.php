@@ -29,11 +29,13 @@ class StockDashboardService
     {
         $companyId = $companyId ?? auth()->user()->company_id;
 
-        // NOTE: there are no coil/chemical master tables carrying a unit_cost, so a
-        // monetary stock value cannot be derived yet. Previously this joined the
-        // non-existent `coils`/`chemicals` tables and threw. Degrade to 0 until a
-        // cost field exists on the stock rows (or a master table is introduced).
-        return 0;
+        // Value = Σ quantity_in_stock × unit_cost across coil/chemical/consumable
+        // (unit_cost added in inventory Phase 0; set on goods receipt).
+        $coil = (float) CoilStock::where('company_id', $companyId)->sum(DB::raw('quantity_in_stock * unit_cost'));
+        $chem = (float) ChemicalStock::where('company_id', $companyId)->sum(DB::raw('quantity_in_stock * unit_cost'));
+        $cons = (float) \App\Models\ConsumableStock::where('company_id', $companyId)->sum(DB::raw('quantity_in_stock * unit_cost'));
+
+        return round($coil + $chem + $cons, 2);
     }
 
     public function getLowStockItems($companyId = null)

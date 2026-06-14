@@ -83,6 +83,7 @@
         <production-runs        v-else-if="active === 'runs'"        @view-order="go('orders')" @go-planner="go('planner')" />
         <qc-dashboard          v-else-if="active === 'qc'"          @view-batch="go('batches')" />
         <stock-manager         v-else-if="active === 'stock'" />
+        <procurement-manager   v-else-if="active === 'procurement'" />
         <dispatch-manager      v-else-if="active === 'dispatches'"  @view-batch="go('batches')" />
         <invoice-manager       v-else-if="active === 'invoices'" />
         <accounts-receivable   v-else-if="active === 'receivables'" @view-invoice="go('invoices')" />
@@ -111,6 +112,7 @@ import ProductionPlanner  from './ProductionPlanner.vue'
 import ProductionRuns     from './ProductionRuns.vue'
 import QcDashboard        from './QcDashboard.vue'
 import StockManager       from './StockManager.vue'
+import ProcurementManager from './ProcurementManager.vue'
 import DispatchManager    from './DispatchManager.vue'
 import InvoiceManager     from './InvoiceManager.vue'
 import AccountsReceivable from './AccountsReceivable.vue'
@@ -166,6 +168,7 @@ const nav = [
   ]},
   { label: 'Inventory', items: [
     { key: 'stock',       label: 'Stock',           icon: ic.stock },
+    { key: 'procurement', label: 'Procurement',     icon: ic.order },
   ]},
   { label: 'Sales & Finance', items: [
     { key: 'dispatches',  label: 'Dispatches',      icon: ic.truck },

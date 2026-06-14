@@ -121,6 +121,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/material-settings', [StockController::class, 'getMaterialSettings'])->name('material.settings.get');
     Route::put('/material-settings', [StockController::class, 'updateMaterialSettings'])->name('material.settings.update');
 
+    // Procurement (suppliers, purchase orders, goods receipt, valuation)
+    Route::get('/suppliers', [\App\Http\Controllers\Api\ProcurementController::class, 'suppliers'])->name('suppliers.list');
+    Route::post('/suppliers', [\App\Http\Controllers\Api\ProcurementController::class, 'storeSupplier'])->name('suppliers.create');
+    Route::get('/procurement/purchasable', [\App\Http\Controllers\Api\ProcurementController::class, 'purchasable'])->name('procurement.purchasable');
+    Route::get('/procurement/valuation', [\App\Http\Controllers\Api\ProcurementController::class, 'valuation'])->name('procurement.valuation');
+    Route::get('/purchase-orders', [\App\Http\Controllers\Api\ProcurementController::class, 'index'])->name('po.list');
+    Route::post('/purchase-orders', [\App\Http\Controllers\Api\ProcurementController::class, 'store'])->name('po.create');
+    Route::get('/purchase-orders/{id}', [\App\Http\Controllers\Api\ProcurementController::class, 'show'])->name('po.show');
+    Route::post('/purchase-orders/{id}/receive', [\App\Http\Controllers\Api\ProcurementController::class, 'receive'])->name('po.receive');
+    Route::post('/purchase-orders/{id}/cancel', [\App\Http\Controllers\Api\ProcurementController::class, 'cancel'])->name('po.cancel');
+
     // Production Batches CRUD
     Route::get('/batches', [ProductionBatchController::class, 'index'])->name('batches.index');
     Route::post('/orders/{orderId}/batches', [ProductionBatchController::class, 'createFromOrder'])->name('batches.create');

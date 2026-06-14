@@ -77,7 +77,8 @@ auto-consume → wastage → valuation. Built on existing `coil_stocks` /
 
 ---
 
-## Phase 4 — Procurement (PO/GRN) + Valuation  ✅ medium
+## Phase 4 — Procurement (PO/GRN) + Valuation  ✅ DONE
+> Done: `suppliers`, `purchase_orders`, `purchase_order_items` tables + models; `ProcurementService` (suppliers, PO create, **receive → StockService stock-in + unit_cost + chemical batch/expiry**, cancel, purchasable list, valuation); `ProcurementController` + routes (/suppliers, /purchase-orders/*, /procurement/purchasable|valuation). GRN = stock transaction (no separate table). **Valuation fixed**: `getTotalStockValue` + `/procurement/valuation` = Σ qty×unit_cost (was 0). Frontend: `ProcurementManager.vue` (PO list/create/receive + supplier add + stock-value card), nav "Procurement". Verified: PO total 7080, receive 500@12.5 → stock +500 unit_cost 12.5, status received, valuation 6250.
 **DB**
 - [ ] `suppliers` (basic), `purchase_orders` (po_no, supplier, status, total), `purchase_order_items` (material_kind, stock_id/new-item, qty, rate, amount), `goods_receipts` + items (received_qty, batch_no, expiry, cost). Sab **softDeletes**.
 **Backend**
