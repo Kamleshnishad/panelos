@@ -75,6 +75,7 @@
 
       <main class="content">
         <home-dashboard        v-if="active === 'dashboard'"   @navigate="go" />
+        <lead-manager          v-else-if="active === 'leads'" />
         <quotation-manager     v-else-if="active === 'quotations'" :open-id="quotationOpenId" @order-created="go('orders')" />
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />
         <order-manager         v-else-if="active === 'orders'"      @view-quotation="go('quotations')" @view-batch="go('batches')" />
@@ -102,8 +103,10 @@ import authService from '../services/authService.js'
 import dashboardService from '../services/dashboardService.js'
 import companyService from '../services/companyService.js'
 import productionService from '../services/productionService.js'
+import leadService from '../services/leadService.js'
 
 import HomeDashboard      from './HomeDashboard.vue'
+import LeadManager        from './LeadManager.vue'
 import QuotationManager   from './QuotationManager.vue'
 import BoqManager         from './BoqManager.vue'
 import OrderManager       from './OrderManager.vue'
@@ -141,6 +144,7 @@ function openQuotation(id) {
 const ic = {
   dashboard:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 10.5 12 3l9 7.5M5 9v11h14V9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   quote:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 2v6h6M9 13h6M9 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  lead:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   order:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m3 7 9-4 9 4-9 4-9-4Zm0 0v10l9 4 9-4V7" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
   factory:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 21V9l6 4V9l6 4V5l6 16H3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
   plan:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3h6v3H9zM6 6h12v15H6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -158,6 +162,7 @@ const ic = {
 const nav = [
   { label: 'Main', items: [
     { key: 'dashboard',   label: 'Dashboard',       icon: ic.dashboard },
+    { key: 'leads',       label: 'Leads',           icon: ic.lead, badgeDanger: true },
     { key: 'quotations',  label: 'Quotations',      icon: ic.quote },
     { key: 'boq',         label: 'BOQ Register',    icon: ic.grid },
     { key: 'orders',      label: 'Orders',          icon: ic.order },
@@ -219,6 +224,10 @@ onMounted(async () => {
   try {
     const p = (await productionService.planning())?.data ?? {}
     if (p?.summary?.alert_count) badges.value = { ...badges.value, planner: p.summary.alert_count }
+  } catch { /* ignore */ }
+  try {
+    const due = (await leadService.list({ follow_up: 'due' }))?.data ?? []
+    if (due.length) badges.value = { ...badges.value, leads: due.length }
   } catch { /* ignore */ }
   try {
     const c = (await companyService.get())?.data ?? {}

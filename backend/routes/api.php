@@ -52,6 +52,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users/{id}/reset-password', [\App\Http\Controllers\Api\UserController::class, 'resetPassword'])->name('users.reset-password');
     Route::get('/roles', [\App\Http\Controllers\Api\UserController::class, 'roles'])->name('roles.index');
 
+    // Lead / Inquiry Management
+    Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
+    Route::post('/leads', [\App\Http\Controllers\Api\LeadController::class, 'store'])->name('leads.store');
+    Route::get('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'show'])->name('leads.show');
+    Route::put('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'update'])->name('leads.update');
+    Route::post('/leads/{id}/status', [\App\Http\Controllers\Api\LeadController::class, 'changeStatus'])->name('leads.status');
+    Route::delete('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'destroy'])->name('leads.destroy');
+
     // Customer Management
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
