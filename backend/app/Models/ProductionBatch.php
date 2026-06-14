@@ -13,6 +13,7 @@ class ProductionBatch extends BaseModel
     protected $fillable = [
         'company_id',
         'order_id',
+        'run_id',
         'batch_no',
         'status',
         'planned_quantity',
@@ -34,6 +35,11 @@ class ProductionBatch extends BaseModel
     public function order()
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function run()
+    {
+        return $this->belongsTo(ProductionRun::class, 'run_id');
     }
 
     public function items()

@@ -106,6 +106,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Production Planning (advisory — run grouping + "take this first" alerts)
     Route::get('/production/planning', [\App\Http\Controllers\Api\ProductionPlanningController::class, 'index'])->name('production.planning');
 
+    // Production Runs (multi-order grouped production)
+    Route::get('/production/runs', [\App\Http\Controllers\Api\ProductionRunController::class, 'index'])->name('runs.index');
+    Route::post('/production/runs', [\App\Http\Controllers\Api\ProductionRunController::class, 'store'])->name('runs.store');
+    Route::get('/production/runs/{id}', [\App\Http\Controllers\Api\ProductionRunController::class, 'show'])->name('runs.show');
+    Route::post('/production/runs/{id}/start', [\App\Http\Controllers\Api\ProductionRunController::class, 'start'])->name('runs.start');
+    Route::post('/production/runs/{id}/complete', [\App\Http\Controllers\Api\ProductionRunController::class, 'complete'])->name('runs.complete');
+    Route::delete('/production/runs/{id}', [\App\Http\Controllers\Api\ProductionRunController::class, 'destroy'])->name('runs.cancel');
+
     // Production Batches CRUD
     Route::get('/batches', [ProductionBatchController::class, 'index'])->name('batches.index');
     Route::post('/orders/{orderId}/batches', [ProductionBatchController::class, 'createFromOrder'])->name('batches.create');

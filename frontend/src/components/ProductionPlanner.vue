@@ -55,6 +55,9 @@
                 <span v-if="g.order_count > 1" class="rb rb-merge">⛓ {{ g.order_count }} orders merge</span>
                 <span v-if="g.is_overdue" class="rb rb-over">⚠ Overdue</span>
                 <span v-else-if="g.due_soon" class="rb rb-soon">⏱ Due {{ g.days_to_due }}d</span>
+                <button class="btn-run" :disabled="creating === g.signature" @click="createRun(g)">
+                  {{ creating === g.signature ? 'Ban raha…' : '▶ Create Run' }}
+                </button>
               </div>
             </div>
 
@@ -94,12 +97,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import productionService from '../services/productionService.js'
-import { toastError } from '../services/ui.js'
+import { toastError, toastSuccess, confirmDialog } from '../services/ui.js'
 
-defineEmits(['view-order'])
+const emit = defineEmits(['view-order', 'view-runs'])
 
 const loading = ref(true)
 const plan = ref(null)
+const creating = ref(null)
 
 function fmt(n) { return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
@@ -123,6 +127,33 @@ async function load() {
     toastError(e?.response?.data?.message ?? 'Plan load nahi hua.')
   } finally {
     loading.value = false
+  }
+}
+
+async function createRun(g) {
+  const orderIds = g.orders.map(o => o.order_id)
+  const ok = await confirmDialog({
+    title: 'Production Run banayein?',
+    message: `${g.order_count} order(s) ka ek hi run banega (${fmt(g.total_sqm)} SQM). Ye orders production mein chale jaayenge.`,
+    confirmLabel: 'Haan, Run banao',
+    cancelLabel: 'Cancel',
+  })
+  if (!ok) return
+  creating.value = g.signature
+  try {
+    const res = await productionService.createRun({
+      order_ids: orderIds,
+      signature: g.signature,
+      label: g.label,
+    })
+    const run = res?.data ?? res
+    toastSuccess(`Run ${run.run_no} ban gaya — ${g.order_count} order(s).`)
+    emit('view-runs')
+    await load()
+  } catch (e) {
+    toastError(e?.response?.data?.message ?? 'Run nahi bana.')
+  } finally {
+    creating.value = null
   }
 }
 
@@ -183,6 +214,9 @@ defineExpose({ reload: load })
 .rb-merge { background: var(--primary-tint); color: var(--primary); }
 .rb-over { background: #fff3e0; color: #e65100; }
 .rb-soon { background: #fff8e1; color: #b5740a; }
+.btn-run { background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 4px 12px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.btn-run:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-run:hover:not(:disabled) { background: var(--primary-hover, #2140C0); }
 
 .run-meta { display: flex; gap: 18px; margin: 8px 0 10px; font-size: 12px; color: var(--text-2); flex-wrap: wrap; }
 .run-meta b { color: var(--text); }

@@ -79,7 +79,8 @@
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />
         <order-manager         v-else-if="active === 'orders'"      @view-quotation="go('quotations')" @view-batch="go('batches')" />
         <batch-manager         v-else-if="active === 'batches'"     @view-order="go('orders')" />
-        <production-planner     v-else-if="active === 'planner'"     @view-order="go('orders')" />
+        <production-planner     v-else-if="active === 'planner'"     @view-order="go('orders')" @view-runs="go('runs')" />
+        <production-runs        v-else-if="active === 'runs'"        @view-order="go('orders')" @go-planner="go('planner')" />
         <qc-dashboard          v-else-if="active === 'qc'"          @view-batch="go('batches')" />
         <stock-manager         v-else-if="active === 'stock'" />
         <dispatch-manager      v-else-if="active === 'dispatches'"  @view-batch="go('batches')" />
@@ -107,6 +108,7 @@ import BoqManager         from './BoqManager.vue'
 import OrderManager       from './OrderManager.vue'
 import BatchManager       from './BatchManager.vue'
 import ProductionPlanner  from './ProductionPlanner.vue'
+import ProductionRuns     from './ProductionRuns.vue'
 import QcDashboard        from './QcDashboard.vue'
 import StockManager       from './StockManager.vue'
 import DispatchManager    from './DispatchManager.vue'
@@ -159,6 +161,7 @@ const nav = [
     { key: 'orders',      label: 'Orders',          icon: ic.order },
     { key: 'batches',     label: 'Production',       icon: ic.factory },
     { key: 'planner',     label: 'Production Plan',  icon: ic.plan, badgeDanger: true },
+    { key: 'runs',        label: 'Production Runs',  icon: ic.factory },
     { key: 'qc',          label: 'Quality Control', icon: ic.qc },
   ]},
   { label: 'Inventory', items: [
