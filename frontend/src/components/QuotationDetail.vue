@@ -156,10 +156,9 @@
     <!-- Inline rate-entry save bar (sticky — live totals visible without scrolling) -->
     <div v-if="canEditRates" class="rate-save-bar">
       <div class="rsb-live">
-        <span class="rsb-item"><label>Subtotal</label>₹ {{ fmtNum(fin.subtotal) }}</span>
+        <span class="rsb-item"><label>Taxable</label>₹ {{ fmtNum(fin.taxable) }}</span>
         <span class="rsb-item"><label>GST</label>₹ {{ fmtNum(fin.cgst + fin.sgst + fin.igst) }}</span>
         <span class="rsb-item rsb-grand"><label>Grand Total</label>₹ {{ fmtNum(fin.grand) }}</span>
-        <span class="rsb-item"><label>Balance</label>₹ {{ fmtNum(fin.balance) }}</span>
       </div>
       <button class="btn btn-primary" :disabled="savingRates" @click="saveRates">{{ savingRates ? 'Saving…' : '💾 Save Rates' }}</button>
     </div>
@@ -183,10 +182,9 @@
         <div class="t-row" v-else><span>Transportation</span><span class="text-muted">Extra as Actual</span></div>
         <div class="t-row" v-if="fin.roundOff != 0"><span>Round Off</span><span>₹ {{ fmtNum(fin.roundOff) }}</span></div>
         <div class="t-row grand"><span>GRAND TOTAL</span><span>₹ {{ fmtNum(fin.grand) }}</span></div>
-        <div class="t-row"><span>Advance ({{ fin.advPct }}%)</span><span>₹ {{ fmtNum(fin.advance) }}</span></div>
-        <div class="t-row balance"><span>Balance Due</span><span>₹ {{ fmtNum(fin.balance) }}</span></div>
         <div class="t-row"><span>Total SQM</span><span>{{ Number(fin.sqm).toFixed(3) }} SQM</span></div>
       </div>
+      <p class="terms-note">Payment terms (advance {{ fin.advPct }}%) appear on the Proforma Invoice / Order.</p>
     </div>
 
     <!-- Notes -->
@@ -372,6 +370,7 @@ onMounted(load)
 .rsb-item { display: flex; flex-direction: column; font-size: 14px; font-weight: 700; color: var(--ink, #15181E); font-variant-numeric: tabular-nums; }
 .rsb-item label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3, #888); margin-bottom: 1px; }
 .rsb-grand { color: var(--primary); font-size: 16px; }
+.terms-note { font-size: 11px; color: var(--text-3, #888); font-style: italic; margin: 10px 2px 0; }
 
 .qd-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .qd-title { display: flex; align-items: center; gap: 8px; flex: 1; }
