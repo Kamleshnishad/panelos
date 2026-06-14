@@ -4,9 +4,14 @@ namespace App\Models;
 
 use App\Models\Concerns\HasImageDataUri;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Company extends BaseModel
+// Company is the tenant root — it has NO company_id column, so it must NOT
+// extend BaseModel (whose creating-hook auto-injects company_id and would crash
+// inserts when an authenticated user creates a company). Uses SoftDeletes
+// directly (companies has deleted_at).
+class Company extends Model
 {
     use HasFactory, SoftDeletes, HasImageDataUri;
 
