@@ -9,32 +9,78 @@
         </div>
       </div>
 
-      <h2>Sign in</h2>
-      <p class="muted">Use your company account to continue.</p>
+      <!-- ── SIGN IN ─────────────────────────────────── -->
+      <template v-if="mode === 'login'">
+        <h2>Sign in</h2>
+        <p class="muted">Use your company account to continue.</p>
 
-      <form @submit.prevent="submit">
-        <div class="field">
-          <label>Email</label>
-          <input v-model="email" type="email" autocomplete="username" placeholder="admin@panelos.local" required />
+        <form @submit.prevent="submit">
+          <div class="field">
+            <label>Email</label>
+            <input v-model="email" type="email" autocomplete="username" placeholder="you@company.com" required />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+          </div>
+
+          <div v-if="error" class="error-msg">{{ error }}</div>
+
+          <button class="btn-login" :disabled="loading">{{ loading ? 'Signing in…' : 'Sign In' }}</button>
+        </form>
+
+        <p class="switch">New factory? <a href="#" @click.prevent="switchMode('signup')">Start a free 14-day trial →</a></p>
+
+        <div class="demo-accounts">
+          <div class="demo-title">Demo accounts (click to fill)</div>
+          <div class="demo-grid">
+            <button v-for="a in accounts" :key="a.email" type="button" class="demo-chip" @click="fill(a)">
+              {{ a.label }}
+            </button>
+          </div>
         </div>
-        <div class="field">
-          <label>Password</label>
-          <input v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
-        </div>
+      </template>
 
-        <div v-if="error" class="error-msg">{{ error }}</div>
+      <!-- ── SIGN UP (new tenant) ────────────────────── -->
+      <template v-else>
+        <h2>Start your free trial</h2>
+        <p class="muted">14 days free. No card required. Set up your factory in a minute.</p>
 
-        <button class="btn-login" :disabled="loading">{{ loading ? 'Signing in…' : 'Sign In' }}</button>
-      </form>
+        <form @submit.prevent="submitSignup">
+          <div class="field">
+            <label>Company / Factory Name</label>
+            <input v-model="su.company_name" type="text" placeholder="e.g. Shree PUF Panels Pvt Ltd" required />
+          </div>
+          <div class="field">
+            <label>Your Name</label>
+            <input v-model="su.name" type="text" placeholder="Owner / Admin name" required />
+          </div>
+          <div class="field">
+            <label>Work Email</label>
+            <input v-model="su.email" type="email" autocomplete="username" placeholder="you@company.com" required />
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Phone</label>
+              <input v-model="su.phone" type="text" placeholder="98XXXXXXXX" />
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <input v-model="su.password" type="password" autocomplete="new-password" placeholder="min 8, letter+number" required />
+            </div>
+          </div>
+          <div class="field">
+            <label>Confirm Password</label>
+            <input v-model="su.password_confirmation" type="password" autocomplete="new-password" placeholder="repeat password" required />
+          </div>
 
-      <div class="demo-accounts">
-        <div class="demo-title">Demo accounts (click to fill)</div>
-        <div class="demo-grid">
-          <button v-for="a in accounts" :key="a.email" type="button" class="demo-chip" @click="fill(a)">
-            {{ a.label }}
-          </button>
-        </div>
-      </div>
+          <div v-if="error" class="error-msg">{{ error }}</div>
+
+          <button class="btn-login" :disabled="loading">{{ loading ? 'Creating your account…' : 'Create Account & Start Trial' }}</button>
+        </form>
+
+        <p class="switch">Already have an account? <a href="#" @click.prevent="switchMode('login')">Sign in →</a></p>
+      </template>
     </div>
   </div>
 </template>
@@ -45,10 +91,29 @@ import authService from '../services/authService.js'
 
 const emit = defineEmits(['logged-in'])
 
+const mode = ref('login')
 const email = ref('admin@panelos.local')
 const password = ref('Admin@123')
 const loading = ref(false)
 const error = ref(null)
+
+const su = ref({ company_name: '', name: '', email: '', phone: '', password: '', password_confirmation: '' })
+
+function switchMode(m) { mode.value = m; error.value = null }
+
+async function submitSignup() {
+  loading.value = true; error.value = null
+  try {
+    if (su.value.password !== su.value.password_confirmation) {
+      error.value = 'Passwords do not match.'; loading.value = false; return
+    }
+    await authService.register({ ...su.value })
+    emit('logged-in')
+  } catch (e) {
+    const errs = e?.response?.data?.errors
+    error.value = errs ? Object.values(errs).flat()[0] : (e?.response?.data?.message ?? 'Signup failed.')
+  } finally { loading.value = false }
+}
 
 const accounts = [
   { label: 'Company Admin', email: 'admin@panelos.local', password: 'Admin@123' },
@@ -114,6 +179,11 @@ h2 { margin: 0 0 5px; font-size: 23px; color: var(--text); }
 }
 .btn-login:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(26,35,126,0.3); }
 .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.switch { margin-top: 16px; font-size: 13px; color: var(--text-3); text-align: center; }
+.switch a { color: var(--brand-700); font-weight: 600; text-decoration: none; }
+.switch a:hover { text-decoration: underline; }
 
 .demo-accounts { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 20px; }
 .demo-title { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 11px; font-weight: 600; }

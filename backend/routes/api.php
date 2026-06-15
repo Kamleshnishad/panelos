@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\OrderController;
 Route::prefix('auth')->group(function () {
     // Public routes — rate-limited to slow brute-force (10 attempts/min per IP)
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1')->name('register');
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {

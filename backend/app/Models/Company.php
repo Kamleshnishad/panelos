@@ -47,6 +47,8 @@ class Company extends Model
         'tcs_applicable',
         'subscription_plan',
         'subscription_status',
+        'trial_ends_at',
+        'subscription_ends_at',
         'is_active',
         'settings',
     ];
@@ -55,6 +57,8 @@ class Company extends Model
     {
         return [
             'settings' => 'array',
+            'trial_ends_at' => 'datetime',
+            'subscription_ends_at' => 'datetime',
             'e_invoice_applicable' => 'boolean',
             'tcs_applicable' => 'boolean',
             'is_active' => 'boolean',

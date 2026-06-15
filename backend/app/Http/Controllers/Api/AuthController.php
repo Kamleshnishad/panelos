@@ -23,6 +23,50 @@ class AuthController extends Controller
     /**
      * Login - POST /auth/login
      */
+    /**
+     * Self-signup — POST /auth/register (public). Provisions a new tenant
+     * (company on a 14-day trial) + first admin user, returns an auth token.
+     */
+    public function register(Request $request, \App\Services\TenantProvisioningService $provisioner)
+    {
+        $validator = Validator::make($request->all(), [
+            'company_name' => 'required|string|max:150',
+            'name'         => 'required|string|max:100',
+            // Email must be globally unique (one email = one tenant) so login stays unambiguous
+            'email'        => 'required|email|max:150|unique:users,email',
+            'password'     => ['required', 'confirmed', self::passwordPolicy()],
+            'phone'        => 'nullable|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->errorResponse($validator->errors()->toArray(), 'Validation failed', 'VALIDATION_ERROR', 422);
+        }
+
+        try {
+            $result = $provisioner->provision($validator->validated());
+            $user   = $result['user'];
+            $token  = $user->createToken('auth_token')->plainTextToken;
+            $user->update(['last_login_at' => now()]);
+
+            return $this->successResponse([
+                'user' => [
+                    'id' => $user->id, 'name' => $user->name, 'email' => $user->email,
+                    'company_id' => $user->company_id,
+                    'is_super_admin' => $user->is_super_admin, 'is_company_admin' => $user->is_company_admin,
+                ],
+                'company' => [
+                    'id' => $result['company']->id, 'name' => $result['company']->name,
+                    'subscription_status' => $result['company']->subscription_status,
+                    'trial_ends_at' => $result['company']->trial_ends_at,
+                ],
+                'token' => $token,
+                'token_type' => 'Bearer',
+            ], 'Account created — welcome to your 14-day trial!', 201);
+        } catch (\Throwable $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], 'Could not create account: ' . $e->getMessage(), 'SIGNUP_ERROR', 400);
+        }
+    }
+
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [

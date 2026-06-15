@@ -21,6 +21,19 @@ export default {
     return data
   },
 
+  async register(payload) {
+    const res = await axios.post('/api/auth/register', payload, { headers: { Accept: 'application/json' } })
+    const data = res.data?.data ?? {}
+    if (data.token) {
+      localStorage.setItem('token', data.token)
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user))
+        localStorage.setItem('user_id', data.user.id)
+      }
+    }
+    return data
+  },
+
   async me() {
     const res = await axios.get('/api/auth/me', { headers: authHeaders() })
     const user = res.data?.data ?? res.data
