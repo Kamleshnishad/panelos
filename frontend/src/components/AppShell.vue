@@ -1,5 +1,5 @@
 <template>
-  <div class="shell">
+  <div class="app-root">
     <!-- Impersonation banner -->
     <div v-if="impersonating" class="imp-banner">
       <span>👁 Viewing as <b>{{ impersonating }}</b> (platform support mode)</span>
@@ -12,6 +12,7 @@
       <button class="ann-x" @click="dismissAnnouncement(a.id)">✕</button>
     </div>
 
+  <div class="shell">
     <!-- Mobile overlay -->
     <div v-if="mobileOpen" class="sidebar-scrim" @click="mobileOpen = false"></div>
 
@@ -114,6 +115,7 @@
         <user-management       v-else-if="active === 'users'" />
         <super-admin           v-else-if="active === 'superadmin'" />
       </main>
+    </div>
     </div>
   </div>
 </template>
@@ -338,8 +340,9 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.shell { display: flex; min-height: 100vh; }
-.imp-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 2000; background: #b5740a; color: #fff; display: flex; align-items: center; justify-content: center; gap: 16px; padding: 7px 16px; font-size: 13px; }
+.app-root { display: flex; flex-direction: column; min-height: 100vh; }
+.shell { display: flex; flex: 1; min-height: 0; }
+.imp-banner { z-index: 2000; background: #b5740a; color: #fff; display: flex; align-items: center; justify-content: center; gap: 16px; padding: 7px 16px; font-size: 13px; }
 .imp-exit { background: #fff; color: #b5740a; border: none; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
 .ann-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 18px; font-size: 13px; font-weight: 500; }
 .ann-banner.info { background: #EEF1FE; color: #2140C0; }
