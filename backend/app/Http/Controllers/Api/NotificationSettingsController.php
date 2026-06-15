@@ -96,7 +96,16 @@ class NotificationSettingsController extends Controller
 
             return $this->successResponse($result, 'Test message sent successfully');
         } catch (\Exception $e) {
-            return $this->errorResponse(['error' => $e->getMessage()], 'Failed to send: ' . $e->getMessage(), 'TWILIO_ERROR', 400);
+            $msg = $e->getMessage();
+            // Friendly hints for the most common Twilio setup mistakes
+            if (stripos($msg, 'could not find a Channel') !== false) {
+                $msg .= '  →  For WhatsApp sandbox, the "WhatsApp From" must be +14155238886 (not your SMS number).';
+            } elseif (stripos($msg, 'not a valid phone number') !== false || stripos($msg, "is not currently reachable") !== false) {
+                $msg .= '  →  The recipient must first send "join <keyword>" to +14155238886 on WhatsApp to opt into the sandbox.';
+            } elseif (stripos($msg, 'unverified') !== false) {
+                $msg .= '  →  On a Twilio trial, the recipient number must be verified in your Twilio Console first.';
+            }
+            return $this->errorResponse(['error' => $msg], 'Failed to send: ' . $msg, 'TWILIO_ERROR', 400);
         }
     }
 }
