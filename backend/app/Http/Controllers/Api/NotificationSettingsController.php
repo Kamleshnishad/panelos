@@ -87,7 +87,9 @@ class NotificationSettingsController extends Controller
         try {
             // Build a live Twilio client from the saved (or env-fallback) credentials
             $client = new \Twilio\Rest\Client($s->resolvedSid(), $s->resolvedToken());
-            $msg    = "PanelOS test message from {$r->user()->company->name}. Notifications are working!";
+            $r->user()->loadMissing('company');
+            $companyName = $r->user()->company?->name ?? 'PanelOS';
+            $msg    = "PanelOS test message from {$companyName}. Notifications are working!";
 
             if ($data['channel'] === 'sms') {
                 $result = $client->messages->create($data['phone'], [
