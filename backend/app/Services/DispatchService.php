@@ -114,6 +114,11 @@ class DispatchService
 
             $dispatch->markAsCompleted($data['actual_delivery_date'] ?? now());
 
+            // WhatsApp/SMS notification — silent on failure
+            try {
+                app(\App\Services\NotificationDispatchService::class)->dispatchDone($dispatch);
+            } catch (\Throwable) {}
+
             return $dispatch;
         });
     }

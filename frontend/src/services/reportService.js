@@ -16,4 +16,5 @@ export default {
   profitLoss(params = {})    { return api('get', '/api/reports/profit-loss', params) },
   cashFlow(params = {})      { return api('get', '/api/reports/cash-flow', params) },
   salesReport(params = {})   { return api('get', '/api/reports/sales', params) },
+  mis(params = {})           { return api('get', '/api/reports/mis', params) },
 }

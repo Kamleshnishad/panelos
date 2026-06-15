@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Models\Order;
 use App\Models\PaymentTransaction;
+use App\Models\ProductionRun;
 use App\Models\TaxCalculation;
 use Illuminate\Support\Facades\DB;
 
@@ -465,5 +467,149 @@ class ReportingService
             'total_value' => round($totalValue, 2),
             'rows'        => $rows->all(),
         ];
+    }
+
+    /**
+     * MIS Report — owner-level monthly summary:
+     * revenue, collection, production (sqm + runs), GST liability, outstanding.
+     */
+    public function getMisReport(int $companyId, string $from, string $to): array
+    {
+        $invoices = Invoice::where('company_id', $companyId)
+            ->whereNotIn('status', ['draft', 'cancelled'])
+            ->whereBetween('invoice_date', [$from, $to])
+            ->with('taxCalculation', 'payments')
+            ->get();
+
+        $totalInvoiced  = round((float) $invoices->sum('total_amount'), 2);
+        $totalPaid      = round((float) $invoices->flatMap(fn ($i) => $i->payments)->sum('amount'), 2);
+        $outstanding    = round($totalInvoiced - $totalPaid, 2);
+
+        // GST summary
+        $cgst = $sgst = $igst = 0.0;
+        foreach ($invoices as $inv) {
+            $tc = $inv->taxCalculation;
+            if ($tc) {
+                $cgst += (float) $tc->cgst_amount;
+                $sgst += (float) $tc->sgst_amount;
+                $igst += (float) $tc->igst_amount;
+            }
+        }
+
+        // Orders
+        $orders = Order::where('company_id', $companyId)
+            ->whereBetween('created_at', [$from, $to])->get();
+
+        // Production runs completed in period
+        $runs = ProductionRun::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->whereBetween('completed_at', [$from, $to])->get();
+        $sqmProduced = round((float) $runs->sum('planned_sqm'), 2);
+
+        // Monthly invoice breakdown
+        $monthly = $invoices->groupBy(fn ($i) => $i->invoice_date->format('Y-m'))
+            ->map(fn ($g, $key) => [
+                'month'     => \Carbon\Carbon::parse($key . '-01')->format('M Y'),
+                'invoiced'  => round((float) $g->sum('total_amount'), 2),
+                'collected' => round((float) $g->flatMap(fn ($i) => $i->payments)->sum('amount'), 2),
+                'count'     => $g->count(),
+            ])
+            ->values();
+
+        // Aging: 0-30, 31-60, 61-90, 90+ days overdue (unpaid invoices)
+        $aging = ['0_30' => 0, '31_60' => 0, '61_90' => 0, 'over_90' => 0];
+        foreach ($invoices->where('status', '!=', 'paid') as $inv) {
+            if (!$inv->due_date || !$inv->due_date->isPast()) continue;
+            $days = now()->diffInDays($inv->due_date);
+            $bal  = max(0, (float) $inv->total_amount - (float) $inv->payments->sum('amount'));
+            if ($bal <= 0) continue;
+            if ($days <= 30)      $aging['0_30']   += $bal;
+            elseif ($days <= 60)  $aging['31_60']  += $bal;
+            elseif ($days <= 90)  $aging['61_90']  += $bal;
+            else                  $aging['over_90'] += $bal;
+        }
+
+        return [
+            'period'     => ['from' => $from, 'to' => $to],
+            'revenue'    => [
+                'invoiced'        => $totalInvoiced,
+                'collected'       => $totalPaid,
+                'outstanding'     => $outstanding,
+                'collection_pct'  => $totalInvoiced > 0 ? round($totalPaid / $totalInvoiced * 100, 1) : 0,
+            ],
+            'gst'        => [
+                'cgst' => round($cgst, 2),
+                'sgst' => round($sgst, 2),
+                'igst' => round($igst, 2),
+                'total'=> round($cgst + $sgst + $igst, 2),
+            ],
+            'orders'     => ['count' => $orders->count()],
+            'production' => ['runs' => $runs->count(), 'sqm_produced' => $sqmProduced],
+            'aging'      => array_map(fn ($v) => round($v, 2), $aging),
+            'monthly'    => $monthly,
+        ];
+    }
+
+    /**
+     * Tally-compatible export data for invoices in a period.
+     * Returns structured rows that the controller serialises to XML or CSV.
+     */
+    public function getTallyExportData(int $companyId, string $from, string $to): array
+    {
+        $invoices = Invoice::where('company_id', $companyId)
+            ->whereNotIn('status', ['draft', 'cancelled'])
+            ->whereBetween('invoice_date', [$from, $to])
+            ->with('taxCalculation', 'items.panelType', 'dispatch.batch.order.customer', 'order.customer', 'company')
+            ->get();
+
+        $company = $invoices->first()?->company;
+
+        $vouchers = $invoices->map(function (Invoice $inv) {
+            $tc       = $inv->taxCalculation;
+            $customer = $inv->dispatch?->batch?->order?->customer ?? $inv->order?->customer;
+            $cgst     = (float) ($tc->cgst_amount ?? 0);
+            $sgst     = (float) ($tc->sgst_amount ?? 0);
+            $igst     = (float) ($tc->igst_amount ?? 0);
+            $taxable  = (float) ($tc->taxable_amount ?? $inv->subtotal);
+            $taxRate  = (float) ($tc->tax_rate ?? 18);
+            $isInter  = $igst > 0;
+
+            return [
+                'voucher_type'   => 'Sales',
+                'voucher_no'     => $inv->invoice_no,
+                'date'           => $inv->invoice_date->format('d-M-Y'),
+                'party_name'     => $customer?->name ?? 'Unknown',
+                'party_gstin'    => $customer?->gstin ?? '',
+                'party_state'    => $customer?->state ?? '',
+                'narration'      => 'Sales Invoice ' . $inv->invoice_no,
+                'taxable_value'  => round($taxable, 2),
+                'cgst_rate'      => $isInter ? 0 : $taxRate / 2,
+                'cgst_amount'    => round($cgst, 2),
+                'sgst_rate'      => $isInter ? 0 : $taxRate / 2,
+                'sgst_amount'    => round($sgst, 2),
+                'igst_rate'      => $isInter ? $taxRate : 0,
+                'igst_amount'    => round($igst, 2),
+                'total_amount'   => round((float) $inv->total_amount, 2),
+                'sales_ledger'   => 'Sales @ ' . $taxRate . '%',
+                'hsn_summary'    => $inv->items->map(fn ($it) => [
+                    'hsn'  => $it->panelType?->hsn_code ?? '39259010',
+                    'desc' => ($it->panelType?->name ?? 'Panel') . ($it->panelType?->thickness ? ' ' . $it->panelType->thickness . 'mm' : ''),
+                    'qty'  => (float) $it->quantity,
+                    'rate' => (float) $it->unit_price,
+                    'amt'  => (float) $it->amount,
+                ])->all(),
+            ];
+        })->all();
+
+        $totals = [
+            'taxable'  => round(collect($vouchers)->sum('taxable_value'), 2),
+            'cgst'     => round(collect($vouchers)->sum('cgst_amount'), 2),
+            'sgst'     => round(collect($vouchers)->sum('sgst_amount'), 2),
+            'igst'     => round(collect($vouchers)->sum('igst_amount'), 2),
+            'total'    => round(collect($vouchers)->sum('total_amount'), 2),
+            'count'    => count($vouchers),
+        ];
+
+        return compact('company', 'vouchers', 'totals', 'from', 'to');
     }
 }

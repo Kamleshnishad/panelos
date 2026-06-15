@@ -96,7 +96,14 @@ class OrderService
                 }
             }
 
-            return $order->load('items.sizes', 'items.panelType', 'customer', 'quotation');
+            $loaded = $order->load('items.sizes', 'items.panelType', 'customer', 'quotation');
+
+            // Fire-and-forget WhatsApp/SMS notification (silent on failure)
+            try {
+                app(\App\Services\NotificationDispatchService::class)->orderConfirmed($loaded);
+            } catch (\Throwable) {}
+
+            return $loaded;
         });
     }
 
