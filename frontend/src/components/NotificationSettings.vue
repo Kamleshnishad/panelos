@@ -45,9 +45,11 @@
             <label>Auth Token <span class="req">*</span></label>
             <div class="secret-row">
               <input :type="showToken ? 'text' : 'password'" v-model="form.twilio_auth_token"
-                     :placeholder="form.token_is_set ? '••••••••  (leave blank to keep current)' : 'Paste auth token'" class="mono-input" />
+                     :placeholder="form.token_is_set ? 'Saved — leave blank to keep, or type new to change' : 'Paste auth token'" class="mono-input" />
               <button type="button" class="btn-eye" @click="showToken = !showToken">{{ showToken ? '🙈' : '👁' }}</button>
             </div>
+            <span v-if="form.token_is_set && !form.twilio_auth_token" class="hint token-saved">✓ Token saved &amp; hidden for security. Leave blank to keep it.</span>
+            <span v-else class="hint">32-character token from your Twilio Console</span>
           </div>
         </div>
       </section>
@@ -185,7 +187,11 @@ async function load() {
   loading.value = true; error.value = null
   try {
     const r = await notificationService.get()
-    form.value = { ...(r?.data ?? r) }
+    const d = { ...(r?.data ?? r) }
+    // Keep the token field empty (real token is masked server-side); token_is_set
+    // drives the "✓ saved" badge. Leaving it blank on save keeps the stored token.
+    d.twilio_auth_token = ''
+    form.value = d
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Could not load settings.'
   } finally { loading.value = false }
@@ -268,6 +274,7 @@ onMounted(load)
 .form-group input:disabled { background: #f5f5f5; color: #aaa; }
 .mono-input { font-family: monospace; letter-spacing: .05em; }
 .hint { font-size: 11px; color: #888; margin-top: 2px; }
+.token-saved { color: #2e7d32; font-weight: 600; }
 .req { color: #c62828; }
 .secret-row { display: flex; gap: 6px; }
 .secret-row input { flex: 1; }
