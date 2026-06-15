@@ -410,6 +410,43 @@ class SuperAdminController extends Controller
         ], 'Signup funnel');
     }
 
+    /** All announcements (super-admin management). */
+    public function announcements(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        return $this->successResponse(\App\Models\PlatformAnnouncement::latest('id')->get(), 'Announcements');
+    }
+
+    public function createAnnouncement(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        $data = $r->validate([
+            'message'   => 'required|string|max:500',
+            'type'      => 'required|in:info,warning,success',
+            'is_active' => 'nullable|boolean',
+            'starts_at' => 'nullable|date',
+            'ends_at'   => 'nullable|date',
+        ]);
+        $a = \App\Models\PlatformAnnouncement::create($data);
+        $this->audit($r, $r->user()->company_id, 'announcement_created', 'Broadcast: ' . substr($data['message'], 0, 60));
+        return $this->successResponse($a, 'Announcement created', 201);
+    }
+
+    public function toggleAnnouncement(Request $r, int $id)
+    {
+        $this->requireSuperAdmin($r);
+        $a = \App\Models\PlatformAnnouncement::findOrFail($id);
+        $a->update(['is_active' => !$a->is_active]);
+        return $this->successResponse($a->fresh(), $a->is_active ? 'Activated' : 'Deactivated');
+    }
+
+    public function deleteAnnouncement(Request $r, int $id)
+    {
+        $this->requireSuperAdmin($r);
+        \App\Models\PlatformAnnouncement::findOrFail($id)->delete();
+        return $this->successResponse(null, 'Announcement deleted');
+    }
+
     /** List platform admins (is_super_admin users). */
     public function platformAdmins(Request $r)
     {

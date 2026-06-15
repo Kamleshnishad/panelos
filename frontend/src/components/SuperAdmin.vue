@@ -27,6 +27,7 @@
         <span v-if="expiring.length" class="tab-badge">{{ expiring.length }}</span>
       </button>
       <button :class="{ on: tab === 'revenue' }" @click="tab = 'revenue'; loadRevenue()">Revenue &amp; Growth</button>
+      <button :class="{ on: tab === 'announce' }" @click="tab = 'announce'; loadAnn()">Announcements</button>
       <button :class="{ on: tab === 'admins' }" @click="tab = 'admins'; loadAdmins()">Platform Admins</button>
       <button :class="{ on: tab === 'settings' }" @click="tab = 'settings'; loadSettings()">Settings</button>
     </div>
@@ -174,6 +175,43 @@
       <p class="warn-note">⚠️ Platform admins can see and manage <b>every</b> tenant. Add only trusted people.</p>
     </template>
 
+    <!-- ════ ANNOUNCEMENTS ════ -->
+    <template v-else-if="tab === 'announce'">
+      <div class="panel">
+        <h3 class="sec-h">📢 New Broadcast</h3>
+        <p class="hint-line">Shown as a banner to <b>all tenants</b> until they dismiss it (or you deactivate it).</p>
+        <div class="form-group"><label>Message</label><input v-model="annForm.message" maxlength="500" placeholder="e.g. Scheduled maintenance on Sunday 2 AM–4 AM" /></div>
+        <div class="form-grid">
+          <div class="form-group"><label>Type</label>
+            <select v-model="annForm.type"><option value="info">Info (blue)</option><option value="warning">Warning (amber)</option><option value="success">Success (green)</option></select>
+          </div>
+          <div class="form-group"><label>Starts (optional)</label><input v-model="annForm.starts_at" type="datetime-local" /></div>
+          <div class="form-group"><label>Ends (optional)</label><input v-model="annForm.ends_at" type="datetime-local" /></div>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-primary" :disabled="annSaving || !annForm.message" @click="createAnn">{{ annSaving ? 'Posting…' : 'Post Announcement' }}</button>
+        </div>
+      </div>
+
+      <div v-if="annLoading" class="loading-hint">Loading…</div>
+      <table v-else class="sa-table">
+        <thead><tr><th>Message</th><th>Type</th><th>Status</th><th>Window</th><th></th></tr></thead>
+        <tbody>
+          <tr v-for="a in announces" :key="a.id">
+            <td>{{ a.message }}</td>
+            <td><span class="flag-chip" :class="a.type">{{ a.type }}</span></td>
+            <td><span class="status-chip" :class="a.is_active ? 'active' : 'suspended'">{{ a.is_active ? 'live' : 'off' }}</span></td>
+            <td class="small">{{ a.starts_at ? fmtDate(a.starts_at) : '—' }} → {{ a.ends_at ? fmtDate(a.ends_at) : '—' }}</td>
+            <td class="actions">
+              <button class="mini ghost" @click="toggleAnn(a)">{{ a.is_active ? 'Deactivate' : 'Activate' }}</button>
+              <button class="mini danger" @click="delAnn(a)">Delete</button>
+            </td>
+          </tr>
+          <tr v-if="!announces.length"><td colspan="5" class="empty">No announcements yet.</td></tr>
+        </tbody>
+      </table>
+    </template>
+
     <!-- ════ SETTINGS ════ -->
     <template v-else-if="tab === 'settings'">
       <div v-if="setLoading" class="loading-hint">Loading…</div>
@@ -317,6 +355,10 @@ const expLoading = ref(false)
 const rev = ref(null)
 const funnel = ref(null)
 const revLoading = ref(false)
+const announces = ref([])
+const annLoading = ref(false)
+const annSaving = ref(false)
+const annForm = reactive({ message: '', type: 'info', starts_at: '', ends_at: '' })
 const settings = ref(null)
 const setLoading = ref(false)
 const saving = ref(false)
@@ -369,6 +411,33 @@ function planPct(p) {
 async function dlInvoice(p) {
   try { await superAdminService.downloadInvoice(p.id, p.invoice_no) }
   catch (e) { toastError('Could not download invoice.') }
+}
+
+async function loadAnn() {
+  annLoading.value = true
+  try { announces.value = (await superAdminService.announcements())?.data ?? [] }
+  catch (e) { toastError(e?.response?.data?.message ?? 'Failed.') }
+  finally { annLoading.value = false }
+}
+async function createAnn() {
+  annSaving.value = true
+  try {
+    await superAdminService.createAnnouncement({ ...annForm, starts_at: annForm.starts_at || null, ends_at: annForm.ends_at || null })
+    toastSuccess('Announcement posted.')
+    Object.assign(annForm, { message: '', type: 'info', starts_at: '', ends_at: '' })
+    await loadAnn()
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Failed.') }
+  finally { annSaving.value = false }
+}
+async function toggleAnn(a) {
+  try { await superAdminService.toggleAnnouncement(a.id); await loadAnn() }
+  catch (e) { toastError('Failed.') }
+}
+async function delAnn(a) {
+  const ok = await confirmDialog({ title: 'Delete announcement?', message: a.message, confirmLabel: 'Delete', cancelLabel: 'Cancel', danger: true })
+  if (!ok) return
+  try { await superAdminService.deleteAnnouncement(a.id); toastSuccess('Deleted.'); await loadAnn() }
+  catch (e) { toastError('Failed.') }
 }
 
 async function loadSettings() {
@@ -576,6 +645,10 @@ onMounted(load)
 .status-strip { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
 .status-strip.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
 .status-strip.off { background: #fff8e1; color: #b5740a; border: 1px solid #ffe082; }
+.flag-chip { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; text-transform: uppercase; }
+.flag-chip.info { background: #EEF1FE; color: #2140C0; }
+.flag-chip.warning { background: #fff8e1; color: #b5740a; }
+.flag-chip.success { background: #e8f5e9; color: #2e7d32; }
 .status-strip .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
 .panel .sec-h { margin: 0 0 4px; }
 .sw { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin: 8px 0 14px; cursor: pointer; }

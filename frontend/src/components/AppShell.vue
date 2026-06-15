@@ -6,6 +6,12 @@
       <button class="imp-exit" @click="exitImpersonation">Exit to Platform Admin</button>
     </div>
 
+    <!-- Platform announcements -->
+    <div v-for="a in visibleAnnouncements" :key="a.id" class="ann-banner" :class="a.type">
+      <span>📢 {{ a.message }}</span>
+      <button class="ann-x" @click="dismissAnnouncement(a.id)">✕</button>
+    </div>
+
     <!-- Mobile overlay -->
     <div v-if="mobileOpen" class="sidebar-scrim" @click="mobileOpen = false"></div>
 
@@ -114,6 +120,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 import authService from '../services/authService.js'
 import dashboardService from '../services/dashboardService.js'
 import companyService from '../services/companyService.js'
@@ -151,6 +158,14 @@ const active      = ref(authService.currentUser()?.is_super_admin ? 'superadmin'
 const user        = ref(authService.currentUser())
 const companyName = ref('PanelOS')
 const impersonating = ref(localStorage.getItem('impersonating'))
+
+const announcements = ref([])
+const dismissedAnn = ref(JSON.parse(localStorage.getItem('dismissed_ann') || '[]'))
+const visibleAnnouncements = computed(() => announcements.value.filter(a => !dismissedAnn.value.includes(a.id)))
+function dismissAnnouncement(id) {
+  dismissedAnn.value = [...dismissedAnn.value, id]
+  localStorage.setItem('dismissed_ann', JSON.stringify(dismissedAnn.value))
+}
 
 function exitImpersonation() {
   const saTok = localStorage.getItem('token_superadmin')
@@ -279,6 +294,13 @@ onMounted(async () => {
   // Refresh the user so permissions/is_admin are current (drives nav gating).
   try { const u = await authService.me(); if (u) user.value = u } catch { /* ignore */ }
 
+  // Live platform announcements (broadcast banner)
+  try {
+    const tok = localStorage.getItem('token')
+    const res = await axios.get('/api/announcements', { headers: tok ? { Authorization: `Bearer ${tok}` } : {} })
+    announcements.value = res.data?.data ?? []
+  } catch { /* ignore */ }
+
   // Platform owner: skip all tenant company/badge loading, land on Platform Admin.
   if (isSuperAdmin.value) {
     companyName.value = 'PanelOS Platform'
@@ -319,6 +341,12 @@ onMounted(async () => {
 .shell { display: flex; min-height: 100vh; }
 .imp-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 2000; background: #b5740a; color: #fff; display: flex; align-items: center; justify-content: center; gap: 16px; padding: 7px 16px; font-size: 13px; }
 .imp-exit { background: #fff; color: #b5740a; border: none; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ann-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 18px; font-size: 13px; font-weight: 500; }
+.ann-banner.info { background: #EEF1FE; color: #2140C0; }
+.ann-banner.warning { background: #fff8e1; color: #8a5a00; }
+.ann-banner.success { background: #e8f5e9; color: #1b5e20; }
+.ann-x { background: transparent; border: none; cursor: pointer; font-size: 14px; color: inherit; opacity: .6; }
+.ann-x:hover { opacity: 1; }
 .imp-banner + .sidebar-scrim + .sidebar, .imp-banner ~ .sidebar { } /* layout unaffected; banner overlays */
 
 /* ---- Sidebar ---- */

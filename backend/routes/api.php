@@ -357,6 +357,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
     Route::post('/gst/validate-gstin', [GstController::class, 'validateGstin'])->name('gst.validate-gstin');
     Route::get('/gst/states', [GstController::class, 'getStatesList'])->name('gst.states');
 
+    // Active platform announcements (any authed user sees the broadcast banner)
+    Route::get('/announcements', fn () => response()->json(['success' => true, 'data' => \App\Models\PlatformAnnouncement::live()]))->name('announcements.active');
+
     // Billing — tenant's own subscription (reachable even when expired, so they can pay)
     Route::get('/billing/status',   [\App\Http\Controllers\Api\BillingController::class, 'status'])->name('billing.status');
     Route::post('/billing/checkout',[\App\Http\Controllers\Api\BillingController::class, 'checkout'])->name('billing.checkout');
@@ -372,6 +375,10 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
         Route::put('/settings',              [\App\Http\Controllers\Api\SuperAdminController::class, 'updateSettings'])->name('admin.settings.update');
         Route::post('/settings/test-razorpay', [\App\Http\Controllers\Api\SuperAdminController::class, 'testRazorpay'])->name('admin.settings.test');
         Route::get('/payments/{id}/invoice', [\App\Http\Controllers\Api\SuperAdminController::class, 'invoicePdf'])->name('admin.payment.invoice');
+        Route::get('/announcements',         [\App\Http\Controllers\Api\SuperAdminController::class, 'announcements'])->name('admin.ann');
+        Route::post('/announcements',        [\App\Http\Controllers\Api\SuperAdminController::class, 'createAnnouncement'])->name('admin.ann.create');
+        Route::post('/announcements/{id}/toggle', [\App\Http\Controllers\Api\SuperAdminController::class, 'toggleAnnouncement'])->name('admin.ann.toggle');
+        Route::delete('/announcements/{id}', [\App\Http\Controllers\Api\SuperAdminController::class, 'deleteAnnouncement'])->name('admin.ann.delete');
         Route::get('/platform-admins',       [\App\Http\Controllers\Api\SuperAdminController::class, 'platformAdmins'])->name('admin.padmins');
         Route::post('/platform-admins',      [\App\Http\Controllers\Api\SuperAdminController::class, 'createPlatformAdmin'])->name('admin.padmins.create');
         Route::get('/companies',             [\App\Http\Controllers\Api\SuperAdminController::class, 'companies'])->name('admin.companies');
