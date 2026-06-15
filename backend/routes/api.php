@@ -36,8 +36,8 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-// Protected routes — generous per-user throttle to cap runaway/abusive traffic
-Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
+// Protected routes — generous per-user throttle + tenant subscription guard
+Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(function () {
     // Home Dashboard
     Route::get('/dashboard', [\App\Http\Controllers\Api\DashboardController::class, 'index'])->name('dashboard');
 

@@ -18,6 +18,10 @@ axios.interceptors.response.use(
       localStorage.removeItem('user_id')
       window.dispatchEvent(new CustomEvent('auth:expired'))
     }
+    // Tenant subscription/trial inactive → show the renew/upgrade screen
+    if (status === 402 && error?.response?.data?.error_code === 'SUBSCRIPTION_INACTIVE') {
+      window.dispatchEvent(new CustomEvent('subscription:inactive', { detail: error.response.data }))
+    }
     return Promise.reject(error)
   }
 )
