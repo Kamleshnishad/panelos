@@ -335,7 +335,7 @@ class InvoiceService
         $companyId = $companyId ?? auth()->user()->company_id;
 
         $invoice = Invoice::where('company_id', $companyId)
-            ->with('company', 'items.panelType', 'taxCalculation', 'dispatch.batch.order.customer', 'order.customer')
+            ->with('company', 'items.panelType', 'taxCalculation', 'payments', 'dispatch.batch.order.customer', 'order.customer')
             ->findOrFail($invoiceId);
 
         $total = $invoice->subtotal + ($invoice->taxCalculation->tax_amount ?? 0);
@@ -364,5 +364,38 @@ class InvoiceService
         $filename = 'invoice_' . $invoice->invoice_no . '_' . now()->timestamp . '.pdf';
 
         return $pdf->download($filename);
+    }
+
+    /** Convert a numeric amount to Indian-format words (e.g. 423738 → "Four Lakh …"). */
+    public static function amountInWords(float $total): string
+    {
+        $num = (int) round($total);
+        if ($num === 0) return 'Zero';
+
+        $ones  = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+                  'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
+                  'Seventeen','Eighteen','Nineteen'];
+        $tens  = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+
+        $two   = function (int $n) use ($ones, $tens): string {
+            if ($n < 20) return $ones[$n];
+            return trim($tens[(int)($n / 10)] . ' ' . $ones[$n % 10]);
+        };
+        $three = function (int $n) use ($ones, $two): string {
+            $h = (int)($n / 100); $r = $n % 100;
+            return trim(($h ? $ones[$h] . ' Hundred ' . ($r ? 'and ' : '') : '') . $two($r));
+        };
+
+        $out    = '';
+        $crore  = (int)($num / 10000000); $num %= 10000000;
+        $lakh   = (int)($num / 100000);   $num %= 100000;
+        $thou   = (int)($num / 1000);     $num %= 1000;
+
+        if ($crore) $out .= $three($crore) . ' Crore ';
+        if ($lakh)  $out .= $three($lakh)  . ' Lakh ';
+        if ($thou)  $out .= $three($thou)  . ' Thousand ';
+        if ($num)   $out .= $three($num);
+
+        return trim($out);
     }
 }

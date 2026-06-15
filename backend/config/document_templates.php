@@ -30,9 +30,9 @@ return [
 
     'invoice' => [
         'classic' => [
-            'name'        => 'Classic',
+            'name'        => 'Professional',
             'view'        => 'invoices.pdf',
-            'description' => 'Standard GST tax invoice.',
+            'description' => 'GST tax invoice — DejaVu font (proper ₹), CGST/SGST/IGST split, amount in words, balance due, signatory block.',
         ],
     ],
 ];
