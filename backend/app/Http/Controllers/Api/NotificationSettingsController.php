@@ -15,16 +15,14 @@ class NotificationSettingsController extends Controller
     public function show(Request $r)
     {
         $s = NotificationSetting::forCompany($r->user()->company_id);
-        // Mask token in response — send '*' so frontend knows it's set
+        // toArray() omits twilio_auth_token ($hidden) — read raw attribute to detect it
+        $hasToken = !empty($s->getAttribute('twilio_auth_token'));
+
         $data = $s->toArray();
-        if (!empty($data['twilio_auth_token'])) {
-            $data['twilio_auth_token'] = str_repeat('*', 8);
-            $data['token_is_set'] = true;
-        } else {
-            $data['token_is_set'] = false;
-        }
-        $data['sms_ready']       = $s->isSmsReady();
-        $data['whatsapp_ready']  = $s->isWhatsappReady();
+        $data['twilio_auth_token'] = $hasToken ? str_repeat('*', 8) : '';
+        $data['token_is_set']      = $hasToken;
+        $data['sms_ready']         = $s->isSmsReady();
+        $data['whatsapp_ready']    = $s->isWhatsappReady();
         return $this->successResponse($data, 'Notification settings retrieved');
     }
 
