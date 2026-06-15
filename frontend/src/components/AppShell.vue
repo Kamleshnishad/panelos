@@ -17,7 +17,7 @@
       </div>
 
       <nav class="side-nav">
-        <template v-for="group in nav" :key="group.label">
+        <template v-for="group in visibleNav" :key="group.label">
           <div class="nav-group-label">{{ group.label }}</div>
           <button
             v-for="item in group.items"
@@ -139,7 +139,7 @@ import SuperAdmin         from './SuperAdmin.vue'
 
 defineEmits(['logout'])
 
-const active      = ref('dashboard')
+const active      = ref(authService.currentUser()?.is_super_admin ? 'superadmin' : 'dashboard')
 const user        = ref(authService.currentUser())
 const companyName = ref('PanelOS')
 const companyLogo = ref(null)
@@ -219,13 +219,22 @@ const nav = [
 const allItems    = nav.flatMap(g => g.items)
 const activeLabel = computed(() => allItems.find(i => i.key === active.value)?.label ?? '')
 const activeGroup = computed(() => nav.find(g => g.items.some(i => i.key === active.value))?.label ?? 'Main')
+
+// Super admins (platform owner) get a clean platform-only menu — no tenant
+// operational features, since they don't belong to any one customer factory.
+const isSuperAdmin = computed(() => !!user.value?.is_super_admin)
+const visibleNav = computed(() => {
+  if (isSuperAdmin.value) {
+    return [{ label: 'Platform', items: [{ key: 'superadmin', label: 'Platform Admin', icon: ic.building, superadmin: true }] }]
+  }
+  return nav
+})
 const initials = computed(() => {
   const n = user.value?.name ?? 'U'
   return n.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 })
 const roleLabel = computed(() => user.value?.is_super_admin ? 'Super Admin' : (user.value?.is_company_admin ? 'Company Admin' : 'User'))
 const isAdmin = computed(() => !!(user.value?.is_admin || user.value?.is_company_admin || user.value?.is_super_admin))
-const isSuperAdmin = computed(() => !!user.value?.is_super_admin)
 function can(key) {
   const u = user.value
   if (!u) return false
@@ -247,6 +256,14 @@ function quickJump() {
 onMounted(async () => {
   // Refresh the user so permissions/is_admin are current (drives nav gating).
   try { const u = await authService.me(); if (u) user.value = u } catch { /* ignore */ }
+
+  // Platform owner: skip all tenant company/badge loading, land on Platform Admin.
+  if (isSuperAdmin.value) {
+    companyName.value = 'PanelOS Platform'
+    if (active.value !== 'superadmin') active.value = 'superadmin'
+    return
+  }
+
   try {
     const res = await dashboardService.get()
     const d = res?.data ?? res
