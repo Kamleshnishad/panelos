@@ -48,16 +48,15 @@ class NotificationSettingsController extends Controller
 
         $s = NotificationSetting::forCompany($r->user()->company_id);
 
-        // Don't overwrite token if placeholder was sent back
-        if (($data['twilio_auth_token'] ?? '') === str_repeat('*', 8)) {
-            unset($data['twilio_auth_token']);
-        }
-        // Don't clear token if not sent
-        if (!array_key_exists('twilio_auth_token', $data) || $data['twilio_auth_token'] === null) {
+        // Don't overwrite token with the masked placeholder
+        $token = $data['twilio_auth_token'] ?? null;
+        if ($token === null || $token === '' || str_starts_with($token, '*') || str_starts_with($token, '•')) {
             unset($data['twilio_auth_token']);
         }
 
-        $s->update(array_filter($data, fn ($v) => $v !== null));
+        // Save: only skip truly null values (allow empty strings to clear fields)
+        $save = array_filter($data, fn ($v) => $v !== null);
+        $s->update($save);
 
         return $this->successResponse([
             'sms_ready'      => $s->fresh()->isSmsReady(),
