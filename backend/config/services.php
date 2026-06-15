@@ -41,6 +41,14 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
 
+    // Razorpay — SaaS subscription billing. Set keys from the Razorpay dashboard.
+    'razorpay' => [
+        'enabled'        => env('RAZORPAY_ENABLED', false),
+        'key_id'         => env('RAZORPAY_KEY_ID'),
+        'key_secret'     => env('RAZORPAY_KEY_SECRET'),
+        'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET'),
+    ],
+
     // e-Invoice GSP (IRP). Set EINVOICE_GSP_ENABLED=true when you have a GSP contract.
     'einvoice' => [
         'enabled'       => env('EINVOICE_GSP_ENABLED', false),

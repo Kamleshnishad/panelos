@@ -93,6 +93,7 @@
         <business-reports      v-else-if="active === 'reports'" />
         <company-settings      v-else-if="active === 'company'" />
         <notification-settings v-else-if="active === 'notifications'" />
+        <billing-settings      v-else-if="active === 'billing'" />
         <document-templates    v-else-if="active === 'doctemplates'" />
         <audit-log             v-else-if="active === 'audit'" />
         <master-data-manager   v-else-if="active === 'master'" />
@@ -129,6 +130,7 @@ import AccountsReceivable from './AccountsReceivable.vue'
 import BusinessReports    from './BusinessReports.vue'
 import CompanySettings    from './CompanySettings.vue'
 import NotificationSettings from './NotificationSettings.vue'
+import BillingSettings    from './BillingSettings.vue'
 import DocumentTemplates  from './DocumentTemplates.vue'
 import AuditLog           from './AuditLog.vue'
 import MasterDataManager  from './MasterDataManager.vue'
@@ -204,6 +206,7 @@ const nav = [
   ]},
   { label: 'Settings', items: [
     { key: 'company',       label: 'Company',         icon: ic.building },
+    { key: 'billing',       label: 'Billing & Plan',  icon: ic.money, admin: true },
     { key: 'notifications', label: 'Notifications',  icon: ic.bell },
     { key: 'doctemplates',  label: 'Doc Templates',  icon: ic.quote },
     { key: 'master',      label: 'Master Data',     icon: ic.grid },

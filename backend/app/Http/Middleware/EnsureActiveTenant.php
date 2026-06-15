@@ -23,7 +23,7 @@ class EnsureActiveTenant
     private array $allow = [
         'me', 'logout', 'change-password',
         'company.show',            // see own company
-        'billing.status', 'billing.plans', 'billing.checkout', 'billing.webhook',
+        'billing.status', 'billing.checkout', 'billing.verify',
         'notif.settings.show',
     ];
 

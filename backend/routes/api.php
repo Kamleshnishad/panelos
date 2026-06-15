@@ -350,6 +350,11 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
     Route::post('/gst/validate-gstin', [GstController::class, 'validateGstin'])->name('gst.validate-gstin');
     Route::get('/gst/states', [GstController::class, 'getStatesList'])->name('gst.states');
 
+    // Billing — tenant's own subscription (reachable even when expired, so they can pay)
+    Route::get('/billing/status',   [\App\Http\Controllers\Api\BillingController::class, 'status'])->name('billing.status');
+    Route::post('/billing/checkout',[\App\Http\Controllers\Api\BillingController::class, 'checkout'])->name('billing.checkout');
+    Route::post('/billing/verify',  [\App\Http\Controllers\Api\BillingController::class, 'verify'])->name('billing.verify');
+
     // Super-admin — platform-owner tenant management (is_super_admin only)
     Route::prefix('admin')->group(function () {
         Route::get('/overview',              [\App\Http\Controllers\Api\SuperAdminController::class, 'overview'])->name('admin.overview');
@@ -368,6 +373,7 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
 
 // Public routes
 Route::post('/webhooks/stripe', [PaymentController::class, 'handleStripeWebhook'])->name('webhooks.stripe');
+Route::post('/webhooks/razorpay', [\App\Http\Controllers\Api\BillingController::class, 'webhook'])->name('billing.webhook');
 
 // Health check endpoint
 Route::get('/health', function () {
