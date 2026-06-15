@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class AuditLog extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     public $timestamps = false; // only created_at, set manually
 
     protected $fillable = [

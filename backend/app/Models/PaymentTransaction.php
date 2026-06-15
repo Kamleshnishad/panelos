@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class PaymentTransaction extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     use \App\Traits\Auditable;
     protected $table = 'payment_transactions';
 

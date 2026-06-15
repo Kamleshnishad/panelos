@@ -2,34 +2,20 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BaseModel extends Model
 {
     use SoftDeletes;
+    use BelongsToTenant;   // global tenant scope + company_id auto-fill on create
 
     protected $fillable = [];
 
     /**
-     * Boot the model
-     */
-    protected static function boot()
-    {
-        parent::boot();
-
-        // Auto-set company_id for all queries (multi-tenancy)
-        if (auth()->check() && auth()->user()) {
-            static::creating(function ($model) {
-                if (!$model->company_id && auth()->user()->company_id) {
-                    $model->company_id = auth()->user()->company_id;
-                }
-            });
-        }
-    }
-
-    /**
-     * Scope query to current company
+     * Scope query to current company (kept for backward compatibility; the
+     * BelongsToTenant global scope now does this automatically on every read).
      */
     public function scopeCompany($query)
     {

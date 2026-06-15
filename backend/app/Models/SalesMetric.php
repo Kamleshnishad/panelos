@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SalesMetric extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $fillable = [
         'company_id',
         'panel_type_id',

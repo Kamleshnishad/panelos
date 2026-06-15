@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class NotificationSetting extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $fillable = [
         'company_id',
         'twilio_account_sid', 'twilio_auth_token', 'twilio_from_number', 'sms_enabled',

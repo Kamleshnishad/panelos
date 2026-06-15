@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class TaxConfiguration extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $table = 'tax_configurations';
 
     protected $fillable = [

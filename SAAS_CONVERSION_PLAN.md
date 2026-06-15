@@ -23,29 +23,30 @@ factories sign up online, get a trial, and pay — safely (no cross-tenant leaks
 
 ---
 
-## Phase S0 — Isolation hardening (DO FIRST, non-negotiable)
+## Phase S0 — Isolation hardening (DO FIRST, non-negotiable)  ✅ CORE DONE
 
 Make tenant isolation structural, not opt-in. Without this, do not run ads/onboard strangers.
 
-1. **`BelongsToTenant` trait + global scope**
-   - New trait that adds a global scope: auto `where('company_id', auth user company)` on every read,
-     bypassed when `auth()->user()->is_super_admin`.
-   - Apply to all 21 BaseModel subclasses (and tenant-owned plain models like PaymentTransaction,
-     NotificationSetting, GstConfiguration, AuditLog, SmsLog, etc.).
-   - Keep the existing `creating` auto-inject for writes.
-   - Child/line tables (OrderItem, QuotationItem, InvoiceItem, *_sizes, …) stay parent-scoped — but
-     add a `company_id`-via-parent assertion in tests.
-2. **Audit all 31 controllers** — with the global scope on, the manual `where('company_id')` becomes
-   defence-in-depth; verify no endpoint relies on cross-tenant reads (except super-admin ones).
-3. **Automated isolation test suite** (Pest/PHPUnit):
-   - Seed 2 companies. With Company A's token, attempt to read/update/delete every major resource by
-     Company B's IDs → must return 404/empty/403, never B's data.
-   - Run on every deploy (CI gate).
-4. **Login tenant resolution** — email is unique *per company*, not global. Decide: (a) global-unique
-   email (simplest), or (b) subdomain/tenant-scoped login. Pick (a) for v1: add a global-unique guard
-   on signup so one email = one tenant.
+1. ✅ **`BelongsToTenant` trait + global scope** — DONE. `app/Models/Concerns/BelongsToTenant.php`
+   adds a global scope `'tenant'` that auto-filters every read by `company_id` (no-op when
+   unauthenticated → seeders/commands safe; bypassed for `is_super_admin`), plus `creating`
+   auto-inject. Applied to BaseModel (covers 21 subclasses) + 17 tenant-owned plain models that
+   have a `company_id` column (PaymentTransaction, AuditLog, NotificationSetting, GstConfiguration,
+   GstTaxBreakdown, HsnCode, SmsLog, StockAllocation, QualityControl, PaymentReminder, TaxConfiguration,
+   AnalyticsSnapshot, DemandForecast, ForecastAccuracy, InventoryForecast, SalesMetric, TrendAnalysis).
+   NOT applied to line/child tables (no company_id — parent-scoped) or User (auth, special).
+2. ✅ **Automated isolation check** — DONE. `php artisan tenant:check-isolation` spins up two throwaway
+   tenants, seeds under B, and asserts tenant A can't see B by list / name / `find(id)`; also asserts
+   the global scope is registered on key models. Exit 0 = safe, 1 = leak. Run before every release.
+   **Verified PASS** — `find(otherTenantId)` now returns NULL (previously leaked).
+3. ⏳ **Controller audit (defence-in-depth)** — with the global scope on, the 116 manual
+   `where('company_id')` clauses are now redundant safety nets. Optional cleanup later; not blocking.
+4. ⏳ **Login tenant resolution** — handle in S1: enforce global-unique email on signup (one email =
+   one tenant) so login stays unambiguous.
 
-**Exit criteria:** isolation test suite green; a forgotten `where` can no longer leak data.
+**Exit criteria:** ✅ isolation check green; a forgotten `where` can no longer leak data (global scope
+catches it). Pre-existing PHPUnit suite is unusable on SQLite (a MySQL-only `MODIFY COLUMN` migration);
+the artisan check runs against real MySQL instead.
 
 ## Phase S1 — Signup, trial & onboarding
 

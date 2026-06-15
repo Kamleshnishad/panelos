@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class AnalyticsSnapshot extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $fillable = [
         'company_id',
         'snapshot_date',

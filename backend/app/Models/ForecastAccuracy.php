@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ForecastAccuracy extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $fillable = [
         'company_id',
         'panel_type_id',

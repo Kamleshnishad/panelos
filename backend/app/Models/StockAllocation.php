@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class StockAllocation extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $table = 'stock_allocations';
 
     protected $fillable = [

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class QualityControl extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     use HasFactory;
 
     protected $fillable = [
