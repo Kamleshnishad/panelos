@@ -21,7 +21,7 @@
           <div class="nav-group-label">{{ group.label }}</div>
           <button
             v-for="item in group.items"
-            v-show="(!item.admin || isAdmin) && (!item.perm || can(item.perm))"
+            v-show="(!item.admin || isAdmin) && (!item.superadmin || isSuperAdmin) && (!item.perm || can(item.perm))"
             :key="item.key"
             :class="['nav-item', { active: active === item.key }]"
             @click="go(item.key)"
@@ -97,6 +97,7 @@
         <audit-log             v-else-if="active === 'audit'" />
         <master-data-manager   v-else-if="active === 'master'" />
         <user-management       v-else-if="active === 'users'" />
+        <super-admin           v-else-if="active === 'superadmin'" />
       </main>
     </div>
   </div>
@@ -132,6 +133,7 @@ import DocumentTemplates  from './DocumentTemplates.vue'
 import AuditLog           from './AuditLog.vue'
 import MasterDataManager  from './MasterDataManager.vue'
 import UserManagement     from './UserManagement.vue'
+import SuperAdmin         from './SuperAdmin.vue'
 
 defineEmits(['logout'])
 
@@ -207,6 +209,7 @@ const nav = [
     { key: 'master',      label: 'Master Data',     icon: ic.grid },
     { key: 'users',       label: 'Users & Roles',   icon: ic.users, admin: true },
     { key: 'audit',       label: 'Audit Log',       icon: ic.qc, admin: true },
+    { key: 'superadmin',  label: 'Platform Admin',  icon: ic.building, superadmin: true },
   ]},
 ]
 
@@ -219,6 +222,7 @@ const initials = computed(() => {
 })
 const roleLabel = computed(() => user.value?.is_super_admin ? 'Super Admin' : (user.value?.is_company_admin ? 'Company Admin' : 'User'))
 const isAdmin = computed(() => !!(user.value?.is_admin || user.value?.is_company_admin || user.value?.is_super_admin))
+const isSuperAdmin = computed(() => !!user.value?.is_super_admin)
 function can(key) {
   const u = user.value
   if (!u) return false

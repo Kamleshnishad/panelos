@@ -350,6 +350,16 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
     Route::post('/gst/validate-gstin', [GstController::class, 'validateGstin'])->name('gst.validate-gstin');
     Route::get('/gst/states', [GstController::class, 'getStatesList'])->name('gst.states');
 
+    // Super-admin — platform-owner tenant management (is_super_admin only)
+    Route::prefix('admin')->group(function () {
+        Route::get('/overview',              [\App\Http\Controllers\Api\SuperAdminController::class, 'overview'])->name('admin.overview');
+        Route::get('/companies',             [\App\Http\Controllers\Api\SuperAdminController::class, 'companies'])->name('admin.companies');
+        Route::get('/companies/{id}',        [\App\Http\Controllers\Api\SuperAdminController::class, 'show'])->name('admin.companies.show');
+        Route::post('/companies/{id}/activate',     [\App\Http\Controllers\Api\SuperAdminController::class, 'activate'])->name('admin.companies.activate');
+        Route::post('/companies/{id}/extend-trial', [\App\Http\Controllers\Api\SuperAdminController::class, 'extendTrial'])->name('admin.companies.extend');
+        Route::post('/companies/{id}/set-active',    [\App\Http\Controllers\Api\SuperAdminController::class, 'setActive'])->name('admin.companies.setactive');
+    });
+
     // Notification settings (Twilio SMS + WhatsApp credentials + triggers)
     Route::get('/settings/notifications',          [\App\Http\Controllers\Api\NotificationSettingsController::class, 'show'])->name('notif.settings.show');
     Route::put('/settings/notifications',          [\App\Http\Controllers\Api\NotificationSettingsController::class, 'update'])->name('notif.settings.update');
