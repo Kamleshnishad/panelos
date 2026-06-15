@@ -240,6 +240,50 @@
           </div>
         </div>
 
+        <div class="panel" v-if="settings.plan_prices">
+          <h3 class="sec-h">💵 Plan Prices (₹/month, GST-inclusive)</h3>
+          <p class="hint-line">Editable — overrides the defaults. Affects checkout, MRR &amp; the trial-gate cards.</p>
+          <div class="form-grid">
+            <div class="form-group"><label>Starter</label><input v-model.number="settings.plan_prices.starter" type="number" min="0" /></div>
+            <div class="form-group"><label>Growth</label><input v-model.number="settings.plan_prices.growth" type="number" min="0" /></div>
+            <div class="form-group"><label>Pro</label><input v-model.number="settings.plan_prices.pro" type="number" min="0" /></div>
+            <div class="form-group"><label>Enterprise</label><input v-model.number="settings.plan_prices.enterprise" type="number" min="0" /></div>
+          </div>
+          <div class="row-actions"><button class="btn btn-primary" :disabled="saving" @click="saveSettings">Save Prices</button></div>
+        </div>
+
+        <div class="panel">
+          <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
+            <h3 class="sec-h">🎟️ Promo Codes</h3>
+            <button class="btn btn-primary btn-sm" @click="showCoupon = !showCoupon">+ New Coupon</button>
+          </div>
+          <div v-if="showCoupon" class="coupon-form">
+            <input v-model="cpForm.code" placeholder="CODE e.g. DIWALI20" class="ei" />
+            <select v-model="cpForm.type" class="ei"><option value="percent">% off</option><option value="flat">₹ off</option></select>
+            <input v-model.number="cpForm.value" type="number" min="0" placeholder="Value" class="ei" />
+            <input v-model.number="cpForm.max_uses" type="number" min="1" placeholder="Max uses (blank=∞)" class="ei" />
+            <input v-model="cpForm.expires_at" type="date" class="ei" />
+            <button class="btn btn-primary btn-sm" :disabled="cpSaving || !cpForm.code || !cpForm.value" @click="createCoupon">Add</button>
+          </div>
+          <table class="sa-table" style="margin-top:10px">
+            <thead><tr><th>Code</th><th>Discount</th><th class="c">Used</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="cp in coupons" :key="cp.id">
+                <td class="mono bold">{{ cp.code }}</td>
+                <td>{{ cp.type === 'percent' ? cp.value + '% off' : '₹' + cp.value + ' off' }}</td>
+                <td class="c">{{ cp.used_count }}{{ cp.max_uses ? '/' + cp.max_uses : '' }}</td>
+                <td class="small">{{ cp.expires_at ? fmtDate(cp.expires_at) : '—' }}</td>
+                <td><span class="status-chip" :class="cp.is_active ? 'active' : 'suspended'">{{ cp.is_active ? 'active' : 'off' }}</span></td>
+                <td class="actions">
+                  <button class="mini ghost" @click="toggleCoupon(cp)">{{ cp.is_active ? 'Off' : 'On' }}</button>
+                  <button class="mini danger" @click="delCoupon(cp)">Del</button>
+                </td>
+              </tr>
+              <tr v-if="!coupons.length"><td colspan="6" class="empty">No coupons yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
         <div class="panel">
           <h3 class="sec-h">🔐 Two-Factor Authentication (your account)</h3>
           <p class="hint-line">When enabled, your next login will require a 6-digit code sent to your email — protects the platform owner account.</p>
@@ -450,6 +494,28 @@ async function delAnn(a) {
   catch (e) { toastError('Failed.') }
 }
 
+const coupons = ref([])
+const showCoupon = ref(false)
+const cpSaving = ref(false)
+const cpForm = reactive({ code: '', type: 'percent', value: null, max_uses: null, expires_at: '' })
+async function loadCoupons() { try { coupons.value = (await superAdminService.coupons())?.data ?? [] } catch {} }
+async function createCoupon() {
+  cpSaving.value = true
+  try {
+    await superAdminService.createCoupon({ ...cpForm, max_uses: cpForm.max_uses || null, expires_at: cpForm.expires_at || null })
+    toastSuccess('Coupon created.'); showCoupon.value = false
+    Object.assign(cpForm, { code: '', type: 'percent', value: null, max_uses: null, expires_at: '' })
+    await loadCoupons()
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Failed.') }
+  finally { cpSaving.value = false }
+}
+async function toggleCoupon(cp) { try { await superAdminService.toggleCoupon(cp.id); await loadCoupons() } catch { toastError('Failed.') } }
+async function delCoupon(cp) {
+  const ok = await confirmDialog({ title: 'Delete coupon?', message: cp.code, confirmLabel: 'Delete', cancelLabel: 'Cancel', danger: true })
+  if (!ok) return
+  try { await superAdminService.deleteCoupon(cp.id); toastSuccess('Deleted.'); await loadCoupons() } catch { toastError('Failed.') }
+}
+
 const twoFa = ref(!!authService.currentUser()?.two_factor_enabled)
 async function saveTwoFa() {
   try {
@@ -464,6 +530,7 @@ async function saveTwoFa() {
 async function loadSettings() {
   setLoading.value = true; testMsg.value = ''
   twoFa.value = !!authService.currentUser()?.two_factor_enabled
+  loadCoupons()
   try {
     const s = (await superAdminService.getSettings())?.data ?? {}
     // blank the masked secrets so the user types only to change
@@ -682,6 +749,8 @@ onMounted(load)
 .err-t { font-size: 12px; color: #c62828; }
 .panel + .panel { margin-top: 14px; }
 @media (max-width: 900px) { .form-grid { grid-template-columns: 1fr; } }
+.coupon-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.coupon-form .ei { padding: 8px 10px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; }
 @media (max-width: 1000px) { .kpi-grid.five { grid-template-columns: repeat(3, 1fr); } .two-col { grid-template-columns: 1fr; } }
 
 @media (max-width: 1000px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } .d-grid, .usage-row { grid-template-columns: repeat(2, 1fr); } }

@@ -93,10 +93,10 @@ Legend: ✅ done · 🟡 partial/data-exists · ⬜ to build
 7. ✅ UTM capture at signup (companies.utm_*; LoginScreen reads URL params); `@funnel` = signups/conversion%/daily/by-source
 8. ✅ GST subscription tax-invoice (platform seller from config/platform.php; CGST/SGST vs IGST by state; SAC 997331; GST-inclusive ₹ split; PINV-YYYY-NNNN series; DejaVu PDF via `@invoicePdf`)
 
-**Phase C — Scale & polish:**
-9. Broadcast announcement banner — M
-10. DB-editable plans + promo codes — M
-11. 2FA for super-admin — M
+**Phase C — Scale & polish: ✅ DONE (2026-06-15)**
+9. ✅ Broadcast announcements — platform_announcements; super-admin compose/toggle/delete; all-tenant dismissible banner (info/warning/success)
+10. ✅ DB-editable plan prices (platform_settings.plan_prices override + UI) + promo codes (coupons table, % / flat, max-uses, expiry; applied at Razorpay checkout; super-admin CRUD; coupon input in billing)
+11. ✅ Super-admin 2FA — email OTP login (opt-in toggle in Settings; verifyOtp flow; OTP hashed + 10-min expiry)
 
 ---
 

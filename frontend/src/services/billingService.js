@@ -22,16 +22,16 @@ function loadRazorpay() {
 
 export default {
   status()                  { return api('get',  '/api/billing/status') },
-  checkout(plan, months)    { return api('post', '/api/billing/checkout', { plan, months }) },
+  checkout(plan, months, coupon) { return api('post', '/api/billing/checkout', { plan, months, coupon }) },
   verify(payload)           { return api('post', '/api/billing/verify', payload) },
 
   /**
    * Full online-payment flow: create order → open Razorpay → verify.
    * Resolves with the verify response on success, rejects on failure/cancel.
    */
-  async pay(plan, months, company) {
+  async pay(plan, months, company, coupon = null) {
     await loadRazorpay()
-    const res = await this.checkout(plan, months)
+    const res = await this.checkout(plan, months, coupon)
     const o = res?.data ?? res
     return new Promise((resolve, reject) => {
       const rzp = new window.Razorpay({
@@ -49,7 +49,7 @@ export default {
               razorpay_order_id: resp.razorpay_order_id,
               razorpay_payment_id: resp.razorpay_payment_id,
               razorpay_signature: resp.razorpay_signature,
-              plan, months,
+              plan, months, coupon: o.coupon || null, amount: o.payable,
             })
             resolve(v?.data ?? v)
           } catch (e) { reject(e) }

@@ -14,15 +14,27 @@ class PlatformSetting extends Model
         'razorpay_enabled', 'razorpay_key_id', 'razorpay_key_secret', 'razorpay_webhook_secret',
         'platform_name', 'platform_gstin', 'platform_pan', 'platform_address',
         'platform_state', 'platform_state_code', 'platform_email', 'platform_phone', 'platform_sac',
+        'plan_prices',
     ];
 
-    protected $casts = ['razorpay_enabled' => 'boolean'];
+    protected $casts = ['razorpay_enabled' => 'boolean', 'plan_prices' => 'array'];
 
     protected $hidden = ['razorpay_key_secret', 'razorpay_webhook_secret'];
 
     public static function current(): self
     {
         return static::firstOrCreate(['id' => 1]);
+    }
+
+    /** Plan prices: DB override merged over config defaults. */
+    public function planPrices(): array
+    {
+        return array_merge(config('plans.prices', []), array_filter((array) ($this->plan_prices ?? [])));
+    }
+
+    public function priceFor(string $plan): int
+    {
+        return (int) ($this->planPrices()[$plan] ?? 0);
     }
 
     // ── Razorpay (DB first, env fallback) ────────────────────────────────

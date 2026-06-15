@@ -16,7 +16,7 @@ class SubscriptionService
      * Activate (or extend) a paid plan for N months. Stacks on remaining time.
      * Records a SubscriptionPayment unless $record is false.
      */
-    public function activate(Company $company, string $plan, int $months = 1, string $method = 'manual', ?string $reference = null, bool $record = true, ?int $byUserId = null): Company
+    public function activate(Company $company, string $plan, int $months = 1, string $method = 'manual', ?string $reference = null, bool $record = true, ?int $byUserId = null, ?float $totalOverride = null): Company
     {
         $base = ($company->subscription_ends_at && $company->subscription_ends_at->isFuture())
             ? $company->subscription_ends_at : now();
@@ -31,7 +31,7 @@ class SubscriptionService
         ]);
 
         if ($record) {
-            $total   = $this->monthlyPrice($plan) * $months;       // GST-inclusive
+            $total   = $totalOverride ?? ($this->monthlyPrice($plan) * $months);   // GST-inclusive
             $rate    = 18.0;
             $taxable = round($total / (1 + $rate / 100), 2);
             $gst     = round($total - $taxable, 2);
@@ -85,6 +85,6 @@ class SubscriptionService
 
     public function monthlyPrice(string $plan): int
     {
-        return (int) (config('plans.prices')[$plan] ?? 0);
+        return \App\Models\PlatformSetting::current()->priceFor($plan);
     }
 }

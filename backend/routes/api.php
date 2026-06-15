@@ -381,6 +381,10 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
         Route::post('/announcements',        [\App\Http\Controllers\Api\SuperAdminController::class, 'createAnnouncement'])->name('admin.ann.create');
         Route::post('/announcements/{id}/toggle', [\App\Http\Controllers\Api\SuperAdminController::class, 'toggleAnnouncement'])->name('admin.ann.toggle');
         Route::delete('/announcements/{id}', [\App\Http\Controllers\Api\SuperAdminController::class, 'deleteAnnouncement'])->name('admin.ann.delete');
+        Route::get('/coupons',               [\App\Http\Controllers\Api\SuperAdminController::class, 'coupons'])->name('admin.coupons');
+        Route::post('/coupons',              [\App\Http\Controllers\Api\SuperAdminController::class, 'createCoupon'])->name('admin.coupons.create');
+        Route::post('/coupons/{id}/toggle',  [\App\Http\Controllers\Api\SuperAdminController::class, 'toggleCoupon'])->name('admin.coupons.toggle');
+        Route::delete('/coupons/{id}',       [\App\Http\Controllers\Api\SuperAdminController::class, 'deleteCoupon'])->name('admin.coupons.delete');
         Route::get('/platform-admins',       [\App\Http\Controllers\Api\SuperAdminController::class, 'platformAdmins'])->name('admin.padmins');
         Route::post('/platform-admins',      [\App\Http\Controllers\Api\SuperAdminController::class, 'createPlatformAdmin'])->name('admin.padmins.create');
         Route::get('/companies',             [\App\Http\Controllers\Api\SuperAdminController::class, 'companies'])->name('admin.companies');

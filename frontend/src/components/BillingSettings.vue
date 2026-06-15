@@ -34,6 +34,12 @@
         <a href="mailto:sales@panelos.app">sales@panelos.app</a>.
       </div>
 
+      <!-- Coupon -->
+      <div v-if="status.online_billing" class="coupon-bar">
+        <span class="coupon-lbl">🎟️ Have a promo code?</span>
+        <input v-model="coupon" placeholder="Enter code" class="coupon-input" />
+      </div>
+
       <!-- Plans -->
       <div class="plans">
         <div v-for="p in status.plans" :key="p.key" class="plan" :class="{ current: p.key === status.current_plan, featured: p.key === 'growth' }">
@@ -62,6 +68,7 @@ const status = ref(null)
 const loading = ref(false)
 const error = ref(null)
 const paying = ref(null)
+const coupon = ref('')
 
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' }
 
@@ -77,7 +84,7 @@ async function load() {
 async function pay(planKey) {
   paying.value = planKey
   try {
-    await billingService.pay(planKey, 1, { name: status.value.company_name, email: status.value.company_email })
+    await billingService.pay(planKey, 1, { name: status.value.company_name, email: status.value.company_email }, coupon.value || null)
     toastSuccess('Payment successful — plan updated!')
     await load()
   } catch (e) {
@@ -113,6 +120,9 @@ onMounted(load)
 .notice { background: #fff8e1; border: 1px solid #ffe082; color: #6d4c00; padding: 11px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
 .notice a { color: var(--primary); font-weight: 600; }
 
+.coupon-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; background: #f8faff; border: 1px solid #dce6f8; border-radius: 8px; padding: 10px 14px; }
+.coupon-lbl { font-size: 13px; color: var(--text-2); font-weight: 600; }
+.coupon-input { padding: 7px 12px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; text-transform: uppercase; }
 .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .plan { border: 1px solid #e2e6ec; border-radius: 12px; padding: 18px 16px; display: flex; flex-direction: column; }
 .plan.featured { border-color: var(--primary); }

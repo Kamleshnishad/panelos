@@ -55,7 +55,7 @@ class SuperAdminController extends Controller
         $byStatus = $companies->groupBy('subscription_status')->map->count();
 
         // Naive MRR estimate from active paid plans
-        $planPrice = config('plans.prices', ['starter' => 2999, 'growth' => 5999, 'pro' => 9999, 'enterprise' => 19999]);
+        $planPrice = \App\Models\PlatformSetting::current()->planPrices();
         $mrr = $companies->where('subscription_status', 'active')
             ->sum(fn ($c) => (int) ($planPrice[$c->subscription_plan] ?? 0));
 
@@ -254,6 +254,7 @@ class SuperAdminController extends Controller
         $data['razorpay_webhook_secret'] = $s->getAttribute('razorpay_webhook_secret') ? '********' : '';
         $data['secret_is_set']           = !empty($s->getAttribute('razorpay_key_secret'));
         $data['razorpay_ready']          = $s->rzpReady();
+        $data['plan_prices']             = $s->planPrices();   // merged (config + override)
         return $this->successResponse($data, 'Platform settings');
     }
 
@@ -274,6 +275,8 @@ class SuperAdminController extends Controller
             'platform_email'           => 'nullable|email|max:120',
             'platform_phone'           => 'nullable|string|max:20',
             'platform_sac'             => 'nullable|string|max:12',
+            'plan_prices'              => 'nullable|array',
+            'plan_prices.*'            => 'nullable|integer|min:0',
         ]);
 
         // Don't overwrite secrets with the masked placeholder / blanks
@@ -331,7 +334,7 @@ class SuperAdminController extends Controller
     public function revenue(Request $r)
     {
         $this->requireSuperAdmin($r);
-        $prices = config('plans.prices', []);
+        $prices = \App\Models\PlatformSetting::current()->planPrices();
 
         $companies = Company::withoutGlobalScope('tenant')->get();
         $activeCos = $companies->where('subscription_status', 'active');
@@ -408,6 +411,43 @@ class SuperAdminController extends Controller
             'daily'          => $series,
             'by_source'      => $bySource,
         ], 'Signup funnel');
+    }
+
+    /** Coupons CRUD. */
+    public function coupons(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        return $this->successResponse(\App\Models\Coupon::latest('id')->get(), 'Coupons');
+    }
+
+    public function createCoupon(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        $data = $r->validate([
+            'code'      => 'required|string|max:40|unique:coupons,code',
+            'type'      => 'required|in:percent,flat',
+            'value'     => 'required|numeric|min:0',
+            'max_uses'  => 'nullable|integer|min:1',
+            'expires_at'=> 'nullable|date',
+            'is_active' => 'nullable|boolean',
+        ]);
+        $data['code'] = strtoupper(trim($data['code']));
+        return $this->successResponse(\App\Models\Coupon::create($data), 'Coupon created', 201);
+    }
+
+    public function toggleCoupon(Request $r, int $id)
+    {
+        $this->requireSuperAdmin($r);
+        $c = \App\Models\Coupon::findOrFail($id);
+        $c->update(['is_active' => !$c->is_active]);
+        return $this->successResponse($c->fresh(), $c->is_active ? 'Activated' : 'Deactivated');
+    }
+
+    public function deleteCoupon(Request $r, int $id)
+    {
+        $this->requireSuperAdmin($r);
+        \App\Models\Coupon::findOrFail($id)->delete();
+        return $this->successResponse(null, 'Coupon deleted');
     }
 
     /** All announcements (super-admin management). */

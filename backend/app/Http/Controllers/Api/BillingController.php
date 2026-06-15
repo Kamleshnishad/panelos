@@ -29,7 +29,7 @@ class BillingController extends Controller
     public function status(Request $r)
     {
         $c = $r->user()->company;
-        $prices = config('plans.prices', []);
+        $prices = \App\Models\PlatformSetting::current()->planPrices();
         $plans = [];
         foreach ($prices as $key => $price) {
             $plans[] = [
@@ -61,6 +61,7 @@ class BillingController extends Controller
         $data = $r->validate([
             'plan'   => 'required|in:starter,growth,pro,enterprise',
             'months' => 'nullable|integer|min:1|max:36',
+            'coupon' => 'nullable|string|max:40',
         ]);
         $months = $data['months'] ?? 1;
         $amount = $this->subs->monthlyPrice($data['plan']) * $months;   // rupees
@@ -68,12 +69,21 @@ class BillingController extends Controller
             return $this->errorResponse([], 'Invalid plan price.', 'BILLING_ERROR', 422);
         }
 
+        // Apply coupon if provided
+        $couponCode = null; $discounted = $amount;
+        if (!empty($data['coupon'])) {
+            $coupon = \App\Models\Coupon::usable($data['coupon']);
+            if (!$coupon) return $this->errorResponse([], 'Invalid or expired coupon.', 'COUPON_INVALID', 422);
+            $discounted = $coupon->apply($amount);
+            $couponCode = $coupon->code;
+        }
+
         try {
             $company = $r->user()->company;
             $order = $this->razorpay->createOrder(
-                $amount * 100,                                  // paise
+                (int) round($discounted * 100),                 // paise
                 'sub_' . $company->id . '_' . time(),
-                ['company_id' => $company->id, 'plan' => $data['plan'], 'months' => $months],
+                ['company_id' => $company->id, 'plan' => $data['plan'], 'months' => $months, 'coupon' => $couponCode, 'amount' => $discounted],
             );
             return $this->successResponse([
                 'order_id'  => $order['id'],
@@ -82,6 +92,9 @@ class BillingController extends Controller
                 'key'       => $this->razorpay->keyId(),
                 'plan'      => $data['plan'],
                 'months'    => $months,
+                'coupon'    => $couponCode,
+                'base'      => $amount,
+                'payable'   => $discounted,
             ], 'Order created');
         } catch (\Throwable $e) {
             Log::error('Razorpay checkout failed', ['error' => $e->getMessage()]);
@@ -98,13 +111,22 @@ class BillingController extends Controller
             'razorpay_signature'  => 'required|string',
             'plan'                => 'required|in:starter,growth,pro,enterprise',
             'months'              => 'required|integer|min:1|max:36',
+            'coupon'              => 'nullable|string|max:40',
+            'amount'              => 'nullable|numeric|min:0',
         ]);
 
         if (!$this->razorpay->verifyPaymentSignature($data['razorpay_order_id'], $data['razorpay_payment_id'], $data['razorpay_signature'])) {
             return $this->errorResponse([], 'Payment verification failed. If money was deducted, contact support.', 'VERIFY_FAILED', 422);
         }
 
-        $company = $this->subs->activate($r->user()->company, $data['plan'], $data['months'], 'razorpay', $data['razorpay_payment_id'], true, $r->user()->id);
+        // Record the actually-paid amount (post-coupon) + increment coupon usage
+        $override = isset($data['amount']) ? (float) $data['amount'] : null;
+        if (!empty($data['coupon'])) {
+            $coupon = \App\Models\Coupon::usable($data['coupon']);
+            if ($coupon) $coupon->increment('used_count');
+        }
+
+        $company = $this->subs->activate($r->user()->company, $data['plan'], $data['months'], 'razorpay', $data['razorpay_payment_id'], true, $r->user()->id, $override);
         Log::info('Subscription activated via Razorpay', ['company_id' => $company->id, 'plan' => $data['plan'], 'months' => $data['months'], 'payment_id' => $data['razorpay_payment_id']]);
 
         return $this->successResponse([
