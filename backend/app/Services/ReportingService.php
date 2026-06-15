@@ -473,6 +473,76 @@ class ReportingService
      * MIS Report — owner-level monthly summary:
      * revenue, collection, production (sqm + runs), GST liability, outstanding.
      */
+    /**
+     * Order-to-invoice reconciliation: per order, ordered value vs invoiced vs
+     * paid — flags revenue leakage (delivered but not / under-invoiced).
+     */
+    public function getReconciliation(int $companyId, ?string $from = null, ?string $to = null): array
+    {
+        $orders = Order::where('company_id', $companyId)
+            ->where('status', '!=', 'cancelled')
+            ->with('customer');
+        if ($from) $orders->whereDate('order_date', '>=', $from);
+        if ($to)   $orders->whereDate('order_date', '<=', $to);
+        $orders = $orders->orderByDesc('order_date')->get();
+
+        // Invoices linked directly (order_id) or via dispatch->batch->order
+        $invoices = Invoice::where('company_id', $companyId)
+            ->whereNotIn('status', ['cancelled'])
+            ->with('payments', 'dispatch.batch')
+            ->get();
+
+        $byOrder = [];   // orderId => ['invoiced'=>, 'paid'=>]
+        foreach ($invoices as $inv) {
+            $oid = $inv->order_id ?: $inv->dispatch?->batch?->order_id;
+            if (!$oid) continue;
+            if (!isset($byOrder[$oid])) $byOrder[$oid] = ['invoiced' => 0.0, 'paid' => 0.0];
+            $byOrder[$oid]['invoiced'] += (float) $inv->total_amount;
+            $byOrder[$oid]['paid']     += (float) $inv->payments->sum('amount');
+        }
+
+        $rows = $orders->map(function ($o) use ($byOrder) {
+            $ordered  = (float) $o->total_amount;
+            $invoiced = $byOrder[$o->id]['invoiced'] ?? 0.0;
+            $paid     = $byOrder[$o->id]['paid'] ?? 0.0;
+            $gap      = round($ordered - $invoiced, 2);
+
+            $flag = 'ok';
+            if ($invoiced <= 0.01)            $flag = 'not_invoiced';
+            elseif ($gap > 1)                 $flag = 'under_invoiced';
+            elseif ($gap < -1)                $flag = 'over_invoiced';
+
+            return [
+                'order_no'      => $o->order_no,
+                'order_id'      => $o->id,
+                'date'          => optional($o->order_date)->format('Y-m-d'),
+                'customer'      => $o->customer->name ?? '—',
+                'status'        => $o->status,
+                'ordered'       => round($ordered, 2),
+                'invoiced'      => round($invoiced, 2),
+                'paid'          => round($paid, 2),
+                'invoice_gap'   => $gap,
+                'balance_due'   => round($invoiced - $paid, 2),
+                'flag'          => $flag,
+            ];
+        });
+
+        $leak = $rows->whereIn('flag', ['not_invoiced', 'under_invoiced'])->sum('invoice_gap');
+
+        return [
+            'rows'    => $rows->values()->all(),
+            'summary' => [
+                'orders'         => $rows->count(),
+                'total_ordered'  => round($rows->sum('ordered'), 2),
+                'total_invoiced' => round($rows->sum('invoiced'), 2),
+                'total_paid'     => round($rows->sum('paid'), 2),
+                'revenue_leak'   => round($leak, 2),          // ordered but not invoiced
+                'not_invoiced'   => $rows->where('flag', 'not_invoiced')->count(),
+                'under_invoiced' => $rows->where('flag', 'under_invoiced')->count(),
+            ],
+        ];
+    }
+
     public function getMisReport(int $companyId, string $from, string $to): array
     {
         $invoices = Invoice::where('company_id', $companyId)

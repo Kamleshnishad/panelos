@@ -5,7 +5,9 @@
       <div class="br-tabs">
         <button :class="{ on: tab === 'dashboard' }" @click="tab = 'dashboard'">Dashboard</button>
         <button :class="{ on: tab === 'mis' }" @click="switchTab('mis')">MIS Report</button>
+        <button :class="{ on: tab === 'recon' }" @click="switchTab('recon')">Reconciliation</button>
         <button :class="{ on: tab === 'tally' }" @click="switchTab('tally')">Tally Export</button>
+        <button :class="{ on: tab === 'export' }" @click="tab = 'export'">Export</button>
       </div>
       <div class="period-picker">
         <label>From</label>
@@ -192,6 +194,55 @@
       </template>
     </template>
 
+    <!-- ═══ RECONCILIATION TAB ══════════════════════════════════════════ -->
+    <template v-else-if="tab === 'recon'">
+      <div v-if="reconLoading" class="loading-hint">Computing reconciliation…</div>
+      <template v-else-if="recon">
+        <div class="headline-grid">
+          <div class="hl-card"><div class="hl-val">{{ recon.summary.orders }}</div><div class="hl-lbl">Orders</div></div>
+          <div class="hl-card"><div class="hl-val">₹ {{ fmtShort(recon.summary.total_ordered) }}</div><div class="hl-lbl">Ordered</div></div>
+          <div class="hl-card"><div class="hl-val">₹ {{ fmtShort(recon.summary.total_invoiced) }}</div><div class="hl-lbl">Invoiced</div></div>
+          <div class="hl-card" :class="recon.summary.revenue_leak > 0 ? 'amber' : ''">
+            <div class="hl-val red">₹ {{ fmtShort(recon.summary.revenue_leak) }}</div><div class="hl-lbl">Revenue Leak</div>
+          </div>
+          <div class="hl-card"><div class="hl-val red">{{ recon.summary.not_invoiced }}</div><div class="hl-lbl">Not Invoiced</div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Order → Invoice Reconciliation</h3>
+            <span class="hint-sm">Orders delivered but not / under-invoiced = money left on the table.</span>
+          </div>
+          <table class="rep-table">
+            <thead><tr><th>Order</th><th>Customer</th><th class="text-right">Ordered</th><th class="text-right">Invoiced</th><th class="text-right">Gap</th><th>Flag</th></tr></thead>
+            <tbody>
+              <tr v-for="r in recon.rows" :key="r.order_id" :class="{ leak: r.flag === 'not_invoiced' || r.flag === 'under_invoiced' }">
+                <td class="bold">{{ r.order_no }}</td>
+                <td>{{ r.customer }}</td>
+                <td class="text-right">₹ {{ fmtNum(r.ordered) }}</td>
+                <td class="text-right">₹ {{ fmtNum(r.invoiced) }}</td>
+                <td class="text-right" :class="{ red: r.invoice_gap > 0 }">₹ {{ fmtNum(r.invoice_gap) }}</td>
+                <td><span class="flag-chip" :class="r.flag">{{ flagLabel(r.flag) }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </template>
+
+    <!-- ═══ EXPORT TAB ══════════════════════════════════════════════════ -->
+    <template v-else-if="tab === 'export'">
+      <div class="card">
+        <h3>📤 Export Data (CSV / Excel)</h3>
+        <p class="card-hint">Download your data as CSV — opens directly in Excel. Date range (top) applies to quotations / orders / invoices.</p>
+        <div class="export-grid">
+          <button class="exp-btn" :disabled="exporting" @click="doExport('customers')">👥 Customers</button>
+          <button class="exp-btn" :disabled="exporting" @click="doExport('quotations')">📄 Quotations</button>
+          <button class="exp-btn" :disabled="exporting" @click="doExport('orders')">📦 Orders</button>
+          <button class="exp-btn" :disabled="exporting" @click="doExport('invoices')">🧾 Invoices</button>
+        </div>
+        <div v-if="exportErr" class="error-banner" style="margin-top:12px">{{ exportErr }}</div>
+      </div>
+    </template>
+
     <!-- ═══ TALLY EXPORT TAB ════════════════════════════════════════════ -->
     <template v-else-if="tab === 'tally'">
       <div class="card tally-card">
@@ -259,6 +310,14 @@ const cf           = ref(null)
 const mis       = ref(null)
 const misLoading = ref(false)
 
+// Reconciliation
+const recon = ref(null)
+const reconLoading = ref(false)
+
+// Export
+const exporting = ref(false)
+const exportErr = ref(null)
+
 // Tally
 const tallyLoading = ref(null)
 const tallyError   = ref(null)
@@ -314,15 +373,46 @@ async function loadMis() {
   } finally { misLoading.value = false }
 }
 
+async function loadRecon() {
+  reconLoading.value = true; error.value = null
+  try {
+    const r = await reportService.reconciliation({ from: from.value, to: to.value })
+    recon.value = r?.data ?? null
+  } catch (e) {
+    error.value = e?.response?.data?.message ?? 'Failed to load reconciliation.'
+  } finally { reconLoading.value = false }
+}
+
 async function switchTab(t) {
   tab.value = t
   if (t === 'mis' && !mis.value) await loadMis()
+  if (t === 'recon' && !recon.value) await loadRecon()
 }
 
 function onPeriodChange() {
-  mis.value = null
+  mis.value = null; recon.value = null
   if (tab.value === 'dashboard') loadDashboard()
   else if (tab.value === 'mis') loadMis()
+  else if (tab.value === 'recon') loadRecon()
+}
+
+function flagLabel(f) {
+  return { ok: 'OK', not_invoiced: 'Not Invoiced', under_invoiced: 'Under-invoiced', over_invoiced: 'Over-invoiced' }[f] || f
+}
+
+async function doExport(type) {
+  exporting.value = true; exportErr.value = null
+  try {
+    const res = await axios.get(`/api/export/${type}`, {
+      params: { from: from.value, to: to.value }, headers: authHeaders(), responseType: 'blob',
+    })
+    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = `${type}_${to.value}.csv`; a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    exportErr.value = e?.response?.data?.message ?? `Failed to export ${type}.`
+  } finally { exporting.value = false }
 }
 
 async function downloadTally(type) {
@@ -397,7 +487,19 @@ onMounted(loadDashboard)
 .rep-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .rep-table th { background: var(--primary-tint); color: #333; padding: 7px 10px; text-align: left; font-size: 11px; text-transform: uppercase; border: 1px solid var(--primary-bd); }
 .rep-table td { padding: 8px 10px; border: 1px solid #e0e0e0; }
+.rep-table tr.leak td { background: #fff7f7; }
 .bold { font-weight: 700; }
+.hint-sm { font-size: 11px; color: #888; font-weight: 400; }
+.flag-chip { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; text-transform: uppercase; }
+.flag-chip.ok { background: #e8f5e9; color: #2e7d32; }
+.flag-chip.not_invoiced { background: #ffebee; color: #c62828; }
+.flag-chip.under_invoiced { background: #fff8e1; color: #b5740a; }
+.flag-chip.over_invoiced { background: #eef1fe; color: #2B50E0; }
+.export-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.exp-btn { padding: 18px 12px; border: 1px solid var(--primary-bd); background: var(--primary-tint); color: var(--primary); border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.exp-btn:hover { background: var(--primary); color: #fff; }
+.exp-btn:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 700px) { .export-grid { grid-template-columns: 1fr 1fr; } }
 .text-right { text-align: right; }
 .red { color: #c62828; }
 .green-val { color: #2e7d32; }

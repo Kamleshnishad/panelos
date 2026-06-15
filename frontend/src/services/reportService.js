@@ -17,4 +17,5 @@ export default {
   cashFlow(params = {})      { return api('get', '/api/reports/cash-flow', params) },
   salesReport(params = {})   { return api('get', '/api/reports/sales', params) },
   mis(params = {})           { return api('get', '/api/reports/mis', params) },
+  reconciliation(params = {}) { return api('get', '/api/reports/reconciliation', params) },
 }

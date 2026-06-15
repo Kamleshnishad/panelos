@@ -309,6 +309,13 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
     Route::get('/reports/top-customers', [ReportingController::class, 'topCustomers'])->name('reports.top-customers');
     Route::get('/reports/panel-type-mix', [ReportingController::class, 'panelTypeMix'])->name('reports.panel-mix');
     Route::get('/reports/mis',            [ReportingController::class, 'misReport'])->name('reports.mis');
+    Route::get('/reports/reconciliation', [ReportingController::class, 'reconciliation'])->name('reports.reconciliation');
+
+    // Bulk CSV exports
+    Route::get('/export/customers',  [\App\Http\Controllers\Api\ExportController::class, 'customers'])->name('export.customers');
+    Route::get('/export/quotations', [\App\Http\Controllers\Api\ExportController::class, 'quotations'])->name('export.quotations');
+    Route::get('/export/orders',     [\App\Http\Controllers\Api\ExportController::class, 'orders'])->name('export.orders');
+    Route::get('/export/invoices',   [\App\Http\Controllers\Api\ExportController::class, 'invoices'])->name('export.invoices');
     Route::get('/reports/tally/xml',      [ReportingController::class, 'tallyXml'])->name('reports.tally.xml');
     Route::get('/reports/tally/csv',      [ReportingController::class, 'tallyCsv'])->name('reports.tally.csv');
 

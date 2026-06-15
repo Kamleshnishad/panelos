@@ -232,6 +232,21 @@ class ReportingController extends Controller
         }
     }
 
+    /** Order-to-invoice reconciliation (revenue leakage). */
+    public function reconciliation(Request $request)
+    {
+        try {
+            $data = $this->reportingService->getReconciliation(
+                auth()->user()->company_id,
+                $request->get('from'),
+                $request->get('to'),
+            );
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
     /** MIS Report — owner monthly summary (revenue, GST, production, aging). */
     public function misReport(Request $request)
     {
