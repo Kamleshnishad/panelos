@@ -185,8 +185,8 @@
           <div class="form-group"><label>Type</label>
             <select v-model="annForm.type"><option value="info">Info (blue)</option><option value="warning">Warning (amber)</option><option value="success">Success (green)</option></select>
           </div>
-          <div class="form-group"><label>Starts (optional)</label><input v-model="annForm.starts_at" type="datetime-local" /></div>
-          <div class="form-group"><label>Ends (optional)</label><input v-model="annForm.ends_at" type="datetime-local" /></div>
+          <div class="form-group"><label>Starts (blank = now, IST)</label><input v-model="annForm.starts_at" type="datetime-local" /></div>
+          <div class="form-group"><label>Ends (blank = forever, IST)</label><input v-model="annForm.ends_at" type="datetime-local" /></div>
         </div>
         <div class="row-actions">
           <button class="btn btn-primary" :disabled="annSaving || !annForm.message" @click="createAnn">{{ annSaving ? 'Posting…' : 'Post Announcement' }}</button>

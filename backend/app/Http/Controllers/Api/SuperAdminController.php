@@ -467,6 +467,12 @@ class SuperAdminController extends Controller
             'starts_at' => 'nullable|date',
             'ends_at'   => 'nullable|date',
         ]);
+        // datetime-local arrives as the admin's local (IST) wall-clock — store in app tz
+        foreach (['starts_at', 'ends_at'] as $f) {
+            if (!empty($data[$f])) {
+                $data[$f] = \Illuminate\Support\Carbon::parse($data[$f], 'Asia/Kolkata')->utc();
+            }
+        }
         $a = \App\Models\PlatformAnnouncement::create($data);
         $this->audit($r, $r->user()->company_id, 'announcement_created', 'Broadcast: ' . substr($data['message'], 0, 60));
         return $this->successResponse($a, 'Announcement created', 201);
