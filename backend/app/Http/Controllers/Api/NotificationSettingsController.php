@@ -97,11 +97,17 @@ class NotificationSettingsController extends Controller
             return $this->successResponse($result, 'Test message sent successfully');
         } catch (\Exception $e) {
             $msg = $e->getMessage();
+            $waFrom = (string) $s->resolvedWhatsappFrom();
             // Friendly hints for the most common Twilio setup mistakes
             if (stripos($msg, 'could not find a Channel') !== false) {
-                $msg .= '  →  For WhatsApp sandbox, the "WhatsApp From" must be +14155238886 (not your SMS number).';
-            } elseif (stripos($msg, 'not a valid phone number') !== false || stripos($msg, "is not currently reachable") !== false) {
-                $msg .= '  →  The recipient must first send "join <keyword>" to +14155238886 on WhatsApp to opt into the sandbox.';
+                if (str_contains($waFrom, '14155238886')) {
+                    $msg .= '  →  Activate the WhatsApp Sandbox first: Twilio Console → Messaging → Try it out → Send a WhatsApp message. '
+                          . 'Confirm the sandbox number shown there matches your "WhatsApp From", then the recipient must send "join <code>" to it.';
+                } else {
+                    $msg .= '  →  For WhatsApp sandbox, the "WhatsApp From" must be +14155238886 (not your SMS number).';
+                }
+            } elseif (stripos($msg, 'not a valid phone number') !== false || stripos($msg, "is not currently reachable") !== false || stripos($msg, 'not currently opted in') !== false) {
+                $msg .= '  →  The recipient must first send "join <code>" to ' . ($waFrom ?: '+14155238886') . ' on WhatsApp to opt into the sandbox.';
             } elseif (stripos($msg, 'unverified') !== false) {
                 $msg .= '  →  On a Twilio trial, the recipient number must be verified in your Twilio Console first.';
             }
