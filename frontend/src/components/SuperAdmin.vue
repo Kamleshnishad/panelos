@@ -28,6 +28,7 @@
       </button>
       <button :class="{ on: tab === 'revenue' }" @click="tab = 'revenue'; loadRevenue()">Revenue &amp; Growth</button>
       <button :class="{ on: tab === 'admins' }" @click="tab = 'admins'; loadAdmins()">Platform Admins</button>
+      <button :class="{ on: tab === 'settings' }" @click="tab = 'settings'; loadSettings()">Settings</button>
     </div>
 
     <!-- ════ COMPANIES ════ -->
@@ -173,6 +174,55 @@
       <p class="warn-note">⚠️ Platform admins can see and manage <b>every</b> tenant. Add only trusted people.</p>
     </template>
 
+    <!-- ════ SETTINGS ════ -->
+    <template v-else-if="tab === 'settings'">
+      <div v-if="setLoading" class="loading-hint">Loading…</div>
+      <template v-else-if="settings">
+        <div class="status-strip" :class="settings.razorpay_ready ? 'ok' : 'off'">
+          <span class="dot"></span>
+          Razorpay {{ settings.razorpay_ready ? 'Active — online payments live' : 'Not configured — tenants pay manually' }}
+        </div>
+
+        <div class="panel">
+          <h3 class="sec-h">🔑 Razorpay Credentials</h3>
+          <p class="hint-line">From Razorpay Dashboard → Settings → API Keys. Webhook secret from Settings → Webhooks.</p>
+          <label class="sw">
+            <input type="checkbox" v-model="settings.razorpay_enabled" />
+            <span>Enable online payments</span>
+          </label>
+          <div class="form-grid">
+            <div class="form-group"><label>Key ID</label><input v-model="settings.razorpay_key_id" placeholder="rzp_live_xxx / rzp_test_xxx" /></div>
+            <div class="form-group"><label>Key Secret</label><input v-model="settings.razorpay_key_secret" type="password" :placeholder="settings.secret_is_set ? 'saved — leave blank to keep' : 'paste secret'" /></div>
+            <div class="form-group"><label>Webhook Secret</label><input v-model="settings.razorpay_webhook_secret" type="password" placeholder="(optional) for webhook backstop" /></div>
+          </div>
+          <div class="row-actions">
+            <button class="btn btn-primary" :disabled="saving" @click="saveSettings(true)">{{ saving ? 'Saving…' : 'Save Settings' }}</button>
+            <button class="btn btn-ghost" :disabled="testing" @click="testRzp">{{ testing ? 'Testing…' : 'Test Razorpay' }}</button>
+            <span v-if="testMsg" :class="testOk ? 'ok-t' : 'err-t'">{{ testMsg }}</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="sec-h">🧾 GST Seller Identity (your subscription invoices)</h3>
+          <p class="hint-line">Shown as the seller on tax invoices you raise to tenants for their subscription.</p>
+          <div class="form-grid">
+            <div class="form-group"><label>Business Name</label><input v-model="settings.platform_name" /></div>
+            <div class="form-group"><label>GSTIN</label><input v-model="settings.platform_gstin" /></div>
+            <div class="form-group"><label>PAN</label><input v-model="settings.platform_pan" /></div>
+            <div class="form-group"><label>Address</label><input v-model="settings.platform_address" /></div>
+            <div class="form-group"><label>State</label><input v-model="settings.platform_state" /></div>
+            <div class="form-group"><label>State Code</label><input v-model="settings.platform_state_code" placeholder="24" /></div>
+            <div class="form-group"><label>Email</label><input v-model="settings.platform_email" /></div>
+            <div class="form-group"><label>Phone</label><input v-model="settings.platform_phone" /></div>
+            <div class="form-group"><label>SAC Code</label><input v-model="settings.platform_sac" placeholder="997331" /></div>
+          </div>
+          <div class="row-actions">
+            <button class="btn btn-primary" :disabled="saving" @click="saveSettings(false)">{{ saving ? 'Saving…' : 'Save Settings' }}</button>
+          </div>
+        </div>
+      </template>
+    </template>
+
     <!-- Activate modal -->
     <div v-if="actTarget" class="modal-overlay" @click.self="actTarget = null">
       <div class="modal-box">
@@ -267,6 +317,12 @@ const expLoading = ref(false)
 const rev = ref(null)
 const funnel = ref(null)
 const revLoading = ref(false)
+const settings = ref(null)
+const setLoading = ref(false)
+const saving = ref(false)
+const testing = ref(false)
+const testMsg = ref('')
+const testOk = ref(false)
 const admins = ref([])
 const admLoading = ref(false)
 const showAddAdmin = ref(false)
@@ -313,6 +369,39 @@ function planPct(p) {
 async function dlInvoice(p) {
   try { await superAdminService.downloadInvoice(p.id, p.invoice_no) }
   catch (e) { toastError('Could not download invoice.') }
+}
+
+async function loadSettings() {
+  setLoading.value = true; testMsg.value = ''
+  try {
+    const s = (await superAdminService.getSettings())?.data ?? {}
+    // blank the masked secrets so the user types only to change
+    s.razorpay_key_secret = ''
+    s.razorpay_webhook_secret = ''
+    settings.value = s
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Failed.') }
+  finally { setLoading.value = false }
+}
+async function saveSettings() {
+  saving.value = true
+  try {
+    const p = { ...settings.value }
+    if (!p.razorpay_key_secret) delete p.razorpay_key_secret
+    if (!p.razorpay_webhook_secret) delete p.razorpay_webhook_secret
+    await superAdminService.saveSettings(p)
+    toastSuccess('Settings saved.')
+    await loadSettings()
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Save failed.') }
+  finally { saving.value = false }
+}
+async function testRzp() {
+  testing.value = true; testMsg.value = ''
+  try {
+    const r = await superAdminService.testRazorpay()
+    testOk.value = true; testMsg.value = r?.message ?? '✓ Razorpay works!'
+  } catch (e) {
+    testOk.value = false; testMsg.value = e?.response?.data?.message ?? 'Test failed.'
+  } finally { testing.value = false }
 }
 
 async function loadAdmins() {
@@ -483,6 +572,21 @@ onMounted(load)
 .plan-bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #4863e0); }
 .mono { font-family: monospace; font-size: 12px; }
 .r { text-align: right; }
+
+.status-strip { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+.status-strip.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.status-strip.off { background: #fff8e1; color: #b5740a; border: 1px solid #ffe082; }
+.status-strip .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.panel .sec-h { margin: 0 0 4px; }
+.sw { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin: 8px 0 14px; cursor: pointer; }
+.sw input { width: 16px; height: 16px; accent-color: var(--primary); }
+.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.form-grid .form-group { margin-bottom: 0; }
+.row-actions { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.ok-t { font-size: 12px; color: #2e7d32; font-weight: 600; }
+.err-t { font-size: 12px; color: #c62828; }
+.panel + .panel { margin-top: 14px; }
+@media (max-width: 900px) { .form-grid { grid-template-columns: 1fr; } }
 @media (max-width: 1000px) { .kpi-grid.five { grid-template-columns: repeat(3, 1fr); } .two-col { grid-template-columns: 1fr; } }
 
 @media (max-width: 1000px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } .d-grid, .usage-row { grid-template-columns: repeat(2, 1fr); } }

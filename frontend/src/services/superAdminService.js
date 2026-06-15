@@ -19,6 +19,9 @@ export default {
   expiring(days = 7)          { return api('get',  '/api/admin/expiring', null, { days }) },
   revenue()                   { return api('get',  '/api/admin/revenue') },
   funnel(days = 30)           { return api('get',  '/api/admin/funnel', null, { days }) },
+  getSettings()               { return api('get',  '/api/admin/settings') },
+  saveSettings(data)          { return api('put',  '/api/admin/settings', data) },
+  testRazorpay()              { return api('post', '/api/admin/settings/test-razorpay') },
   async downloadInvoice(paymentId, invoiceNo) {
     const res = await axios.get(`/api/admin/payments/${paymentId}/invoice`, { headers: authHeaders(), responseType: 'blob' })
     const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))

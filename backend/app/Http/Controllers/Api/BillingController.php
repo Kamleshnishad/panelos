@@ -117,7 +117,7 @@ class BillingController extends Controller
     /** Razorpay webhook (public). Activates on payment.captured as a backstop. */
     public function webhook(Request $r)
     {
-        $secret = config('services.razorpay.webhook_secret');
+        $secret = \App\Models\PlatformSetting::current()->rzpWebhookSecret();
         $sig    = $r->header('X-Razorpay-Signature', '');
         if (!$secret || !$this->razorpay->verifyWebhookSignature($r->getContent(), $sig, $secret)) {
             return response()->json(['ok' => false], 400);

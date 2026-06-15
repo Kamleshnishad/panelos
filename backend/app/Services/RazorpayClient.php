@@ -17,9 +17,18 @@ class RazorpayClient
 
     public function __construct()
     {
-        $this->keyId     = config('services.razorpay.key_id');
-        $this->keySecret = config('services.razorpay.key_secret');
-        $this->enabled   = (bool) config('services.razorpay.enabled', false) && $this->keyId && $this->keySecret;
+        // DB platform settings take priority over .env config.
+        try {
+            $ps = \App\Models\PlatformSetting::current();
+            $this->keyId     = $ps->rzpKeyId();
+            $this->keySecret = $ps->rzpKeySecret();
+            $this->enabled   = $ps->rzpReady();
+        } catch (\Throwable) {
+            // table may not exist yet (pre-migration) — fall back to env
+            $this->keyId     = config('services.razorpay.key_id');
+            $this->keySecret = config('services.razorpay.key_secret');
+            $this->enabled   = (bool) config('services.razorpay.enabled', false) && $this->keyId && $this->keySecret;
+        }
     }
 
     public function isEnabled(): bool { return $this->enabled; }

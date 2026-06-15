@@ -244,6 +244,68 @@ class SuperAdminController extends Controller
         ], "Impersonating {$c->name}");
     }
 
+    /** Platform settings (Razorpay creds + GST seller identity). Secrets masked. */
+    public function getSettings(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        $s = \App\Models\PlatformSetting::current();
+        $data = $s->toArray();
+        $data['razorpay_key_secret']     = $s->getAttribute('razorpay_key_secret') ? '********' : '';
+        $data['razorpay_webhook_secret'] = $s->getAttribute('razorpay_webhook_secret') ? '********' : '';
+        $data['secret_is_set']           = !empty($s->getAttribute('razorpay_key_secret'));
+        $data['razorpay_ready']          = $s->rzpReady();
+        return $this->successResponse($data, 'Platform settings');
+    }
+
+    public function updateSettings(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        $data = $r->validate([
+            'razorpay_enabled'         => 'nullable|boolean',
+            'razorpay_key_id'          => 'nullable|string|max:100',
+            'razorpay_key_secret'      => 'nullable|string|max:150',
+            'razorpay_webhook_secret'  => 'nullable|string|max:150',
+            'platform_name'            => 'nullable|string|max:150',
+            'platform_gstin'           => 'nullable|string|max:20',
+            'platform_pan'             => 'nullable|string|max:20',
+            'platform_address'         => 'nullable|string|max:255',
+            'platform_state'           => 'nullable|string|max:60',
+            'platform_state_code'      => 'nullable|string|max:5',
+            'platform_email'           => 'nullable|email|max:120',
+            'platform_phone'           => 'nullable|string|max:20',
+            'platform_sac'             => 'nullable|string|max:12',
+        ]);
+
+        // Don't overwrite secrets with the masked placeholder / blanks
+        foreach (['razorpay_key_secret', 'razorpay_webhook_secret'] as $sec) {
+            if (!array_key_exists($sec, $data) || $data[$sec] === null || $data[$sec] === '' || str_starts_with((string) $data[$sec], '*')) {
+                unset($data[$sec]);
+            }
+        }
+
+        $s = \App\Models\PlatformSetting::current();
+        $s->update($data);
+        $this->audit($r, $r->user()->company_id, 'platform_settings_updated', 'Platform settings updated');
+
+        return $this->successResponse(['razorpay_ready' => $s->fresh()->rzpReady()], 'Settings saved');
+    }
+
+    /** Send a tiny Razorpay test order to confirm credentials work. */
+    public function testRazorpay(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        $rc = new \App\Services\RazorpayClient();
+        if (!$rc->isEnabled()) {
+            return $this->errorResponse([], 'Razorpay is not enabled or keys are missing. Save valid keys and enable first.', 'RZP_NOT_READY', 422);
+        }
+        try {
+            $order = $rc->createOrder(100, 'test_' . time(), ['test' => true]);   // ₹1 test order
+            return $this->successResponse(['order_id' => $order['id']], 'Razorpay credentials work! Test order created.');
+        } catch (\Throwable $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], 'Razorpay test failed: ' . $e->getMessage(), 'RZP_ERROR', 400);
+        }
+    }
+
     /** Download a GST subscription tax-invoice PDF for a payment. */
     public function invoicePdf(Request $r, int $paymentId)
     {
@@ -251,9 +313,10 @@ class SuperAdminController extends Controller
         $p = \App\Models\SubscriptionPayment::withoutGlobalScope('tenant')->findOrFail($paymentId);
         $company = Company::withoutGlobalScope('tenant')->find($p->company_id);
 
-        $intra = ($company?->state_code ?? '') === config('platform.state_code');
+        $platform = \App\Models\PlatformSetting::current()->billingIdentity();
+        $intra = ($company?->state_code ?? '') === $platform['state_code'];
         $html = view('billing.subscription_invoice', [
-            'p' => $p, 'company' => $company, 'platform' => config('platform'),
+            'p' => $p, 'company' => $company, 'platform' => $platform,
             'intra' => $intra,
             'words' => \App\Services\InvoiceService::amountInWords((float) $p->total_amount),
         ])->render();
