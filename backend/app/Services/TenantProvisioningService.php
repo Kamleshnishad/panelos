@@ -35,6 +35,10 @@ class TenantProvisioningService
                 'subscription_status' => 'trial',
                 'trial_ends_at'       => now()->addDays(self::TRIAL_DAYS),
                 'is_active'           => true,
+                'utm_source'          => $data['utm_source'] ?? null,
+                'utm_medium'          => $data['utm_medium'] ?? null,
+                'utm_campaign'        => $data['utm_campaign'] ?? null,
+                'signup_referrer'     => $data['signup_referrer'] ?? null,
             ]);
 
             $roles = $this->createDefaultRoles($company->id);

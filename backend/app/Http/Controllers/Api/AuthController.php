@@ -36,6 +36,10 @@ class AuthController extends Controller
             'email'        => 'required|email|max:150|unique:users,email',
             'password'     => ['required', 'confirmed', self::passwordPolicy()],
             'phone'        => 'nullable|string|max:20',
+            'utm_source'   => 'nullable|string|max:60',
+            'utm_medium'   => 'nullable|string|max:60',
+            'utm_campaign' => 'nullable|string|max:80',
+            'signup_referrer' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {

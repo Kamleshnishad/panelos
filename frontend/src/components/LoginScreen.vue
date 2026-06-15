@@ -101,13 +101,23 @@ const su = ref({ company_name: '', name: '', email: '', phone: '', password: '',
 
 function switchMode(m) { mode.value = m; error.value = null }
 
+function utmParams() {
+  const q = new URLSearchParams(window.location.search)
+  return {
+    utm_source: q.get('utm_source') || undefined,
+    utm_medium: q.get('utm_medium') || undefined,
+    utm_campaign: q.get('utm_campaign') || undefined,
+    signup_referrer: document.referrer || undefined,
+  }
+}
+
 async function submitSignup() {
   loading.value = true; error.value = null
   try {
     if (su.value.password !== su.value.password_confirmation) {
       error.value = 'Passwords do not match.'; loading.value = false; return
     }
-    await authService.register({ ...su.value })
+    await authService.register({ ...su.value, ...utmParams() })
     emit('logged-in')
   } catch (e) {
     const errs = e?.response?.data?.errors

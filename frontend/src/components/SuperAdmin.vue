@@ -26,6 +26,7 @@
       <button :class="{ on: tab === 'expiring' }" @click="tab = 'expiring'; loadExpiring()">Expiring Soon
         <span v-if="expiring.length" class="tab-badge">{{ expiring.length }}</span>
       </button>
+      <button :class="{ on: tab === 'revenue' }" @click="tab = 'revenue'; loadRevenue()">Revenue &amp; Growth</button>
       <button :class="{ on: tab === 'admins' }" @click="tab = 'admins'; loadAdmins()">Platform Admins</button>
     </div>
 
@@ -91,6 +92,64 @@
           <tr v-if="!expiring.length"><td colspan="6" class="empty">No tenants expiring in the next 7 days. 🎉</td></tr>
         </tbody>
       </table>
+    </template>
+
+    <!-- ════ REVENUE & GROWTH ════ -->
+    <template v-else-if="tab === 'revenue'">
+      <div v-if="revLoading" class="loading-hint">Loading…</div>
+      <template v-else-if="rev">
+        <div class="kpi-grid five">
+          <div class="kpi primary"><div class="kpi-val">₹{{ fmtShort(rev.mrr) }}</div><div class="kpi-lbl">MRR</div></div>
+          <div class="kpi"><div class="kpi-val">₹{{ fmtShort(rev.arr) }}</div><div class="kpi-lbl">ARR</div></div>
+          <div class="kpi"><div class="kpi-val">₹{{ fmtShort(rev.arpu) }}</div><div class="kpi-lbl">ARPU</div></div>
+          <div class="kpi green"><div class="kpi-val">₹{{ fmtShort(rev.collected_this_month) }}</div><div class="kpi-lbl">Collected (mo)</div></div>
+          <div class="kpi red"><div class="kpi-val">{{ rev.churned_this_month }}</div><div class="kpi-lbl">Churned (mo)</div></div>
+        </div>
+
+        <div class="two-col">
+          <!-- Funnel -->
+          <div class="panel" v-if="funnel">
+            <h3 class="sec-h">Signup Funnel (30 days)</h3>
+            <div class="funnel-row"><span>Signups</span><b>{{ funnel.signups }}</b></div>
+            <div class="funnel-row"><span>Still on trial</span><b>{{ funnel.still_trial }}</b></div>
+            <div class="funnel-row"><span>Converted (paid)</span><b class="green-t">{{ funnel.converted }}</b></div>
+            <div class="funnel-row"><span>Expired</span><b class="red">{{ funnel.expired }}</b></div>
+            <div class="conv-bar"><div class="conv-fill" :style="{ width: funnel.conversion_pct + '%' }"></div></div>
+            <div class="conv-lbl">{{ funnel.conversion_pct }}% conversion</div>
+            <h4 class="d-h">By source (UTM)</h4>
+            <div v-for="s in funnel.by_source" :key="s.source" class="src-row"><span>{{ s.source }}</span><b>{{ s.count }}</b></div>
+          </div>
+
+          <!-- Plan distribution -->
+          <div class="panel">
+            <h3 class="sec-h">Active Plans</h3>
+            <div v-for="p in rev.by_plan" :key="p.plan" class="plan-row">
+              <span class="plan-chip">{{ p.plan }}</span>
+              <span class="plan-bar-track"><span class="plan-bar-fill" :style="{ width: planPct(p) + '%' }"></span></span>
+              <b>{{ p.count }}</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment history -->
+        <h3 class="sec-h" style="margin:8px 0 10px">Recent Subscription Payments</h3>
+        <table class="sa-table">
+          <thead><tr><th>Invoice</th><th>Company</th><th>Plan</th><th class="c">Months</th><th class="r">Amount</th><th>Method</th><th>Date</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="p in rev.payments" :key="p.id">
+              <td class="mono">{{ p.invoice_no || '—' }}</td>
+              <td>{{ p.company }}</td>
+              <td><span class="plan-chip">{{ p.plan }}</span></td>
+              <td class="c">{{ p.months }}</td>
+              <td class="r"><b>₹ {{ Number(p.total).toLocaleString('en-IN') }}</b></td>
+              <td><span class="status-chip" :class="p.method === 'razorpay' ? 'active' : 'trial'">{{ p.method }}</span></td>
+              <td class="small">{{ fmtDate(p.date) }}</td>
+              <td><button v-if="p.invoice_no" class="mini ghost" @click="dlInvoice(p)">Invoice</button></td>
+            </tr>
+            <tr v-if="!rev.payments.length"><td colspan="8" class="empty">No payments yet.</td></tr>
+          </tbody>
+        </table>
+      </template>
     </template>
 
     <!-- ════ PLATFORM ADMINS ════ -->
@@ -205,6 +264,9 @@ const actError = ref(null)
 const detail = ref(null)
 const expiring = ref([])
 const expLoading = ref(false)
+const rev = ref(null)
+const funnel = ref(null)
+const revLoading = ref(false)
 const admins = ref([])
 const admLoading = ref(false)
 const showAddAdmin = ref(false)
@@ -233,6 +295,24 @@ async function loadExpiring() {
   try { expiring.value = (await superAdminService.expiring(7))?.data ?? [] }
   catch (e) { toastError(e?.response?.data?.message ?? 'Failed.') }
   finally { expLoading.value = false }
+}
+
+async function loadRevenue() {
+  revLoading.value = true
+  try {
+    const [r, f] = await Promise.all([superAdminService.revenue(), superAdminService.funnel(30)])
+    rev.value = r?.data ?? null
+    funnel.value = f?.data ?? null
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Failed.') }
+  finally { revLoading.value = false }
+}
+function planPct(p) {
+  const total = (rev.value?.by_plan ?? []).reduce((s, x) => s + x.count, 0) || 1
+  return Math.round((p.count / total) * 100)
+}
+async function dlInvoice(p) {
+  try { await superAdminService.downloadInvoice(p.id, p.invoice_no) }
+  catch (e) { toastError('Could not download invoice.') }
 }
 
 async function loadAdmins() {
@@ -388,6 +468,22 @@ onMounted(load)
 .d-h { margin: 14px 0 6px; font-size: 13px; color: var(--primary); }
 .mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .mini-table td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; }
+
+.kpi-grid.five { grid-template-columns: repeat(5, 1fr); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.panel { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 16px 18px; }
+.funnel-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f3f3f3; font-size: 13px; }
+.green-t { color: #2e7d32; }
+.conv-bar { height: 10px; background: #eef1f5; border-radius: 6px; overflow: hidden; margin: 12px 0 4px; }
+.conv-fill { height: 100%; background: linear-gradient(90deg, #2e7d32, #43a047); }
+.conv-lbl { font-size: 12px; font-weight: 700; color: #2e7d32; text-align: center; }
+.src-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 4px 0; color: #444; }
+.plan-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.plan-bar-track { flex: 1; height: 14px; background: #eef1f5; border-radius: 7px; overflow: hidden; }
+.plan-bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #4863e0); }
+.mono { font-family: monospace; font-size: 12px; }
+.r { text-align: right; }
+@media (max-width: 1000px) { .kpi-grid.five { grid-template-columns: repeat(3, 1fr); } .two-col { grid-template-columns: 1fr; } }
 
 @media (max-width: 1000px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } .d-grid, .usage-row { grid-template-columns: repeat(2, 1fr); } }
 </style>

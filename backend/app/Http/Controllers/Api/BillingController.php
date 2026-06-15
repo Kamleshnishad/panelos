@@ -104,7 +104,7 @@ class BillingController extends Controller
             return $this->errorResponse([], 'Payment verification failed. If money was deducted, contact support.', 'VERIFY_FAILED', 422);
         }
 
-        $company = $this->subs->activate($r->user()->company, $data['plan'], $data['months']);
+        $company = $this->subs->activate($r->user()->company, $data['plan'], $data['months'], 'razorpay', $data['razorpay_payment_id'], true, $r->user()->id);
         Log::info('Subscription activated via Razorpay', ['company_id' => $company->id, 'plan' => $data['plan'], 'months' => $data['months'], 'payment_id' => $data['razorpay_payment_id']]);
 
         return $this->successResponse([
@@ -133,7 +133,7 @@ class BillingController extends Controller
             if ($cid && $plan) {
                 $company = Company::withoutGlobalScope('tenant')->find($cid);
                 if ($company && $company->subscription_status !== 'active') {
-                    $this->subs->activate($company, $plan, $months);
+                    $this->subs->activate($company, $plan, $months, 'razorpay', 'webhook:' . ($r->input('payload.payment.entity.id') ?? ''));
                     Log::info('Subscription activated via webhook', ['company_id' => $cid, 'plan' => $plan]);
                 }
             }

@@ -359,6 +359,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
     Route::prefix('admin')->group(function () {
         Route::get('/overview',              [\App\Http\Controllers\Api\SuperAdminController::class, 'overview'])->name('admin.overview');
         Route::get('/expiring',              [\App\Http\Controllers\Api\SuperAdminController::class, 'expiring'])->name('admin.expiring');
+        Route::get('/revenue',               [\App\Http\Controllers\Api\SuperAdminController::class, 'revenue'])->name('admin.revenue');
+        Route::get('/funnel',                [\App\Http\Controllers\Api\SuperAdminController::class, 'funnel'])->name('admin.funnel');
+        Route::get('/payments/{id}/invoice', [\App\Http\Controllers\Api\SuperAdminController::class, 'invoicePdf'])->name('admin.payment.invoice');
         Route::get('/platform-admins',       [\App\Http\Controllers\Api\SuperAdminController::class, 'platformAdmins'])->name('admin.padmins');
         Route::post('/platform-admins',      [\App\Http\Controllers\Api\SuperAdminController::class, 'createPlatformAdmin'])->name('admin.padmins.create');
         Route::get('/companies',             [\App\Http\Controllers\Api\SuperAdminController::class, 'companies'])->name('admin.companies');

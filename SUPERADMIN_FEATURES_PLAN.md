@@ -88,10 +88,10 @@ Legend: ✅ done · 🟡 partial/data-exists · ⬜ to build
 4. ✅ Super-admin action audit (activate/extend/suspend/impersonate/admin-create → audit_logs) — `audit()` helper
 5. ✅ Add-more-platform-admins (list + create) — `@platformAdmins/@createPlatformAdmin`
 
-**Phase B — Money & growth:**
-6. Subscription payment history + real MRR/ARR/churn — M
-7. Signup funnel + conversion % + UTM capture — M
-8. GST tax-invoice for subscriptions (you're selling in India) — L
+**Phase B — Money & growth: ✅ DONE (2026-06-15)**
+6. ✅ `subscription_payments` table; recorded on manual activate + Razorpay verify/webhook; `@revenue` = real MRR/ARR/ARPU/churn + collected-this-month + plan split + payment history
+7. ✅ UTM capture at signup (companies.utm_*; LoginScreen reads URL params); `@funnel` = signups/conversion%/daily/by-source
+8. ✅ GST subscription tax-invoice (platform seller from config/platform.php; CGST/SGST vs IGST by state; SAC 997331; GST-inclusive ₹ split; PINV-YYYY-NNNN series; DejaVu PDF via `@invoicePdf`)
 
 **Phase C — Scale & polish:**
 9. Broadcast announcement banner — M

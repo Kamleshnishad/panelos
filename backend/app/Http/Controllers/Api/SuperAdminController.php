@@ -140,18 +140,11 @@ class SuperAdminController extends Controller
         $c = Company::withoutGlobalScope('tenant')->findOrFail($id);
         $months = $data['months'] ?? 1;
 
-        $base = ($c->subscription_ends_at && $c->subscription_ends_at->isFuture())
-            ? $c->subscription_ends_at : now();
-
-        $c->update([
-            'subscription_plan'    => $data['plan'],
-            'subscription_status'  => 'active',
-            'is_active'            => true,
-            'subscription_ends_at' => $base->copy()->addMonths($months),
-        ]);
+        $c = app(\App\Services\SubscriptionService::class)
+            ->activate($c, $data['plan'], $months, 'manual', 'Manual activation by ' . $r->user()->name, true, $r->user()->id);
 
         $this->audit($r, $c->id, 'subscription_activated', "Activated {$data['plan']} for {$months} month(s)", ['plan' => $data['plan'], 'months' => $months]);
-        return $this->successResponse($c->fresh(), "Activated {$data['plan']} for {$months} month(s)");
+        return $this->successResponse($c, "Activated {$data['plan']} for {$months} month(s)");
     }
 
     /** Extend the free trial. */
@@ -249,6 +242,109 @@ class SuperAdminController extends Controller
                 'is_super_admin' => false, 'is_company_admin' => $target->is_company_admin,
             ],
         ], "Impersonating {$c->name}");
+    }
+
+    /** Download a GST subscription tax-invoice PDF for a payment. */
+    public function invoicePdf(Request $r, int $paymentId)
+    {
+        $this->requireSuperAdmin($r);
+        $p = \App\Models\SubscriptionPayment::withoutGlobalScope('tenant')->findOrFail($paymentId);
+        $company = Company::withoutGlobalScope('tenant')->find($p->company_id);
+
+        $intra = ($company?->state_code ?? '') === config('platform.state_code');
+        $html = view('billing.subscription_invoice', [
+            'p' => $p, 'company' => $company, 'platform' => config('platform'),
+            'intra' => $intra,
+            'words' => \App\Services\InvoiceService::amountInWords((float) $p->total_amount),
+        ])->render();
+
+        $pdf = app('dompdf.wrapper');
+        $pdf->loadHTML($html);
+        $pdf->setPaper('A4');
+        return $pdf->download('subscription_' . ($p->invoice_no ?? $p->id) . '.pdf');
+    }
+
+    /** Revenue dashboard: real MRR/ARR/ARPU, churn, plan split, recent payments. */
+    public function revenue(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        $prices = config('plans.prices', []);
+
+        $companies = Company::withoutGlobalScope('tenant')->get();
+        $activeCos = $companies->where('subscription_status', 'active');
+        $mrr  = $activeCos->sum(fn ($c) => (int) ($prices[$c->subscription_plan] ?? 0));
+        $arpu = $activeCos->count() ? round($mrr / $activeCos->count()) : 0;
+
+        // Churn this month = went expired/suspended this month / active at month start (approx)
+        $churnedThisMonth = $companies->filter(fn ($c) =>
+            (($c->subscription_status === 'expired') || !$c->is_active)
+            && $c->updated_at && $c->updated_at->isCurrentMonth()
+        )->count();
+
+        $payments = \App\Models\SubscriptionPayment::withoutGlobalScope('tenant')
+            ->latest('created_at')->take(50)->get();
+        $collectedThisMonth = \App\Models\SubscriptionPayment::withoutGlobalScope('tenant')
+            ->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)->sum('total_amount');
+
+        $byPlan = [];
+        foreach ($prices as $plan => $price) {
+            $byPlan[] = ['plan' => $plan, 'count' => $activeCos->where('subscription_plan', $plan)->count(), 'price' => $price];
+        }
+
+        // Map payments to company names
+        $names = $companies->pluck('name', 'id');
+        $payRows = $payments->map(fn ($p) => [
+            'id' => $p->id, 'company' => $names[$p->company_id] ?? ('#' . $p->company_id),
+            'plan' => $p->plan, 'months' => $p->months, 'total' => $p->total_amount,
+            'method' => $p->method, 'invoice_no' => $p->invoice_no, 'date' => $p->created_at,
+        ]);
+
+        return $this->successResponse([
+            'mrr'                  => $mrr,
+            'arr'                  => $mrr * 12,
+            'arpu'                 => $arpu,
+            'active_count'         => $activeCos->count(),
+            'churned_this_month'   => $churnedThisMonth,
+            'collected_this_month' => round((float) $collectedThisMonth, 2),
+            'by_plan'              => $byPlan,
+            'payments'             => $payRows,
+        ], 'Revenue dashboard');
+    }
+
+    /** Signup funnel + conversion + UTM source breakdown. */
+    public function funnel(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        $days = (int) $r->query('days', 30);
+        $since = now()->subDays($days)->startOfDay();
+
+        $cos = Company::withoutGlobalScope('tenant')->where('created_at', '>=', $since)->get();
+        $signups   = $cos->count();
+        $converted = $cos->where('subscription_status', 'active')->count();
+        $stillTrial = $cos->where('subscription_status', 'trial')->count();
+        $expired   = $cos->where('subscription_status', 'expired')->count();
+
+        // Daily signups series
+        $series = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $d = now()->subDays($i)->format('Y-m-d');
+            $series[] = ['date' => now()->subDays($i)->format('d M'), 'count' => $cos->filter(fn ($c) => $c->created_at->format('Y-m-d') === $d)->count()];
+        }
+
+        // UTM source breakdown
+        $bySource = $cos->groupBy(fn ($c) => $c->utm_source ?: 'direct')->map->count()
+            ->map(fn ($count, $src) => ['source' => $src, 'count' => $count])->values();
+
+        return $this->successResponse([
+            'period_days'    => $days,
+            'signups'        => $signups,
+            'converted'      => $converted,
+            'still_trial'    => $stillTrial,
+            'expired'        => $expired,
+            'conversion_pct' => $signups ? round($converted / $signups * 100, 1) : 0,
+            'daily'          => $series,
+            'by_source'      => $bySource,
+        ], 'Signup funnel');
     }
 
     /** List platform admins (is_super_admin users). */

@@ -51,6 +51,10 @@ class Company extends Model
         'subscription_ends_at',
         'is_active',
         'settings',
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
+        'signup_referrer',
     ];
 
     protected function casts(): array

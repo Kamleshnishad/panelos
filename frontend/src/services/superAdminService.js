@@ -17,6 +17,15 @@ export default {
   setActive(id, isActive)     { return api('post', `/api/admin/companies/${id}/set-active`, { is_active: isActive }) },
   impersonate(id)             { return api('post', `/api/admin/companies/${id}/impersonate`) },
   expiring(days = 7)          { return api('get',  '/api/admin/expiring', null, { days }) },
+  revenue()                   { return api('get',  '/api/admin/revenue') },
+  funnel(days = 30)           { return api('get',  '/api/admin/funnel', null, { days }) },
+  async downloadInvoice(paymentId, invoiceNo) {
+    const res = await axios.get(`/api/admin/payments/${paymentId}/invoice`, { headers: authHeaders(), responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = `${invoiceNo || 'invoice'}.pdf`; a.click()
+    window.URL.revokeObjectURL(url)
+  },
   platformAdmins()            { return api('get',  '/api/admin/platform-admins') },
   createPlatformAdmin(data)   { return api('post', '/api/admin/platform-admins', data) },
 }
