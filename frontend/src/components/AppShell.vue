@@ -58,19 +58,21 @@
           </div>
         </div>
         <div class="tb-right">
-          <div class="search">
-            <svg class="s-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            <input v-model="searchQ" aria-label="Jump to a section" placeholder="Jump to a section…" @keyup.enter="quickJump" />
-            <span class="kbd">↵</span>
-          </div>
-          <button class="icon-btn" aria-label="View receivables alerts" title="Receivables alerts" @click="go('receivables')">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span v-if="alertCount" class="bell-dot"></span>
-          </button>
-          <button class="btn-primary" @click="go('quotations')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-            New Quote
-          </button>
+          <template v-if="!isSuperAdmin">
+            <div class="search">
+              <svg class="s-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <input v-model="searchQ" aria-label="Jump to a section" placeholder="Jump to a section…" @keyup.enter="quickJump" />
+              <span class="kbd">↵</span>
+            </div>
+            <button class="icon-btn" aria-label="View receivables alerts" title="Receivables alerts" @click="go('receivables')">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span v-if="alertCount" class="bell-dot"></span>
+            </button>
+            <button class="btn-primary" @click="go('quotations')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+              New Quote
+            </button>
+          </template>
         </div>
       </header>
 
@@ -218,7 +220,7 @@ const nav = [
 
 const allItems    = nav.flatMap(g => g.items)
 const activeLabel = computed(() => allItems.find(i => i.key === active.value)?.label ?? '')
-const activeGroup = computed(() => nav.find(g => g.items.some(i => i.key === active.value))?.label ?? 'Main')
+const activeGroup = computed(() => visibleNav.value.find(g => g.items.some(i => i.key === active.value))?.label ?? 'Main')
 
 // Super admins (platform owner) get a clean platform-only menu — no tenant
 // operational features, since they don't belong to any one customer factory.
