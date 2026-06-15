@@ -85,25 +85,19 @@ class NotificationSettingsController extends Controller
         }
 
         try {
-            // Build a live Twilio client from the saved (or env-fallback) credentials
-            $client = new \Twilio\Rest\Client($s->resolvedSid(), $s->resolvedToken());
+            $twilio = new \App\Services\TwilioStreamClient($s->resolvedSid(), $s->resolvedToken());
             $r->user()->loadMissing('company');
             $companyName = $r->user()->company?->name ?? 'PanelOS';
-            $msg    = "PanelOS test message from {$companyName}. Notifications are working!";
+            $msg  = "PanelOS test message from {$companyName}. Notifications are working! ✅";
+            $phone = $data['phone'];
 
             if ($data['channel'] === 'sms') {
-                $result = $client->messages->create($data['phone'], [
-                    'from' => $s->resolvedFromNumber(),
-                    'body' => $msg,
-                ]);
+                $result = $twilio->sendSms($phone, $s->resolvedFromNumber(), $msg);
             } else {
-                $result = $client->messages->create('whatsapp:' . $data['phone'], [
-                    'from' => 'whatsapp:' . $s->resolvedWhatsappFrom(),
-                    'body' => $msg,
-                ]);
+                $result = $twilio->sendWhatsApp($phone, $s->resolvedWhatsappFrom(), $msg);
             }
 
-            return $this->successResponse(['sid' => $result->sid, 'status' => $result->status], 'Test message sent successfully');
+            return $this->successResponse($result, 'Test message sent successfully');
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], 'Failed to send: ' . $e->getMessage(), 'TWILIO_ERROR', 400);
         }

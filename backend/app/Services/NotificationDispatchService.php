@@ -6,7 +6,6 @@ use App\Models\NotificationSetting;
 use App\Models\Order;
 use App\Models\Invoice;
 use Illuminate\Support\Facades\Log;
-use Twilio\Rest\Client;
 
 /**
  * Sends WhatsApp / SMS notifications on business events.
@@ -120,18 +119,17 @@ class NotificationDispatchService
         if (!$sid || !$token) return;
 
         try {
-            $client = new Client($sid, $token);
+            $twilio = new TwilioStreamClient($sid, $token);
+            $to     = $this->e164($phone);
 
             if ($ns->isWhatsappReady()) {
-                $from = 'whatsapp:' . $ns->resolvedWhatsappFrom();
-                $to   = 'whatsapp:' . $this->e164($phone);
-                $client->messages->create($to, ['from' => $from, 'body' => $msg]);
+                $twilio->sendWhatsApp($to, $ns->resolvedWhatsappFrom(), $msg);
                 Log::info("WA notification sent", ['type' => $type, 'to' => $phone, 'company' => $companyId]);
                 return;
             }
 
             if ($ns->isSmsReady()) {
-                $client->messages->create($this->e164($phone), ['from' => $ns->resolvedFromNumber(), 'body' => $msg]);
+                $twilio->sendSms($to, $ns->resolvedFromNumber(), $msg);
                 Log::info("SMS notification sent", ['type' => $type, 'to' => $phone, 'company' => $companyId]);
             }
         } catch (\Throwable $e) {
