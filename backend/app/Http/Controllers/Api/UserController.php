@@ -87,6 +87,17 @@ class UserController extends Controller
         try {
             $companyId = $request->user()->company_id;
 
+            // Plan-based user limit
+            $company = $request->user()->company;
+            if ($company && !$company->withinUserLimit()) {
+                return $this->errorResponse(
+                    ['plan' => $company->subscription_plan, 'limit' => $company->userLimit()],
+                    "Your {$company->subscription_plan} plan allows up to {$company->userLimit()} users. Upgrade your plan to add more.",
+                    'PLAN_LIMIT_REACHED',
+                    422
+                );
+            }
+
             $validated = $request->validate([
                 'name'             => 'required|string|max:255',
                 'email'            => ['required', 'email', 'max:255', Rule::unique('users', 'email')],

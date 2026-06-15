@@ -48,12 +48,21 @@ Make tenant isolation structural, not opt-in. Without this, do not run ads/onboa
 catches it). Pre-existing PHPUnit suite is unusable on SQLite (a MySQL-only `MODIFY COLUMN` migration);
 the artisan check runs against real MySQL instead.
 
-## ✅ STATUS (2026-06-15): S0–S3 DONE — SaaS v1 launchable with manual billing
+## ✅ STATUS (2026-06-15): S0–S4 DONE — full self-serve SaaS ready
 
 Verified end-to-end: signup→trial(200) → trial-expiry(402, auto-flip expired) →
-super-admin activate(200, 6-mo) → suspend(402); isolation check PASS.
-Remaining: S2b Razorpay auto-billing (optional, removes manual payment handling),
-S4 plan feature-gating. All committed LOCALLY (not pushed, per request).
+activate(200) → suspend(402); isolation check PASS; plan gating (starter: 3 users +
+no e-invoice; pro: unlimited + e-invoice) verified; Razorpay signature verify pass/reject.
+
+- **S0** structural tenant isolation (global scope) ✅
+- **S1** self-signup + 14-day trial + provisioning ✅
+- **S2a** subscription enforcement middleware + trial gate ✅
+- **S2b** Razorpay online billing (pluggable; manual fallback) ✅
+- **S3** super-admin platform panel ✅
+- **S4** plan-based feature gating (user limit + e-invoice) ✅
+
+To activate online billing: set RAZORPAY_ENABLED=true + keys in .env.
+Until then, tenants pay manually and the owner activates via super-admin panel.
 
 ## Phase S1 — Signup, trial & onboarding   ✅ DONE (wizard optional)
 

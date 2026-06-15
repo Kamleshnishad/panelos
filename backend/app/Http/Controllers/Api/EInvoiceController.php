@@ -19,6 +19,21 @@ class EInvoiceController extends Controller
         return Invoice::where('company_id', $r->user()->company_id)->findOrFail($id);
     }
 
+    /** Plan-gate: e-Invoice/e-Way is a Pro+ feature. Returns a response when blocked. */
+    private function planGate(Request $r): ?\Illuminate\Http\JsonResponse
+    {
+        $company = $r->user()->company;
+        if ($company && !$company->canUseEinvoice()) {
+            return $this->errorResponse(
+                ['plan' => $company->subscription_plan],
+                'e-Invoice & e-Way Bill require the Pro plan. Please upgrade to use this feature.',
+                'PLAN_FEATURE_LOCKED',
+                422
+            );
+        }
+        return null;
+    }
+
     /** Current IRN + e-Way Bill status. */
     public function status(Request $r, int $id)
     {
@@ -32,6 +47,7 @@ class EInvoiceController extends Controller
     /** Attempt GSP IRN generation (stub until keys set). */
     public function generateIrn(Request $r, int $id)
     {
+        if ($deny = $this->planGate($r)) return $deny;
         try {
             $inv = $this->invoice($r, $id);
             if ($inv->status === 'cancelled') {
@@ -49,6 +65,7 @@ class EInvoiceController extends Controller
     /** Manually set IRN + ACK from the GST portal. */
     public function setIrnManual(Request $r, int $id)
     {
+        if ($deny = $this->planGate($r)) return $deny;
         try {
             $inv = $this->invoice($r, $id);
             $data = $r->validate([
@@ -71,6 +88,7 @@ class EInvoiceController extends Controller
     /** Cancel IRN (local record; manual GSP cancel or stub). */
     public function cancelIrn(Request $r, int $id)
     {
+        if ($deny = $this->planGate($r)) return $deny;
         try {
             $inv = $this->invoice($r, $id);
             $data = $r->validate(['reason' => 'required|string|max:255']);
@@ -88,6 +106,7 @@ class EInvoiceController extends Controller
     /** Attempt GSP e-Way Bill generation (stub). */
     public function generateEwayBill(Request $r, int $id)
     {
+        if ($deny = $this->planGate($r)) return $deny;
         try {
             $inv = $this->invoice($r, $id);
             $transport = $r->only(['eway_transporter_id', 'eway_vehicle_no', 'eway_transport_mode', 'eway_distance_km', 'eway_doc_no']);
@@ -103,6 +122,7 @@ class EInvoiceController extends Controller
     /** Manually set e-Way Bill number. */
     public function setEwayBillManual(Request $r, int $id)
     {
+        if ($deny = $this->planGate($r)) return $deny;
         try {
             $inv = $this->invoice($r, $id);
             $data = $r->validate([
@@ -128,6 +148,7 @@ class EInvoiceController extends Controller
     /** Cancel e-Way Bill. */
     public function cancelEwayBill(Request $r, int $id)
     {
+        if ($deny = $this->planGate($r)) return $deny;
         try {
             $inv = $this->invoice($r, $id);
             $data = $r->validate(['reason' => 'nullable|string|max:255']);

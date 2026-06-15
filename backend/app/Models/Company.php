@@ -81,4 +81,30 @@ class Company extends Model
     {
         return $this->hasMany(Role::class);
     }
+
+    // ── Plan-based feature gating ────────────────────────────────────────
+    public function planLimits(): array
+    {
+        return config('plans.limits.' . $this->subscription_plan)
+            ?? config('plans.limits.starter', ['users' => 3, 'einvoice' => false]);
+    }
+
+    /** Max users allowed by plan (0 = unlimited). */
+    public function userLimit(): int
+    {
+        return (int) ($this->planLimits()['users'] ?? 0);
+    }
+
+    /** True if another user can be added under the current plan. */
+    public function withinUserLimit(): bool
+    {
+        $limit = $this->userLimit();
+        if ($limit <= 0) return true;   // unlimited
+        return $this->users()->count() < $limit;
+    }
+
+    public function canUseEinvoice(): bool
+    {
+        return (bool) ($this->planLimits()['einvoice'] ?? false);
+    }
 }
