@@ -48,7 +48,14 @@ Make tenant isolation structural, not opt-in. Without this, do not run ads/onboa
 catches it). Pre-existing PHPUnit suite is unusable on SQLite (a MySQL-only `MODIFY COLUMN` migration);
 the artisan check runs against real MySQL instead.
 
-## Phase S1 — Signup, trial & onboarding
+## ✅ STATUS (2026-06-15): S0–S3 DONE — SaaS v1 launchable with manual billing
+
+Verified end-to-end: signup→trial(200) → trial-expiry(402, auto-flip expired) →
+super-admin activate(200, 6-mo) → suspend(402); isolation check PASS.
+Remaining: S2b Razorpay auto-billing (optional, removes manual payment handling),
+S4 plan feature-gating. All committed LOCALLY (not pushed, per request).
+
+## Phase S1 — Signup, trial & onboarding   ✅ DONE (wizard optional)
 
 5. **Public signup endpoint** `POST /auth/register` (rate-limited, unauthenticated):
    - Validates company name, admin name, email (global-unique), password (passwordPolicy).
