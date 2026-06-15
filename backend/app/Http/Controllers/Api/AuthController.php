@@ -100,8 +100,22 @@ class AuthController extends Controller
             );
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Two-factor (email OTP): if enabled, don't issue a token yet — send a code.
+        if ($user->two_factor_enabled) {
+            $this->sendOtp($user);
+            return $this->successResponse([
+                'needs_2fa' => true,
+                'email'     => $user->email,
+            ], 'A verification code has been sent to your email.', 200);
+        }
 
+        return $this->issueLogin($user);
+    }
+
+    /** Issue the auth token + standard login payload. */
+    private function issueLogin(User $user)
+    {
+        $token = $user->createToken('auth_token')->plainTextToken;
         $user->update(['last_login_at' => now()]);
 
         return $this->successResponse([
@@ -116,6 +130,53 @@ class AuthController extends Controller
             'token' => $token,
             'token_type' => 'Bearer',
         ], 'Login successful', 200);
+    }
+
+    /** Generate, store (hashed) and email a 6-digit OTP. Also logged for dev. */
+    private function sendOtp(User $user): void
+    {
+        $code = (string) random_int(100000, 999999);
+        $user->forceFill([
+            'two_factor_code'       => Hash::make($code),
+            'two_factor_expires_at' => now()->addMinutes(10),
+        ])->save();
+
+        $body = "Your PanelOS verification code is: {$code}\nIt expires in 10 minutes.";
+        try {
+            \Illuminate\Support\Facades\Mail::raw($body, function ($m) use ($user) {
+                $m->to($user->email)->subject('PanelOS — Your login code');
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('2FA email send failed', ['error' => $e->getMessage()]);
+        }
+        // Dev fallback: code is in the log (MAIL_MAILER=log) so login still works without SMTP.
+        \Illuminate\Support\Facades\Log::info("2FA code for {$user->email}: {$code}");
+    }
+
+    /** Step 2 of login — verify the OTP and issue the token. */
+    public function verifyOtp(Request $request)
+    {
+        $request->validate(['email' => 'required|email', 'code' => 'required|string']);
+
+        $user = User::where('email', $request->email)->where('is_active', true)->first();
+        if (!$user || !$user->two_factor_code || !$user->two_factor_expires_at
+            || $user->two_factor_expires_at->isPast()
+            || !Hash::check($request->code, $user->two_factor_code)) {
+            return $this->errorResponse(['code' => ['Invalid or expired code']], 'Invalid or expired code', 'OTP_INVALID', 401);
+        }
+
+        $user->forceFill(['two_factor_code' => null, 'two_factor_expires_at' => null])->save();
+        return $this->issueLogin($user);
+    }
+
+    /** Enable/disable 2FA for the current user. */
+    public function toggleTwoFactor(Request $request)
+    {
+        $data = $request->validate(['enabled' => 'required|boolean']);
+        $user = $request->user();
+        $user->update(['two_factor_enabled' => $data['enabled']]);
+        return $this->successResponse(['two_factor_enabled' => $user->two_factor_enabled],
+            $data['enabled'] ? 'Two-factor enabled — you will get an email code at next login.' : 'Two-factor disabled.');
     }
 
     /**
@@ -157,6 +218,7 @@ class AuthController extends Controller
             'role'             => $user->role?->name,
             'permissions'      => $user->effectivePermissions(),
             'is_active'        => $user->is_active,
+            'two_factor_enabled' => $user->two_factor_enabled,
             'last_login_at'    => $user->last_login_at,
             'company'          => $company ? [
                 'id'           => $company->id,

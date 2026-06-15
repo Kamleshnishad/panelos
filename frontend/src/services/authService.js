@@ -21,6 +21,23 @@ export default {
     return data
   },
 
+  async verifyOtp(email, code) {
+    const res = await axios.post('/api/auth/verify-otp', { email, code }, { headers: { Accept: 'application/json' } })
+    const data = res.data?.data ?? {}
+    if (data.token) {
+      localStorage.setItem('token', data.token)
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user))
+        localStorage.setItem('user_id', data.user.id)
+      }
+    }
+    return data
+  },
+
+  toggleTwoFactor(enabled) {
+    return axios.post('/api/auth/two-factor', { enabled }, { headers: authHeaders() }).then(r => r.data)
+  },
+
   async register(payload) {
     const res = await axios.post('/api/auth/register', payload, { headers: { Accept: 'application/json' } })
     const data = res.data?.data ?? {}

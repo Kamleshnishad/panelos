@@ -9,8 +9,23 @@
         </div>
       </div>
 
+      <!-- ── 2FA OTP ─────────────────────────────────── -->
+      <template v-if="mode === 'otp'">
+        <h2>Enter verification code</h2>
+        <p class="muted">We sent a 6-digit code to <b>{{ otpEmail }}</b>. It expires in 10 minutes.</p>
+        <form @submit.prevent="submitOtp">
+          <div class="field">
+            <label>Verification Code</label>
+            <input v-model="otpCode" inputmode="numeric" maxlength="6" placeholder="••••••" autofocus />
+          </div>
+          <div v-if="error" class="error-msg">{{ error }}</div>
+          <button class="btn-login" :disabled="loading || otpCode.length < 6">{{ loading ? 'Verifying…' : 'Verify & Sign In' }}</button>
+        </form>
+        <p class="switch"><a href="#" @click.prevent="switchMode('login')">← Back to sign in</a></p>
+      </template>
+
       <!-- ── SIGN IN ─────────────────────────────────── -->
-      <template v-if="mode === 'login'">
+      <template v-else-if="mode === 'login'">
         <h2>Sign in</h2>
         <p class="muted">Use your company account to continue.</p>
 
@@ -42,7 +57,7 @@
       </template>
 
       <!-- ── SIGN UP (new tenant) ────────────────────── -->
-      <template v-else>
+      <template v-else-if="mode === 'signup'">
         <h2>Start your free trial</h2>
         <p class="muted">14 days free. No card required. Set up your factory in a minute.</p>
 
@@ -96,6 +111,8 @@ const email = ref('admin@panelos.local')
 const password = ref('Admin@123')
 const loading = ref(false)
 const error = ref(null)
+const otpEmail = ref('')
+const otpCode = ref('')
 
 const su = ref({ company_name: '', name: '', email: '', phone: '', password: '', password_confirmation: '' })
 
@@ -139,13 +156,29 @@ async function submit() {
   loading.value = true
   error.value = null
   try {
-    await authService.login(email.value, password.value)
+    const data = await authService.login(email.value, password.value)
+    if (data?.needs_2fa) {
+      otpEmail.value = data.email || email.value
+      otpCode.value = ''
+      mode.value = 'otp'
+      return
+    }
     emit('logged-in')
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Login failed. Check your credentials.'
   } finally {
     loading.value = false
   }
+}
+
+async function submitOtp() {
+  loading.value = true; error.value = null
+  try {
+    await authService.verifyOtp(otpEmail.value, otpCode.value)
+    emit('logged-in')
+  } catch (e) {
+    error.value = e?.response?.data?.message ?? 'Invalid or expired code.'
+  } finally { loading.value = false }
 }
 </script>
 

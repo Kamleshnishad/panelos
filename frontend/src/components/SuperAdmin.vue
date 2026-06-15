@@ -241,6 +241,15 @@
         </div>
 
         <div class="panel">
+          <h3 class="sec-h">🔐 Two-Factor Authentication (your account)</h3>
+          <p class="hint-line">When enabled, your next login will require a 6-digit code sent to your email — protects the platform owner account.</p>
+          <label class="sw">
+            <input type="checkbox" v-model="twoFa" @change="saveTwoFa" />
+            <span>{{ twoFa ? 'Enabled — email code required at login' : 'Disabled' }}</span>
+          </label>
+        </div>
+
+        <div class="panel">
           <h3 class="sec-h">🧾 GST Seller Identity (your subscription invoices)</h3>
           <p class="hint-line">Shown as the seller on tax invoices you raise to tenants for their subscription.</p>
           <div class="form-grid">
@@ -334,6 +343,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import superAdminService from '../services/superAdminService.js'
+import authService from '../services/authService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 
 const tab = ref('companies')
@@ -440,8 +450,20 @@ async function delAnn(a) {
   catch (e) { toastError('Failed.') }
 }
 
+const twoFa = ref(!!authService.currentUser()?.two_factor_enabled)
+async function saveTwoFa() {
+  try {
+    await authService.toggleTwoFactor(twoFa.value)
+    const u = authService.currentUser() || {}
+    u.two_factor_enabled = twoFa.value
+    localStorage.setItem('user', JSON.stringify(u))
+    toastSuccess(twoFa.value ? '2FA enabled.' : '2FA disabled.')
+  } catch (e) { twoFa.value = !twoFa.value; toastError('Failed to update 2FA.') }
+}
+
 async function loadSettings() {
   setLoading.value = true; testMsg.value = ''
+  twoFa.value = !!authService.currentUser()?.two_factor_enabled
   try {
     const s = (await superAdminService.getSettings())?.data ?? {}
     // blank the masked secrets so the user types only to change

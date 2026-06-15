@@ -26,6 +26,7 @@ Route::prefix('auth')->group(function () {
     // Public routes — rate-limited to slow brute-force (10 attempts/min per IP)
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1')->name('register');
+    Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:10,1')->name('verify-otp');
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {
@@ -33,6 +34,7 @@ Route::prefix('auth')->group(function () {
         Route::get('/me', [AuthController::class, 'me'])->name('me');
         Route::post('/refresh-token', [AuthController::class, 'refreshToken'])->name('refresh-token');
         Route::post('/change-password', [AuthController::class, 'changePassword'])->name('change-password');
+        Route::post('/two-factor', [AuthController::class, 'toggleTwoFactor'])->name('two-factor');
     });
 });
 
