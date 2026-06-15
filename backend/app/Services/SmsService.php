@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Models\NotificationSetting;
 use App\Models\SmsLog;
 use Twilio\Rest\Client;
 use Illuminate\Support\Facades\Log;
@@ -15,35 +16,47 @@ class SmsService
     protected $whatsappEnabled;
     protected $whatsappFrom;
 
-    public function __construct()
+    /**
+     * Boot with credentials — prefers DB NotificationSetting over .env.
+     * Pass $companyId to load company-specific credentials; omit for
+     * env-only mode (e.g. scheduled commands run before auth).
+     */
+    public function __construct(?int $companyId = null)
     {
-        $this->enabled = config('services.twilio.enabled', false);
-        $this->whatsappEnabled = config('services.twilio.whatsapp_enabled', false);
-        $this->whatsappFrom = config('services.twilio.whatsapp_from');
+        $ns = $companyId ? NotificationSetting::forCompany($companyId) : null;
 
-        if ($this->enabled || $this->whatsappEnabled) {
-            $accountSid = config('services.twilio.account_sid');
-            $authToken = config('services.twilio.auth_token');
-            $this->twilioPhone = config('services.twilio.from_number');
+        $this->enabled         = $ns ? $ns->isSmsReady()       : config('services.twilio.enabled', false);
+        $this->whatsappEnabled = $ns ? $ns->isWhatsappReady()  : config('services.twilio.whatsapp_enabled', false);
+        $this->twilioPhone     = $ns ? $ns->resolvedFromNumber(): config('services.twilio.from_number');
+        $this->whatsappFrom    = $ns ? $ns->resolvedWhatsappFrom() : config('services.twilio.whatsapp_from');
 
-            $this->client = new Client($accountSid, $authToken);
+        $sid   = $ns ? $ns->resolvedSid()   : config('services.twilio.account_sid');
+        $token = $ns ? $ns->resolvedToken() : config('services.twilio.auth_token');
+
+        if (($this->enabled || $this->whatsappEnabled) && $sid && $token) {
+            $this->client = new Client($sid, $token);
         }
     }
 
-    public function isWhatsappEnabled(): bool
+    /** Re-initialise for a specific company (useful in controllers). */
+    public static function forCompany(int $companyId): static
     {
-        return (bool) $this->whatsappEnabled;
+        return new static($companyId);
     }
+
+    public function isEnabled(): bool      { return (bool) $this->enabled; }
+    public function isWhatsappEnabled(): bool { return (bool) $this->whatsappEnabled; }
 
     /**
      * Send a payment reminder over WhatsApp (Twilio whatsapp: channel).
-     * Pluggable — no-op with a clear message until TWILIO_WHATSAPP_ENABLED=true
-     * and a whatsapp_from number are configured.
      */
     public function sendPaymentReminderWhatsApp(Invoice $invoice, $companyId, $phoneNumber = null)
     {
         if (!$this->whatsappEnabled) {
-            return ['success' => false, 'message' => 'WhatsApp service not enabled'];
+            return ['success' => false, 'message' => 'WhatsApp not enabled. Configure credentials in Settings → Notifications.'];
+        }
+        if (!$this->client) {
+            return ['success' => false, 'message' => 'Twilio client not initialised — check credentials.'];
         }
 
         try {
@@ -319,8 +332,4 @@ class SmsService
         return substr($phone, 0, 3) . '****' . substr($phone, -2);
     }
 
-    public function isEnabled()
-    {
-        return $this->enabled;
-    }
 }

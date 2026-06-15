@@ -345,6 +345,11 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::get('/gst/compliance', [GstController::class, 'getCompliance'])->name('gst.compliance');
     Route::post('/gst/validate-gstin', [GstController::class, 'validateGstin'])->name('gst.validate-gstin');
     Route::get('/gst/states', [GstController::class, 'getStatesList'])->name('gst.states');
+
+    // Notification settings (Twilio SMS + WhatsApp credentials + triggers)
+    Route::get('/settings/notifications',          [\App\Http\Controllers\Api\NotificationSettingsController::class, 'show'])->name('notif.settings.show');
+    Route::put('/settings/notifications',          [\App\Http\Controllers\Api\NotificationSettingsController::class, 'update'])->name('notif.settings.update');
+    Route::post('/settings/notifications/test',    [\App\Http\Controllers\Api\NotificationSettingsController::class, 'testSend'])->name('notif.settings.test');
 });
 
 // Public routes

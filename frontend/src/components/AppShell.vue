@@ -92,6 +92,7 @@
         <accounts-receivable   v-else-if="active === 'receivables'" @view-invoice="go('invoices')" />
         <business-reports      v-else-if="active === 'reports'" />
         <company-settings      v-else-if="active === 'company'" />
+        <notification-settings v-else-if="active === 'notifications'" />
         <document-templates    v-else-if="active === 'doctemplates'" />
         <audit-log             v-else-if="active === 'audit'" />
         <master-data-manager   v-else-if="active === 'master'" />
@@ -126,6 +127,7 @@ import InvoiceManager     from './InvoiceManager.vue'
 import AccountsReceivable from './AccountsReceivable.vue'
 import BusinessReports    from './BusinessReports.vue'
 import CompanySettings    from './CompanySettings.vue'
+import NotificationSettings from './NotificationSettings.vue'
 import DocumentTemplates  from './DocumentTemplates.vue'
 import AuditLog           from './AuditLog.vue'
 import MasterDataManager  from './MasterDataManager.vue'
@@ -172,6 +174,7 @@ const ic = {
   building:   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 21V5l8-2 8 2v16M4 21h16M9 8h0m3 0h0m3 0h0M9 12h0m3 0h0m3 0h0M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   grid:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg>',
   users:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5M16 4a3.2 3.2 0 0 1 0 8m5 8c0-2.5-1.5-4.3-4-4.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  bell:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6 6 0 0 0-5-5.917V4a1 1 0 0 0-2 0v1.083A6 6 0 0 0 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 0 1-6 0v-1m6 0H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 }
 
 const nav = [
@@ -198,8 +201,9 @@ const nav = [
     { key: 'reports',     label: 'Reports',         icon: ic.chart, perm: 'reports.view' },
   ]},
   { label: 'Settings', items: [
-    { key: 'company',     label: 'Company',         icon: ic.building },
-    { key: 'doctemplates',label: 'Doc Templates',   icon: ic.quote },
+    { key: 'company',       label: 'Company',         icon: ic.building },
+    { key: 'notifications', label: 'Notifications',  icon: ic.bell },
+    { key: 'doctemplates',  label: 'Doc Templates',  icon: ic.quote },
     { key: 'master',      label: 'Master Data',     icon: ic.grid },
     { key: 'users',       label: 'Users & Roles',   icon: ic.users, admin: true },
     { key: 'audit',       label: 'Audit Log',       icon: ic.qc, admin: true },
