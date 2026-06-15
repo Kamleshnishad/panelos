@@ -54,4 +54,13 @@ export default {
   // Accounts Receivable / aging
   accountsReceivable(params = {}) { return api('get', '/api/reports/accounts-receivable', null, params) },
   sendReminder(id)              { return api('post', `/api/invoices/${id}/payment-reminder`) },
+
+  // e-Invoice (IRN / QR) + e-Way Bill
+  einvoiceStatus(id)               { return api('get',  `/api/invoices/${id}/einvoice/status`) },
+  generateIrn(id)                  { return api('post', `/api/invoices/${id}/einvoice/irn/generate`) },
+  setIrnManual(id, data)           { return api('post', `/api/invoices/${id}/einvoice/irn/manual`, data) },
+  cancelIrn(id, reason)            { return api('post', `/api/invoices/${id}/einvoice/irn/cancel`, { reason }) },
+  generateEwayBill(id, data)       { return api('post', `/api/invoices/${id}/einvoice/eway/generate`, data) },
+  setEwayBillManual(id, data)      { return api('post', `/api/invoices/${id}/einvoice/eway/manual`, data) },
+  cancelEwayBill(id, reason)       { return api('post', `/api/invoices/${id}/einvoice/eway/cancel`, { reason }) },
 }

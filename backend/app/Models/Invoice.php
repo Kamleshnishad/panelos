@@ -24,16 +24,23 @@ class Invoice extends BaseModel
         'due_date',
         'paid_date',
         'notes',
-        'terms'
+        'terms',
+        'irn', 'irn_qr', 'irn_ack_no', 'irn_ack_date', 'irn_status', 'irn_cancel_reason', 'irn_generated_at',
+        'eway_bill_no', 'eway_bill_generated_at', 'eway_bill_expiry', 'eway_bill_status',
+        'eway_transporter_id', 'eway_vehicle_no', 'eway_transport_mode', 'eway_distance_km', 'eway_doc_no',
     ];
 
     protected $casts = [
         'subtotal' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
-        'invoice_date' => 'date',
-        'due_date' => 'date',
-        'paid_date' => 'date'
+        'invoice_date'           => 'date',
+        'due_date'               => 'date',
+        'paid_date'              => 'date',
+        'irn_ack_date'           => 'datetime',
+        'irn_generated_at'       => 'datetime',
+        'eway_bill_generated_at' => 'datetime',
+        'eway_bill_expiry'       => 'datetime',
     ];
 
     // Expose computed payment fields in API responses (requires payments loaded for accuracy)

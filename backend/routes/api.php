@@ -261,6 +261,15 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf.download');
     Route::get('/invoices/{id}/pdf-preview', [InvoiceController::class, 'generatePreview'])->name('invoices.pdf.preview');
     Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail'])->name('invoices.email.send');
+
+    // e-Invoice (IRN / QR) + e-Way Bill
+    Route::get('/invoices/{id}/einvoice/status',            [\App\Http\Controllers\Api\EInvoiceController::class, 'status'])->name('einvoice.status');
+    Route::post('/invoices/{id}/einvoice/irn/generate',     [\App\Http\Controllers\Api\EInvoiceController::class, 'generateIrn'])->name('einvoice.irn.generate');
+    Route::post('/invoices/{id}/einvoice/irn/manual',       [\App\Http\Controllers\Api\EInvoiceController::class, 'setIrnManual'])->name('einvoice.irn.manual');
+    Route::post('/invoices/{id}/einvoice/irn/cancel',       [\App\Http\Controllers\Api\EInvoiceController::class, 'cancelIrn'])->name('einvoice.irn.cancel');
+    Route::post('/invoices/{id}/einvoice/eway/generate',    [\App\Http\Controllers\Api\EInvoiceController::class, 'generateEwayBill'])->name('einvoice.eway.generate');
+    Route::post('/invoices/{id}/einvoice/eway/manual',      [\App\Http\Controllers\Api\EInvoiceController::class, 'setEwayBillManual'])->name('einvoice.eway.manual');
+    Route::post('/invoices/{id}/einvoice/eway/cancel',      [\App\Http\Controllers\Api\EInvoiceController::class, 'cancelEwayBill'])->name('einvoice.eway.cancel');
     Route::get('/invoices/{id}/email-preview/{type}', [InvoiceController::class, 'emailPreview'])->name('invoices.email.preview');
 
     // Payment Management

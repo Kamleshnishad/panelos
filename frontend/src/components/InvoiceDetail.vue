@@ -122,6 +122,79 @@
       <div v-if="invoice.terms" style="margin-top:6px"><span class="lbl">Terms:</span> {{ invoice.terms }}</div>
     </div>
 
+    <!-- e-Invoice / e-Way Bill panel -->
+    <div class="card ei-card">
+      <div class="ei-head">
+        <div class="ei-title">e-Invoice &amp; e-Way Bill
+          <span class="ei-sub">GST Compliance — IRN &amp; e-Way Bill</span>
+        </div>
+        <button class="btn btn-ghost sm" @click="loadEiStatus">↻ Refresh</button>
+      </div>
+
+      <div v-if="eiLoading" class="ei-loading">Loading…</div>
+      <template v-else-if="eiStatus">
+        <!-- IRN section -->
+        <div class="ei-section">
+          <div class="ei-sec-label">IRN (Invoice Reference Number)
+            <span :class="['ei-badge', eiStatus.irn_status]">{{ eiStatus.irn_status }}</span>
+          </div>
+          <template v-if="eiStatus.irn_status === 'generated'">
+            <div class="ei-mono">{{ eiStatus.irn }}</div>
+            <div class="ei-meta" v-if="eiStatus.irn_ack_no">Ack: {{ eiStatus.irn_ack_no }}{{ eiStatus.irn_ack_date ? '  |  ' + fmtDate(eiStatus.irn_ack_date) : '' }}</div>
+            <button class="btn btn-danger sm" style="margin-top:6px" @click="cancelIrn">Cancel IRN</button>
+          </template>
+          <template v-else-if="eiStatus.irn_status !== 'cancelled'">
+            <div v-if="eiStatus.gsp_enabled" class="ei-note">GSP connected — click to auto-generate.</div>
+            <div v-else class="ei-note">GSP not configured — enter IRN manually from the <a href="https://einvoice1.gst.gov.in" target="_blank">GST portal</a>.</div>
+            <div class="ei-form">
+              <input v-model="irnForm.irn" placeholder="64-char IRN" class="ei-input wide" />
+              <input v-model="irnForm.irn_ack_no" placeholder="Ack Number" class="ei-input" />
+              <input v-model="irnForm.irn_ack_date" type="date" class="ei-input" />
+              <textarea v-model="irnForm.irn_qr" placeholder="QR string or data:image/png;base64,..." rows="2" class="ei-textarea"></textarea>
+              <div class="ei-actions">
+                <button v-if="eiStatus.gsp_enabled" class="btn btn-primary sm" :disabled="eiBusy" @click="generateIrn">{{ eiBusy ? '…' : 'Auto-generate IRN' }}</button>
+                <button class="btn btn-accept sm" :disabled="eiBusy || !irnForm.irn || irnForm.irn.length !== 64" @click="saveIrnManual">{{ eiBusy ? '…' : 'Save IRN' }}</button>
+              </div>
+            </div>
+          </template>
+          <div v-else class="ei-note" style="color:#c62828">IRN cancelled{{ eiStatus.irn_cancel_reason ? ': ' + eiStatus.irn_cancel_reason : '' }}</div>
+        </div>
+
+        <!-- e-Way Bill section -->
+        <div class="ei-section" style="margin-top:12px">
+          <div class="ei-sec-label">e-Way Bill
+            <span :class="['ei-badge', eiStatus.eway_bill_status]">{{ eiStatus.eway_bill_status }}</span>
+          </div>
+          <template v-if="eiStatus.eway_bill_status === 'active'">
+            <div class="ei-meta bold">{{ eiStatus.eway_bill_no }}</div>
+            <div class="ei-meta" v-if="eiStatus.eway_bill_expiry">Expires: {{ fmtDate(eiStatus.eway_bill_expiry) }}</div>
+            <div class="ei-meta">{{ eiStatus.eway_vehicle_no }} &nbsp;|&nbsp; Mode: {{ eiStatus.eway_transport_mode }}</div>
+            <button class="btn btn-danger sm" style="margin-top:6px" @click="cancelEwayBill">Cancel e-Way Bill</button>
+          </template>
+          <template v-else-if="eiStatus.eway_bill_status !== 'cancelled'">
+            <div class="ei-note">Enter e-Way Bill details manually or auto-generate via GSP.</div>
+            <div class="ei-form">
+              <input v-model="ewayForm.eway_bill_no" placeholder="12-digit e-Way Bill No" class="ei-input" />
+              <input v-model="ewayForm.eway_bill_expiry" type="datetime-local" class="ei-input" />
+              <input v-model="ewayForm.eway_vehicle_no" placeholder="Vehicle No (e.g. GJ01AB1234)" class="ei-input" />
+              <select v-model="ewayForm.eway_transport_mode" class="ei-input">
+                <option value="road">Road</option><option value="rail">Rail</option>
+                <option value="air">Air</option><option value="ship">Ship</option>
+              </select>
+              <input v-model.number="ewayForm.eway_distance_km" type="number" placeholder="Distance (km)" class="ei-input" />
+              <input v-model="ewayForm.eway_transporter_id" placeholder="Transporter GSTIN/ID" class="ei-input" />
+              <div class="ei-actions">
+                <button class="btn btn-accept sm" :disabled="eiBusy || !ewayForm.eway_bill_no" @click="saveEwayManual">{{ eiBusy ? '…' : 'Save e-Way Bill' }}</button>
+              </div>
+            </div>
+          </template>
+          <div v-else class="ei-note" style="color:#c62828">e-Way Bill cancelled.</div>
+        </div>
+      </template>
+      <div v-else class="ei-note ei-loading">Click ↻ to load status.</div>
+      <div v-if="eiError" class="error-banner" style="margin-top:8px">{{ eiError }}</div>
+    </div>
+
     <!-- Record Payment modal -->
     <div v-if="showPayment" class="modal-overlay" @click.self="showPayment = false">
       <div class="modal-box pay-modal">
@@ -204,6 +277,64 @@ const saving     = ref(false)
 const pdfLoading = ref(false)
 const actionLoading = ref(false)
 const actionError   = ref(null)
+
+// e-Invoice / e-Way Bill
+const eiStatus  = ref(null)
+const eiLoading = ref(false)
+const eiBusy    = ref(false)
+const eiError   = ref(null)
+const irnForm   = reactive({ irn: '', irn_ack_no: '', irn_ack_date: '', irn_qr: '' })
+const ewayForm  = reactive({ eway_bill_no: '', eway_bill_expiry: '', eway_vehicle_no: '', eway_transport_mode: 'road', eway_distance_km: null, eway_transporter_id: '' })
+
+async function loadEiStatus() {
+  eiLoading.value = true; eiError.value = null
+  try {
+    const r = await invoiceService.einvoiceStatus(props.invoiceId)
+    eiStatus.value = r?.data ?? r
+  } catch (e) { eiError.value = e?.response?.data?.message ?? 'Could not load e-Invoice status.' }
+  finally { eiLoading.value = false }
+}
+async function generateIrn() {
+  eiBusy.value = true; eiError.value = null
+  try {
+    const r = await invoiceService.generateIrn(props.invoiceId)
+    eiStatus.value = r?.data ?? r
+  } catch (e) { eiError.value = e?.response?.data?.message ?? 'IRN generation failed.' }
+  finally { eiBusy.value = false }
+}
+async function saveIrnManual() {
+  eiBusy.value = true; eiError.value = null
+  try {
+    const r = await invoiceService.setIrnManual(props.invoiceId, { irn: irnForm.irn, irn_ack_no: irnForm.irn_ack_no || null, irn_ack_date: irnForm.irn_ack_date || null, irn_qr: irnForm.irn_qr || null })
+    eiStatus.value = r?.data ?? r
+    Object.assign(irnForm, { irn: '', irn_ack_no: '', irn_ack_date: '', irn_qr: '' })
+  } catch (e) { eiError.value = e?.response?.data?.message ?? 'Could not save IRN.' }
+  finally { eiBusy.value = false }
+}
+async function cancelIrn() {
+  const reason = prompt('Reason for cancellation?'); if (!reason) return
+  eiBusy.value = true; eiError.value = null
+  try { const r = await invoiceService.cancelIrn(props.invoiceId, reason); eiStatus.value = r?.data ?? r }
+  catch (e) { eiError.value = e?.response?.data?.message ?? 'Cancel failed.' }
+  finally { eiBusy.value = false }
+}
+async function saveEwayManual() {
+  eiBusy.value = true; eiError.value = null
+  try {
+    const payload = { eway_bill_no: ewayForm.eway_bill_no, eway_bill_expiry: ewayForm.eway_bill_expiry || null, eway_vehicle_no: ewayForm.eway_vehicle_no || null, eway_transport_mode: ewayForm.eway_transport_mode, eway_distance_km: ewayForm.eway_distance_km || null, eway_transporter_id: ewayForm.eway_transporter_id || null }
+    const r = await invoiceService.setEwayBillManual(props.invoiceId, payload)
+    eiStatus.value = r?.data ?? r
+    Object.assign(ewayForm, { eway_bill_no: '', eway_bill_expiry: '', eway_vehicle_no: '', eway_transport_mode: 'road', eway_distance_km: null, eway_transporter_id: '' })
+  } catch (e) { eiError.value = e?.response?.data?.message ?? 'Could not save e-Way Bill.' }
+  finally { eiBusy.value = false }
+}
+async function cancelEwayBill() {
+  const reason = prompt('Reason?') ?? 'Cancelled'
+  eiBusy.value = true; eiError.value = null
+  try { const r = await invoiceService.cancelEwayBill(props.invoiceId, reason); eiStatus.value = r?.data ?? r }
+  catch (e) { eiError.value = e?.response?.data?.message ?? 'Cancel failed.' }
+  finally { eiBusy.value = false }
+}
 const actionSuccess = ref(null)
 const showCancel    = ref(false)
 
@@ -313,7 +444,7 @@ async function downloadPdf() {
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' }
 function fmtNum(n)  { return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
-onMounted(load)
+onMounted(async () => { await load(); loadEiStatus() })
 </script>
 
 <style scoped>
@@ -411,4 +542,28 @@ onMounted(load)
 .req { color: #c62828; }
 .hint { font-size: 11px; color: #c62828; margin-top: 3px; display: block; }
 .error-msg { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+
+/* e-Invoice panel */
+.ei-card { padding: 16px 20px; }
+.ei-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.ei-title { font-size: 14px; font-weight: 700; color: var(--primary); }
+.ei-sub { font-size: 11px; font-weight: 400; color: var(--text-2); margin-left: 8px; }
+.ei-loading { font-size: 12px; color: #888; padding: 8px 0; }
+.ei-section { background: #f8faff; border: 1px solid #dce6f8; border-radius: 7px; padding: 10px 14px; }
+.ei-sec-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #5b6472; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.ei-badge { font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; }
+.ei-badge.none { background: #f0f0f0; color: #888; }
+.ei-badge.generated { background: #e8f5e9; color: #2e7d32; }
+.ei-badge.cancelled { background: #ffebee; color: #c62828; }
+.ei-badge.active { background: #e8f5e9; color: #2e7d32; }
+.ei-badge.expired { background: #fff8e1; color: #b5740a; }
+.ei-mono { font-family: monospace; font-size: 10px; color: #333; word-break: break-all; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; margin-bottom: 4px; }
+.ei-meta { font-size: 11px; color: #555; margin-bottom: 2px; }
+.ei-note { font-size: 11.5px; color: #667085; margin-bottom: 8px; }
+.ei-note a { color: var(--primary); }
+.ei-form { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ei-input { padding: 6px 9px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; min-width: 160px; }
+.ei-input.wide { min-width: 320px; flex: 1; }
+.ei-textarea { width: 100%; padding: 6px 9px; border: 1px solid #ddd; border-radius: 5px; font-size: 11px; font-family: monospace; resize: vertical; }
+.ei-actions { width: 100%; display: flex; gap: 8px; margin-top: 4px; }
 </style>

@@ -271,6 +271,43 @@ table { width: 100%; border-collapse: collapse; }
   </div>
   @endif
 
+  <!-- e-Invoice / e-Way Bill block -->
+  @if($invoice->irn || $invoice->eway_bill_no)
+  <div style="border:1px solid #D6DEFB;border-radius:3px;padding:8px 12px;margin-bottom:10px;background:#f8faff;">
+    <div style="display:table;width:100%;">
+      <div style="display:table-cell;width:70%;vertical-align:top;">
+        @if($invoice->irn)
+        <div style="margin-bottom:4px;">
+          <span style="font-size:8px;text-transform:uppercase;color:#888;letter-spacing:.4px;">IRN</span><br>
+          <span style="font-size:9px;font-family:monospace;color:#222;word-break:break-all;">{{ $invoice->irn }}</span>
+        </div>
+        @if($invoice->irn_ack_no)
+        <div style="font-size:9px;color:#444;">Ack No: <strong>{{ $invoice->irn_ack_no }}</strong>
+          @if($invoice->irn_ack_date) &nbsp; Ack Date: <strong>{{ \Carbon\Carbon::parse($invoice->irn_ack_date)->format('d/m/Y') }}</strong>@endif
+        </div>
+        @endif
+        @endif
+        @if($invoice->eway_bill_no)
+        <div style="margin-top:5px;font-size:9px;color:#444;">
+          e-Way Bill: <strong>{{ $invoice->eway_bill_no }}</strong>
+          @if($invoice->eway_bill_expiry) &nbsp; Valid till: <strong>{{ \Carbon\Carbon::parse($invoice->eway_bill_expiry)->format('d/m/Y H:i') }}</strong>@endif
+          @if($invoice->eway_vehicle_no) &nbsp; Vehicle: <strong>{{ strtoupper($invoice->eway_vehicle_no) }}</strong>@endif
+        </div>
+        @endif
+      </div>
+      @if($invoice->irn_qr)
+      <div style="display:table-cell;width:30%;text-align:right;vertical-align:top;">
+        @if(str_starts_with(trim($invoice->irn_qr), 'data:image'))
+          <img src="{{ $invoice->irn_qr }}" style="max-width:80px;max-height:80px;" alt="IRN QR">
+        @else
+          <div style="font-size:7px;font-family:monospace;word-break:break-all;max-width:80px;color:#555;">{{ $invoice->irn_qr }}</div>
+        @endif
+      </div>
+      @endif
+    </div>
+  </div>
+  @endif
+
   <!-- Signatory -->
   <div class="sign-block">
     <div class="sign-cell">

@@ -41,6 +41,18 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
 
+    // e-Invoice GSP (IRP). Set EINVOICE_GSP_ENABLED=true when you have a GSP contract.
+    'einvoice' => [
+        'enabled'       => env('EINVOICE_GSP_ENABLED', false),
+        'url'           => env('EINVOICE_GSP_URL'),           // GSP IRN API base URL
+        'eway_url'      => env('EINVOICE_GSP_EWAY_URL'),      // GSP e-Way Bill API base URL
+        'client_id'     => env('EINVOICE_GSP_CLIENT_ID'),
+        'client_secret' => env('EINVOICE_GSP_CLIENT_SECRET'),
+        'gstin'         => env('EINVOICE_GSP_GSTIN'),         // GSTIN of the registered taxpayer
+        'username'      => env('EINVOICE_GSP_USERNAME'),
+        'password'      => env('EINVOICE_GSP_PASSWORD'),
+    ],
+
     'twilio' => [
         'enabled' => env('TWILIO_ENABLED', false),
         'account_sid' => env('TWILIO_ACCOUNT_SID'),
