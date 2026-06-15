@@ -358,8 +358,12 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
     // Super-admin — platform-owner tenant management (is_super_admin only)
     Route::prefix('admin')->group(function () {
         Route::get('/overview',              [\App\Http\Controllers\Api\SuperAdminController::class, 'overview'])->name('admin.overview');
+        Route::get('/expiring',              [\App\Http\Controllers\Api\SuperAdminController::class, 'expiring'])->name('admin.expiring');
+        Route::get('/platform-admins',       [\App\Http\Controllers\Api\SuperAdminController::class, 'platformAdmins'])->name('admin.padmins');
+        Route::post('/platform-admins',      [\App\Http\Controllers\Api\SuperAdminController::class, 'createPlatformAdmin'])->name('admin.padmins.create');
         Route::get('/companies',             [\App\Http\Controllers\Api\SuperAdminController::class, 'companies'])->name('admin.companies');
         Route::get('/companies/{id}',        [\App\Http\Controllers\Api\SuperAdminController::class, 'show'])->name('admin.companies.show');
+        Route::post('/companies/{id}/impersonate', [\App\Http\Controllers\Api\SuperAdminController::class, 'impersonate'])->name('admin.companies.impersonate');
         Route::post('/companies/{id}/activate',     [\App\Http\Controllers\Api\SuperAdminController::class, 'activate'])->name('admin.companies.activate');
         Route::post('/companies/{id}/extend-trial', [\App\Http\Controllers\Api\SuperAdminController::class, 'extendTrial'])->name('admin.companies.extend');
         Route::post('/companies/{id}/set-active',    [\App\Http\Controllers\Api\SuperAdminController::class, 'setActive'])->name('admin.companies.setactive');

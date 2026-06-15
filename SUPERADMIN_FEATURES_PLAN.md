@@ -81,12 +81,12 @@ Legend: ✅ done · 🟡 partial/data-exists · ⬜ to build
 
 ## Recommended build order (for your ad-launch situation)
 
-**Phase A — Operate the SaaS (highest value now):**
-1. Tenant detail drill-down screen (see who signed up, their usage) — S
-2. Trials-expiring list + one-click WhatsApp/email outreach — S (uses existing WhatsApp!)
-3. Login-as / impersonate (debug a tenant's issue) — M
-4. Super-admin action audit (every activate/suspend recorded) — S
-5. Add-more-platform-admins — S
+**Phase A — Operate the SaaS (highest value now): ✅ DONE (2026-06-15)**
+1. ✅ Tenant detail drill-down (usage: users/quotations/orders/invoices + users list + recent platform actions) — `@show`, detail drawer
+2. ✅ Trials-expiring tab + one-click WhatsApp (wa.me) / Email (mailto) outreach — `@expiring`
+3. ✅ Login-as / impersonate (issues tenant token, audited, banner + Exit restores platform session) — `@impersonate`
+4. ✅ Super-admin action audit (activate/extend/suspend/impersonate/admin-create → audit_logs) — `audit()` helper
+5. ✅ Add-more-platform-admins (list + create) — `@platformAdmins/@createPlatformAdmin`
 
 **Phase B — Money & growth:**
 6. Subscription payment history + real MRR/ARR/churn — M

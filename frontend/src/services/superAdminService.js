@@ -15,4 +15,8 @@ export default {
   activate(id, plan, months)  { return api('post', `/api/admin/companies/${id}/activate`, { plan, months }) },
   extendTrial(id, days)       { return api('post', `/api/admin/companies/${id}/extend-trial`, { days }) },
   setActive(id, isActive)     { return api('post', `/api/admin/companies/${id}/set-active`, { is_active: isActive }) },
+  impersonate(id)             { return api('post', `/api/admin/companies/${id}/impersonate`) },
+  expiring(days = 7)          { return api('get',  '/api/admin/expiring', null, { days }) },
+  platformAdmins()            { return api('get',  '/api/admin/platform-admins') },
+  createPlatformAdmin(data)   { return api('post', '/api/admin/platform-admins', data) },
 }
