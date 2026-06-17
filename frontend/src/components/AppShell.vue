@@ -114,6 +114,7 @@
         <master-data-manager   v-else-if="active === 'master'" />
         <user-management       v-else-if="active === 'users'" />
         <super-admin           v-else-if="active === 'superadmin'" />
+        <user-guide            v-else-if="active === 'guide'" />
       </main>
     </div>
     </div>
@@ -153,6 +154,7 @@ import AuditLog           from './AuditLog.vue'
 import MasterDataManager  from './MasterDataManager.vue'
 import UserManagement     from './UserManagement.vue'
 import SuperAdmin         from './SuperAdmin.vue'
+import UserGuide          from './UserGuide.vue'
 
 defineEmits(['logout'])
 
@@ -252,6 +254,9 @@ const nav = [
     { key: 'users',       label: 'Users & Roles',   icon: ic.users, admin: true },
     { key: 'audit',       label: 'Audit Log',       icon: ic.qc, admin: true },
     { key: 'superadmin',  label: 'Platform Admin',  icon: ic.building, superadmin: true },
+  ]},
+  { label: 'Help', items: [
+    { key: 'guide',       label: 'Guide',           icon: ic.quote },
   ]},
 ]
 
