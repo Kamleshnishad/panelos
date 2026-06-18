@@ -1,0 +1,239 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — Deploy workflow (CD)
+#  Triggers on every push to main + manual dispatch.
+#  Flow: build images → push to ghcr.io → SSH to server → restart.
+#  Aim: zero-touch deployment from `git push origin main`.
+# ═══════════════════════════════════════════════════════════════
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  # Lets you re-run a deploy from the Actions tab without a new commit
+  # (useful for rollback: re-run an old workflow → redeploys that SHA).
+  workflow_dispatch:
+
+# Allow this workflow to push images to GitHub Container Registry.
+# Default GITHUB_TOKEN has read-only on packages; we widen it to write
+# only for THIS workflow.
+permissions:
+  contents: read
+  packages: write
+
+# IMPORTANT: do NOT cancel an in-flight deploy if a new commit lands.
+# Queue it behind the current one. Cancelling mid-deploy risks leaving
+# the server in a half-updated state.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  # Image names — use the repo owner so tags work for any fork.
+  IMAGE_BACKEND: ghcr.io/${{ github.repository_owner }}/panelos-backend
+  IMAGE_FRONTEND: ghcr.io/${{ github.repository_owner }}/panelos-frontend
+
+jobs:
+  deploy:
+    name: Build, Push, Deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # `environment: production` enables GitHub's environment protection
+    # (required reviewers, wait timer) if we later want to gate deploys.
+    # For now it just labels runs in the UI.
+    environment:
+      name: production
+      url: http://${{ secrets.DEPLOY_HOST }}:3030
+
+    steps:
+      # ── 1. Checkout the code being deployed ────────────────────
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # ── 2. Buildx supports advanced features (multi-arch, cache) ──
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── 3. Authenticate to ghcr.io ────────────────────────────
+      # GITHUB_TOKEN is auto-injected; with `packages: write` it can push.
+      # No PAT needed.
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 4. Compute a short SHA for human-readable tags ────────
+      - name: Compute tags
+        id: tags
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Tagging images with: latest, ${SHORT_SHA}, ${GITHUB_SHA}"
+
+      # ── 5. Build + push the BACKEND image ─────────────────────
+      # Three tags so:
+      # - latest = "what to deploy by default"
+      # - short SHA = human-readable rollback target
+      # - full SHA = globally unique, never reused
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_BACKEND }}:latest
+            ${{ env.IMAGE_BACKEND }}:${{ steps.tags.outputs.short_sha }}
+            ${{ env.IMAGE_BACKEND }}:${{ github.sha }}
+          cache-from: type=gha,scope=deploy-backend
+          cache-to: type=gha,scope=deploy-backend,mode=max
+          # Hint for ghcr.io: link this package to the GitHub repo, so the
+          # repo's Packages tab lists it and visibility rules can propagate.
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # ── 6. Build + push the FRONTEND image ────────────────────
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_FRONTEND }}:latest
+            ${{ env.IMAGE_FRONTEND }}:${{ steps.tags.outputs.short_sha }}
+            ${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
+          cache-from: type=gha,scope=deploy-frontend
+          cache-to: type=gha,scope=deploy-frontend,mode=max
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # ── 7. Install the SSH private key from secrets ───────────
+      # The community action handles ~/.ssh perms correctly (700/600) so
+      # ssh doesn't refuse the key. The key file is written to
+      # ~/.ssh/panelos_deploy on the runner; gets deleted at job end.
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          name: panelos_deploy
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      # ── 8. Trust the server's host key ────────────────────────
+      # ssh-keyscan fetches the server's host key non-interactively, so
+      # ssh doesn't prompt "Are you sure?" mid-deploy.
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      # ── 9. The actual deploy ──────────────────────────────────
+      # We SSH in once with a heredoc carrying all the deploy commands.
+      # Note: outer `bash -c` so `set -e` aborts on first failure inside
+      # the heredoc — partial deploys are worse than no deploy.
+      - name: Deploy to server
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/panelos_deploy \
+              -o StrictHostKeyChecking=accept-new \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "bash -s" <<ENDSSH
+            set -euo pipefail
+            echo ""
+            echo "═══════════════════════════════════════════════════"
+            echo "  Deploying commit: ${DEPLOY_SHA}"
+            echo "  Triggered by:     ${{ github.actor }}"
+            echo "  Run URL:          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "═══════════════════════════════════════════════════"
+
+            cd /opt/panelos
+
+            echo ""
+            echo "▸ Syncing repo to ${DEPLOY_SHA}"
+            git fetch --all --tags
+            git reset --hard "${DEPLOY_SHA}"
+
+            echo ""
+            echo "▸ Pulling images from ghcr.io"
+            export PANELOS_VERSION="${DEPLOY_SHA}"
+            docker compose -f docker-compose.prod.yml --env-file .env.production pull
+
+            echo ""
+            echo "▸ Recreating containers with new images"
+            docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
+
+            echo ""
+            echo "▸ Waiting up to 60s for backend to report healthy"
+            for i in {1..12}; do
+              status=\$(docker inspect panelos_backend --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+              echo "  attempt \$i/12: \$status"
+              if [ "\$status" = "healthy" ]; then break; fi
+              sleep 5
+            done
+            if [ "\$status" != "healthy" ]; then
+              echo "✗ backend did not become healthy in 60s"
+              docker compose -f docker-compose.prod.yml logs backend --tail=50
+              exit 1
+            fi
+
+            echo ""
+            echo "▸ Running database migrations"
+            docker exec panelos_backend php artisan migrate --force
+
+            echo ""
+            echo "▸ Container status"
+            docker compose -f docker-compose.prod.yml ps
+
+            echo ""
+            echo "✓ Deploy complete"
+          ENDSSH
+
+      # ── 10. Final verification from the runner ────────────────
+      # Independent check: ask the server from OUTSIDE (from GitHub's
+      # network) whether it's responding. Catches firewall/networking
+      # regressions that internal healthchecks can't see.
+      - name: Verify production from outside
+        run: |
+          set -e
+          echo "▸ Frontend (root):"
+          curl -fsS -o /dev/null -w "  HTTP %{http_code}  total %{time_total}s\n" \
+            "http://${{ secrets.DEPLOY_HOST }}:3030/" \
+            || (echo "✗ frontend not responding" && exit 1)
+
+          echo "▸ API health:"
+          response=$(curl -fsS "http://${{ secrets.DEPLOY_HOST }}:3030/api/health")
+          echo "  $response"
+          echo "$response" | grep -q '"status":"OK"' || (echo "✗ /api/health not OK" && exit 1)
+
+          echo ""
+          echo "✓ Production is live and responding."
+
+      # ── 11. Summary in the workflow UI ────────────────────────
+      - name: Write deploy summary
+        if: always()
+        run: |
+          {
+            echo "# PanelOS Deploy"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Short SHA | \`${{ steps.tags.outputs.short_sha }}\` |"
+            echo "| Actor | @${{ github.actor }} |"
+            echo "| Production | <http://${{ secrets.DEPLOY_HOST }}:3030> |"
+            echo "| Status | ${{ job.status }} |"
+            echo ""
+            echo "Images pushed to ghcr.io:"
+            echo "- \`${{ env.IMAGE_BACKEND }}:${{ steps.tags.outputs.short_sha }}\`"
+            echo "- \`${{ env.IMAGE_FRONTEND }}:${{ steps.tags.outputs.short_sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
