@@ -363,7 +363,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.app-root { display: flex; flex-direction: column; min-height: 100vh; }
+/* Lock the whole shell to exactly the viewport height so .content scrolls
+   internally rather than the entire document. Otherwise the sidebar and
+   topbar scroll along with the page content — the classic "sidebar slides
+   off-screen as you scroll down" bug. */
+.app-root { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .shell { display: flex; flex: 1; min-height: 0; }
 .imp-banner { z-index: 2000; background: #b5740a; color: #fff; display: flex; align-items: center; justify-content: center; gap: 16px; padding: 7px 16px; font-size: 13px; }
 .imp-exit { background: #fff; color: #b5740a; border: none; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
