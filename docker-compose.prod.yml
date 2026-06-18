@@ -25,15 +25,20 @@ services:
     env_file:
       - .env.production
     environment:
-      # Compose-level overrides take priority over env_file. We force the DB
-      # host to the docker→host gateway, regardless of what .env says.
-      DB_HOST: host.docker.internal
+      # Compose-level overrides take priority over env_file. We use the LITERAL
+      # gateway IP of panelos_net (pinned to 172.30.0.1 in network creation)
+      # rather than `host.docker.internal`. Why: on Linux, the `host-gateway`
+      # extra_host magic resolves to the DEFAULT docker bridge gateway (172.17.0.1),
+      # not the gateway of the network the container is actually attached to. So
+      # `host.docker.internal` would point at the wrong IP, where MySQL isn't
+      # bound. The literal IP is stable as long as panelos_net's subnet doesn't
+      # change.
+      DB_HOST: 172.30.0.1
       APP_ENV: production
       APP_DEBUG: "false"
 
-    # Linux trick: maps host.docker.internal inside the container to the
-    # docker network's gateway IP (172.30.0.1 because of our network config below).
-    # This is how PHP-FPM reaches MySQL bound on the host.
+    # Kept for completeness — `host.docker.internal` still resolves to the
+    # docker0 gateway, which is harmless. Not used by Laravel (see DB_HOST above).
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
