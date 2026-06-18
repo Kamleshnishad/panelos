@@ -13,8 +13,8 @@
 
     <!-- Filters -->
     <div class="filters">
-      <input v-model="filters.search" class="filter-input" placeholder="Search by number, project, customer…" @input="debouncedLoad" />
-      <select v-model="filters.status" class="filter-select" @change="loadList">
+      <input v-model="filters.search" class="filter-input" placeholder="Search by number, project, customer…" @input="onFilterChange(true)" />
+      <select v-model="filters.status" class="filter-select" @change="onFilterChange(false)">
         <option value="">All Statuses</option>
         <option value="draft">Draft</option>
         <option value="sent">Sent</option>
@@ -23,8 +23,8 @@
         <option value="revised">Revised</option>
         <option value="expired">Expired</option>
       </select>
-      <input v-model="filters.from_date" type="date" class="filter-input" @change="loadList" />
-      <input v-model="filters.to_date" type="date" class="filter-input" @change="loadList" />
+      <input v-model="filters.from_date" type="date" class="filter-input" @change="onFilterChange(false)" />
+      <input v-model="filters.to_date" type="date" class="filter-input" @change="onFilterChange(false)" />
       <button class="btn btn-ghost" @click="clearFilters">Clear</button>
     </div>
 
@@ -126,6 +126,14 @@ let debounceTimer = null
 function debouncedLoad() {
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(loadList, 350)
+}
+
+// Any filter change must reset to page 1 — otherwise typing a search term while
+// on page 4 fetches page 4 of the NEW result set and the table appears empty.
+function onFilterChange(debounce = false) {
+  filters.page = 1
+  if (debounce) debouncedLoad()
+  else loadList()
 }
 
 async function loadList() {

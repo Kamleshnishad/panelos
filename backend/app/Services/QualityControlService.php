@@ -71,8 +71,10 @@ class QualityControlService
      */
     public function approve(QualityControl $qc, int $userId, ?string $notes = null): QualityControl
     {
-        if (!in_array($qc->status, ['pass', 'fail'])) {
-            throw new \Exception('Can only approve QC with pass or fail status');
+        // Approval is the green-light for dispatch — must not be granted on a
+        // failed QC. Failed batches need rework / reject, not approval.
+        if ($qc->status !== 'pass') {
+            throw new \Exception('Can only approve QC entries with pass status. Failed QC requires rework.');
         }
 
         $batch = $qc->batch;
@@ -83,10 +85,7 @@ class QualityControlService
             'notes' => $notes ?? $qc->notes,
         ]);
 
-        // Update batch to final status after QC approval
-        if ($qc->status === 'pass') {
-            $batch->update(['status' => 'qc_passed']);
-        }
+        $batch->update(['status' => 'qc_passed']);
 
         return $qc->fresh();
     }

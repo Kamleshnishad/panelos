@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Dispatch;
 use App\Models\DispatchItem;
 use App\Models\ProductionBatch;
+use App\Models\QualityControl;
 use App\Models\StockAllocation;
 use App\Models\StockTransaction;
 use Illuminate\Support\Facades\DB;
@@ -26,8 +27,16 @@ class DispatchService
             $batch = ProductionBatch::where('company_id', $companyId)
                 ->findOrFail($batchId);
 
+            // Stricter precondition: an APPROVED 'pass' QC must exist for the batch.
+            // The old check let 'completed' batches through, bypassing QC entirely.
+            $qc = QualityControl::where('batch_id', $batch->id)
+                ->where('company_id', $companyId)
+                ->first();
+            if (!$qc || $qc->status !== 'pass' || !$qc->approved_at) {
+                throw new \Exception('Batch must have an approved-pass QC record before dispatch.');
+            }
             if ($batch->status !== 'qc_passed' && $batch->status !== 'completed') {
-                throw new \Exception('Batch must be completed or passed QC before dispatch');
+                throw new \Exception('Batch must be qc_passed or completed before dispatch.');
             }
 
             if (Dispatch::where('batch_id', $batchId)->exists()) {

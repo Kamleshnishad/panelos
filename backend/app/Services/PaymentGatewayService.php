@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\PaymentTransaction;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Stripe\Stripe;
 use Stripe\Checkout\Session;
 use Stripe\PaymentIntent;
@@ -174,23 +176,53 @@ class PaymentGatewayService
             return ['success' => false, 'message' => 'No invoice ID in metadata'];
         }
 
-        $invoiceId = $paymentIntent->metadata->invoice_id;
-        $companyId = $paymentIntent->metadata->company_id;
-        $amountPaid = $paymentIntent->amount / 100; // Convert from cents
+        $invoiceId    = (int) $paymentIntent->metadata->invoice_id;
+        $amountPaid   = $paymentIntent->amount / 100; // Stripe uses minor units
+        $gatewayTxnId = $paymentIntent->charges->data[0]->id ?? $paymentIntent->id;
 
         try {
-            PaymentTransaction::create([
-                'company_id' => $companyId,
-                'invoice_id' => $invoiceId,
-                'amount' => $amountPaid,
-                'payment_method' => 'stripe',
-                'transaction_id' => $paymentIntent->charges->data[0]->id ?? $paymentIntent->id,
-                'transaction_date' => date('Y-m-d H:i:s', $paymentIntent->created),
-                'status' => 'completed',
-            ]);
+            return DB::transaction(function () use ($invoiceId, $amountPaid, $gatewayTxnId, $paymentIntent) {
+                // Defence-in-depth: trust the invoice's company_id, not metadata.
+                $invoice = Invoice::withoutGlobalScope('tenant')->lockForUpdate()->find($invoiceId);
+                if (!$invoice) {
+                    return ['success' => false, 'message' => 'Invoice not found'];
+                }
 
-            return ['success' => true];
+                // Idempotency: Stripe retries webhooks on 5xx; same transaction_id
+                // means we already recorded this payment. Return success without
+                // double-crediting.
+                $existing = PaymentTransaction::withoutGlobalScope('tenant')
+                    ->where('company_id', $invoice->company_id)
+                    ->where('transaction_id', $gatewayTxnId)
+                    ->exists();
+                if ($existing) {
+                    return ['success' => true, 'idempotent' => true];
+                }
+
+                PaymentTransaction::create([
+                    'company_id'       => $invoice->company_id,
+                    'invoice_id'       => $invoice->id,
+                    'amount'           => $amountPaid,
+                    'payment_method'   => 'stripe',
+                    'status'           => 'completed',
+                    'transaction_id'   => $gatewayTxnId,
+                    'transaction_date' => date('Y-m-d H:i:s', $paymentIntent->created),
+                ]);
+
+                // If the new total of payments covers the invoice, transition status.
+                $invoice->refresh()->load('payments', 'taxCalculation');
+                if ($invoice->getTotal() > 0 && $invoice->remaining_due <= 0.01 && $invoice->canMarkPaid()) {
+                    $invoice->update(['status' => 'paid', 'paid_date' => now()]);
+                }
+
+                return ['success' => true];
+            });
         } catch (\Exception $e) {
+            Log::error('Stripe webhook handlePaymentSucceeded failed', [
+                'invoice_id' => $invoiceId,
+                'gateway_txn' => $gatewayTxnId,
+                'error' => $e->getMessage(),
+            ]);
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }

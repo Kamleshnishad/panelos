@@ -46,7 +46,7 @@
 
         <p class="switch">New factory? <a href="#" @click.prevent="switchMode('signup')">Start a free 14-day trial →</a></p>
 
-        <div class="demo-accounts">
+        <div v-if="isDev" class="demo-accounts">
           <div class="demo-title">Demo accounts (click to fill)</div>
           <div class="demo-grid">
             <button v-for="a in accounts" :key="a.email" type="button" class="demo-chip" @click="fill(a)">
@@ -106,9 +106,11 @@ import authService from '../services/authService.js'
 
 const emit = defineEmits(['logged-in'])
 
+// Prefilled demo credentials only in dev. Production tenants never see them.
+const isDev = import.meta.env.DEV
 const mode = ref('login')
-const email = ref('admin@panelos.local')
-const password = ref('Admin@123')
+const email = ref(isDev ? 'admin@panelos.local' : '')
+const password = ref(isDev ? 'Admin@123' : '')
 const loading = ref(false)
 const error = ref(null)
 const otpEmail = ref('')

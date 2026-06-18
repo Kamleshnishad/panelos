@@ -24,17 +24,22 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import DispatchList   from './DispatchList.vue'
 import DispatchDetail from './DispatchDetail.vue'
 import DispatchCreate from './DispatchCreate.vue'
 
+const props = defineProps({ openId: { type: Number, default: null } })
 const emit = defineEmits(['view-batch'])
 
 const view       = ref('list')
 const detailId   = ref(null)
 const showCreate = ref(false)
 const listRef    = ref(null)
+
+// Deep-link from another module: jump straight into the detail view.
+watch(() => props.openId, (id) => { if (id) openDetail(id) })
+onMounted(() => { if (props.openId) openDetail(props.openId) })
 
 function openDetail(id) { detailId.value = id; view.value = 'detail' }
 function backToList() { view.value = 'list'; detailId.value = null; listRef.value?.reload() }

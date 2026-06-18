@@ -285,6 +285,12 @@ class AuthController extends Controller
 
         $user->update(['password' => Hash::make($request->new_password)]);
 
+        // Revoke all other sessions so a stolen token can't survive a password change.
+        $currentTokenId = optional($user->currentAccessToken())->id;
+        $user->tokens()
+            ->when($currentTokenId, fn ($q) => $q->where('id', '!=', $currentTokenId))
+            ->delete();
+
         return $this->successResponse(null, 'Password changed successfully', 200);
     }
 }

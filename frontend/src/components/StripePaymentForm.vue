@@ -89,7 +89,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { toastSuccess } from '../services/ui.js'
-import { loadStripe } from '@stripe/js'
+import { loadStripe } from '@stripe/stripe-js'
 import { paymentService } from '@/services/accountingService'
 
 const props = defineProps({

@@ -235,11 +235,21 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label>Payment Date <span class="req">*</span></label>
+          <input v-model="payForm.transaction_date" type="date" :max="todayIso()" />
+          <span class="hint" v-if="payForm.transaction_date > todayIso()">Date cannot be in the future.</span>
+        </div>
+
         <div v-if="payError" class="error-msg">{{ payError }}</div>
 
         <div class="modal-actions">
           <button class="btn btn-ghost" @click="showPayment = false">Cancel</button>
-          <button class="btn btn-record" :disabled="paySaving || !payForm.amount || payForm.amount > remainingDue" @click="recordPayment">
+          <button
+            class="btn btn-record"
+            :disabled="paySaving || !payForm.amount || payForm.amount <= 0 || payForm.amount > remainingDue || !payForm.transaction_date || payForm.transaction_date > todayIso()"
+            @click="recordPayment"
+          >
             {{ paySaving ? 'Recording…' : 'Record ₹ ' + fmtNum(payForm.amount || 0) }}
           </button>
         </div>
@@ -342,7 +352,8 @@ const showCancel    = ref(false)
 const showPayment = ref(false)
 const paySaving   = ref(false)
 const payError    = ref(null)
-const payForm     = reactive({ amount: null, payment_method: 'bank_transfer', reference_no: '' })
+const payForm     = reactive({ amount: null, payment_method: 'bank_transfer', reference_no: '', transaction_date: '' })
+const todayIso    = () => new Date().toISOString().slice(0, 10)
 
 const editForm = reactive({ due_date: '', notes: '', terms: '' })
 
@@ -400,23 +411,31 @@ async function action(type) {
 }
 
 function openPaymentModal() {
-  payForm.amount         = Number(remainingDue.value)
-  payForm.payment_method = 'bank_transfer'
-  payForm.reference_no   = ''
-  payError.value         = null
-  showPayment.value      = true
+  payForm.amount           = Number(remainingDue.value)
+  payForm.payment_method   = 'bank_transfer'
+  payForm.reference_no     = ''
+  payForm.transaction_date = todayIso()
+  payError.value           = null
+  showPayment.value        = true
 }
 
 async function recordPayment() {
-  if (!payForm.amount || payForm.amount > remainingDue.value) return
+  // Stricter guards: amount must be positive AND within balance; date must be set
+  // and not in the future. Backend can still validate, but failing early gives
+  // the user immediate feedback instead of a 422 round-trip.
+  if (!payForm.amount || payForm.amount <= 0) { payError.value = 'Amount must be greater than zero.'; return }
+  if (payForm.amount > remainingDue.value)    { payError.value = 'Amount exceeds balance due.';      return }
+  if (!payForm.transaction_date)              { payError.value = 'Payment date is required.';        return }
+  if (payForm.transaction_date > todayIso())  { payError.value = 'Payment date cannot be in the future.'; return }
   paySaving.value = true
   payError.value  = null
   try {
     await invoiceService.recordPayment({
-      invoice_id:     props.invoiceId,
-      amount:         payForm.amount,
-      payment_method: payForm.payment_method,
-      reference_no:   payForm.reference_no || null,
+      invoice_id:       props.invoiceId,
+      amount:           payForm.amount,
+      payment_method:   payForm.payment_method,
+      reference_no:     payForm.reference_no || null,
+      transaction_date: payForm.transaction_date,
     })
     showPayment.value   = false
     actionSuccess.value = `Payment of ₹ ${fmtNum(payForm.amount)} recorded.`

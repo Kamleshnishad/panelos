@@ -15,7 +15,9 @@ class TaxService
         $companyId = $companyId ?? auth()->user()->company_id;
 
         return DB::transaction(function () use ($invoiceId, $companyId) {
-            $invoice = Invoice::where('company_id', $companyId)->findOrFail($invoiceId);
+            $invoice = Invoice::where('company_id', $companyId)
+                ->with('company', 'order.customer', 'dispatch.batch.order.customer')
+                ->findOrFail($invoiceId);
             $taxConfig = $this->getTaxConfiguration($companyId);
 
             if (!$taxConfig || !$taxConfig->is_active) {
@@ -33,7 +35,7 @@ class TaxService
                 $taxAmount = $subtotal - $taxableAmount;
             }
 
-            $taxBreakdown = $this->calculateTaxBreakdown($taxConfig, $taxableAmount, $taxConfig->default_tax_rate);
+            $taxBreakdown = $this->calculateTaxBreakdown($taxConfig, $taxableAmount, $taxConfig->default_tax_rate, $invoice);
 
             TaxCalculation::updateOrCreate(
                 ['invoice_id' => $invoiceId],
@@ -53,23 +55,36 @@ class TaxService
         });
     }
 
-    public function calculateTaxBreakdown($taxConfig, $taxableAmount, $taxRate)
+    public function calculateTaxBreakdown($taxConfig, $taxableAmount, $taxRate, ?Invoice $invoice = null)
     {
-        if (strpos($taxConfig->gst_number, 'GST') !== false) {
-            $singleRate = $taxRate / 2;
-            $amount = ($taxableAmount * $taxRate) / 100;
+        // Intra-state vs inter-state is decided by comparing the supplier's state
+        // code (company.state_code) against the customer's state code. The old
+        // implementation looked for the literal substring "GST" inside the GSTIN
+        // (e.g. "27AAA…1Z5"), which never matches, so EVERY invoice was being
+        // taxed as inter-state (IGST only). This is the canonical India-GST rule.
+        $isIntraState = false;
+        if ($invoice) {
+            $supplierState = $invoice->company?->state_code;
+            $customer      = $invoice->order?->customer ?? $invoice->dispatch?->batch?->order?->customer;
+            $customerState = $customer?->state_code;
+            if ($supplierState && $customerState) {
+                $isIntraState = ((string) $supplierState === (string) $customerState);
+            }
+        }
 
+        if ($isIntraState) {
+            $singleRate = $taxRate / 2;
             return [
                 'sgst' => round(($taxableAmount * $singleRate) / 100, 2),
                 'cgst' => round(($taxableAmount * $singleRate) / 100, 2),
-                'igst' => 0
+                'igst' => 0,
             ];
         }
 
         return [
             'sgst' => 0,
             'cgst' => 0,
-            'igst' => round(($taxableAmount * $taxRate) / 100, 2)
+            'igst' => round(($taxableAmount * $taxRate) / 100, 2),
         ];
     }
 

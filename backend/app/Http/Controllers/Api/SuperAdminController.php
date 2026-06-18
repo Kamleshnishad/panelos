@@ -229,7 +229,9 @@ class SuperAdminController extends Controller
             return $this->errorResponse([], 'No active user to impersonate in this company.', 'NO_USER', 422);
         }
 
-        $token = $target->createToken('impersonation')->plainTextToken;
+        // 30-minute expiry + 'impersonation' ability so tokens are distinguishable
+        // and revocable separately from the user's own login tokens.
+        $token = $target->createToken('impersonation:super_admin:' . $r->user()->id, ['impersonation'], now()->addMinutes(30))->plainTextToken;
         $this->audit($r, $c->id, 'impersonate', "Logged in as {$target->email} of {$c->name}", ['target_user_id' => $target->id]);
 
         return $this->successResponse([

@@ -1,0 +1,45 @@
+# Anything listed here is excluded from the `COPY . .` step in the Dockerfile.
+# Crucial: node_modules MUST be excluded — the laptop's node_modules is for
+# the laptop's OS; the build container reinstalls clean from package-lock.json.
+
+# ── npm + build artifacts ──────────────────────────────────
+node_modules
+dist
+dist-ssr
+.cache
+.vite
+.parcel-cache
+*.local
+
+# ── Source-control / IDE noise ─────────────────────────────
+.git
+.gitignore
+.gitattributes
+.idea
+.vscode
+*.swp
+*.swo
+
+# ── Env files (no secrets in static bundles, but defensive) ─
+.env
+.env.*
+!.env.example
+
+# ── Tests + storybook (not needed in the prod bundle) ──────
+__tests__
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+coverage
+.nyc_output
+
+# ── Logs + OS junk ─────────────────────────────────────────
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp

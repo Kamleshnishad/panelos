@@ -18,15 +18,20 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import OrderList   from './OrderList.vue'
 import OrderDetail from './OrderDetail.vue'
 
+const props = defineProps({ openId: { type: Number, default: null } })
 const emit = defineEmits(['view-quotation', 'view-batch'])
 
 const view     = ref('list')
 const detailId = ref(null)
 const listRef  = ref(null)
+
+// Deep-link from another module: jump straight into the detail view.
+watch(() => props.openId, (id) => { if (id) openDetail(id) })
+onMounted(() => { if (props.openId) openDetail(props.openId) })
 
 function openDetail(id) {
   detailId.value = id

@@ -91,7 +91,7 @@ class InvoicePdfTest extends TestCase
         // or might return a stream in test environment
         $this->assertTrue(
             $response->status() === 200 ||
-            isset($response->headers->get('content-disposition'))
+            $response->headers->get('content-disposition') !== null
         );
     }
 

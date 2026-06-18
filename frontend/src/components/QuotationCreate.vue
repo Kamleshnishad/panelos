@@ -890,11 +890,20 @@ async function save(mode) {
   submitError.value = null
   if (!form.customer_id) return failValidation('Please select a customer.')
   if (panelRows.value.length === 0) return failValidation('Add at least one panel row.')
+  const isSendMode = mode === 'send' || !isBoq.value
   for (const row of panelRows.value) {
-    if (!row.panel_type_id) return failValidation(`Row ${panelRows.value.indexOf(row) + 1}: select a panel type.`, row)
-    if (row.sizes.length === 0) return failValidation(`Row ${panelRows.value.indexOf(row) + 1}: add at least one size entry.`, row)
+    const rowNum = panelRows.value.indexOf(row) + 1
+    if (!row.panel_type_id) return failValidation(`Row ${rowNum}: select a panel type.`, row)
+    if (row.sizes.length === 0) return failValidation(`Row ${rowNum}: add at least one size entry.`, row)
     for (const sz of row.sizes) {
-      if (!sz.length_mm || sz.length_mm < 500) return failValidation(`Row ${panelRows.value.indexOf(row) + 1}: length must be at least 500mm.`, row)
+      if (!sz.length_mm || sz.length_mm < 500)  return failValidation(`Row ${rowNum}: length must be at least 500mm.`, row)
+      if (sz.length_mm > 14000)                 return failValidation(`Row ${rowNum}: length cannot exceed 14000mm.`, row)
+      if (!sz.nos || Number(sz.nos) < 1)        return failValidation(`Row ${rowNum}: quantity (Nos) must be at least 1.`, row)
+      // A quote being SENT to a customer must have non-zero rates. BOQ drafts
+      // (rates_pending) can save with rate=0 — they're priced later.
+      if (isSendMode && (!sz.rate_per_sqm || Number(sz.rate_per_sqm) <= 0)) {
+        return failValidation(`Row ${rowNum}: enter a rate per SQM before sending. Save as BOQ if rates aren't ready.`, row)
+      }
     }
   }
 

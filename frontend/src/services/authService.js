@@ -65,9 +65,11 @@ export default {
     try {
       await axios.post('/api/auth/logout', {}, { headers: authHeaders() })
     } catch { /* ignore */ }
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    localStorage.removeItem('user_id')
+    // Clear primary session AND any stashed impersonation / super-admin shadow
+    // tokens — otherwise the next user on this machine inherits stale state.
+    ;['token', 'user', 'user_id',
+      'impersonating', 'token_superadmin', 'user_superadmin']
+      .forEach((k) => localStorage.removeItem(k))
   },
 
   isLoggedIn() {

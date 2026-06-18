@@ -45,8 +45,11 @@ class Dispatch extends BaseModel
 
     protected static function generateDispatchNumber($companyId)
     {
-        $year = now()->format('Y');
-        $prefix = "DISP-{$year}";
+        // Match Invoice + Quotation FY rollover (April–March) so a challan and
+        // its invoice always carry the same year prefix within the same FY.
+        $now    = now();
+        $fyYear = $now->month >= 4 ? $now->year : $now->year - 1;
+        $prefix = "DISP-{$fyYear}";
 
         $lastDispatch = static::where('company_id', $companyId)
             ->where('dispatch_no', 'like', "{$prefix}%")

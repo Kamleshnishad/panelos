@@ -1,0 +1,116 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — Production Compose
+#  Used by: manual first deploy (Phase 6) AND CI/CD deploys (Phase 11+).
+#  Run with:
+#     docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#  The env file lives on the SERVER at /opt/panelos/.env.production —
+#  never committed to git.
+# ═══════════════════════════════════════════════════════════════
+
+name: panelos
+
+services:
+  # ── Backend: Laravel API ─────────────────────────────────────
+  backend:
+    image: ghcr.io/kamleshnishad/panelos-backend:${PANELOS_VERSION:-latest}
+    container_name: panelos_backend
+    restart: unless-stopped
+
+    # NOT in `ports:` — we don't publish 8080 to the host. The frontend
+    # container reaches us over panelos_net by hostname `backend`.
+    expose:
+      - "8080"
+
+    # All Laravel config flows in via env. The image is environment-agnostic.
+    env_file:
+      - .env.production
+    environment:
+      # Compose-level overrides take priority over env_file. We force the DB
+      # host to the docker→host gateway, regardless of what .env says.
+      DB_HOST: host.docker.internal
+      APP_ENV: production
+      APP_DEBUG: "false"
+
+    # Linux trick: maps host.docker.internal inside the container to the
+    # docker network's gateway IP (172.30.0.1 because of our network config below).
+    # This is how PHP-FPM reaches MySQL bound on the host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      # Named volume → /var/www/html/storage. Survives container recreate.
+      # On first start, docker auto-copies the image's storage/ structure
+      # into the empty volume, so Laravel finds its expected directory tree.
+      - panelos_storage:/var/www/html/storage
+
+    networks:
+      - panelos_net
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
+      interval: 15s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+
+    # Optional: cap log file growth. Without this, busy containers can
+    # accumulate tens of GB of json logs in /var/lib/docker.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ── Frontend: Vue SPA + nginx (also reverse-proxies /api/*) ──
+  frontend:
+    image: ghcr.io/kamleshnishad/panelos-frontend:${PANELOS_VERSION:-latest}
+    container_name: panelos_frontend
+    restart: unless-stopped
+
+    # The ONE public port. Host's 3030 → container's 80.
+    ports:
+      - "3030:80"
+
+    networks:
+      - panelos_net
+
+    # Don't even try to start the frontend until the backend reports healthy.
+    # Avoids the "frontend loads but /api 502s for the first 30 seconds" race.
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+# ═══════════════════════════════════════════════════════════════
+#  Networks — pinned subnet so MySQL bind-address can name it
+# ═══════════════════════════════════════════════════════════════
+networks:
+  panelos_net:
+    name: panelos_net
+    driver: bridge
+    ipam:
+      config:
+        # Pinned to 172.30.x — see Phase 5 note about MySQL bind-address.
+        # If 172.30.0.0/16 is already in use on the host, change BOTH this
+        # subnet AND the corresponding bind-address line in mysqld.cnf.
+        - subnet: 172.30.0.0/16
+          gateway: 172.30.0.1
+
+# ═══════════════════════════════════════════════════════════════
+#  Volumes — persisted between deploys
+# ═══════════════════════════════════════════════════════════════
+volumes:
+  panelos_storage:
+    name: panelos_storage

@@ -11,12 +11,16 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['company_id', 'name', 'email', 'phone', 'password', 'role_id', 'is_super_admin', 'is_company_admin', 'is_active'])]
+#[Fillable(['company_id', 'name', 'email', 'phone', 'password', 'role_id', 'is_company_admin', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasApiTokens, SoftDeletes;
 
+    // is_super_admin is intentionally NOT fillable. Set it only via forceFill()
+    // from SuperAdminController::createPlatformAdmin or seeders. Any future
+    // refactor that does $user->fill($request->all()) would otherwise allow
+    // self-promotion to super admin.
     protected $fillable = [
         'company_id',
         'name',
@@ -25,7 +29,6 @@ class User extends Authenticatable
         'whatsapp_no',
         'password',
         'role_id',
-        'is_super_admin',
         'is_company_admin',
         'is_active',
         'last_login_at',

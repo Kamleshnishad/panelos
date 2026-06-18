@@ -18,7 +18,9 @@ class PaymentTransaction extends Model
         'invoice_id',
         'amount',
         'payment_method',
+        'status',
         'reference_no',
+        'transaction_id',
         'transaction_date',
         'created_by_user_id',
         'created_at'

@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Services\LeadService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class LeadController extends Controller
@@ -41,7 +42,7 @@ class LeadController extends Controller
     public function store(Request $r)
     {
         try {
-            $data = $r->validate($this->rules());
+            $data = $r->validate($this->rules(false, $this->cid($r)));
             return $this->createdResponse($this->leads->create($this->cid($r), $data), 'Lead created', 201);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
@@ -52,7 +53,7 @@ class LeadController extends Controller
     {
         try {
             $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
-            $data = $r->validate($this->rules(true));
+            $data = $r->validate($this->rules(true, $this->cid($r)));
             return $this->successResponse($this->leads->update($lead, $data), 'Lead updated');
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
@@ -118,7 +119,7 @@ class LeadController extends Controller
         }
     }
 
-    private function rules(bool $update = false): array
+    private function rules(bool $update = false, ?int $companyId = null): array
     {
         $req = $update ? 'sometimes|required' : 'required';
         return [
@@ -133,7 +134,13 @@ class LeadController extends Controller
             'est_qty_sqm'         => 'nullable|numeric|min:0',
             'est_value'           => 'nullable|numeric|min:0',
             'status'              => 'nullable|in:new,contacted,qualified,quoted,won,lost',
-            'assigned_to_user_id' => 'nullable|integer|exists:users,id',
+            // Scope the assigned user to the caller's company so a tenant can't write
+            // a foreign tenant's user id (information disclosure + cross-tenant UI poisoning).
+            'assigned_to_user_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('users', 'id')->where(fn ($q) => $companyId ? $q->where('company_id', $companyId) : $q),
+            ],
             'next_follow_up_date' => 'nullable|date',
             'notes'               => 'nullable|string|max:2000',
         ];

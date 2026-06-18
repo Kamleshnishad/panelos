@@ -21,10 +21,25 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\PanelTypeController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\OrderController;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+
+// Login limiter: both per-IP (10/min) AND per-email (5/min). The per-email key
+// stops a distributed botnet (each IP under the IP limit) from grinding any
+// single account. Returning multiple limits = all of them must pass.
+RateLimiter::for('login', function (Request $request) {
+    $email = Str::lower((string) $request->input('email', ''));
+    return [
+        Limit::perMinute(10)->by($request->ip()),
+        Limit::perMinute(5)->by($email . '|' . $request->ip()),
+    ];
+});
 
 Route::prefix('auth')->group(function () {
-    // Public routes — rate-limited to slow brute-force (10 attempts/min per IP)
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
+    // Public routes — rate-limited per-IP AND per-email (see RateLimiter::for('login') above)
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login')->name('login');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1')->name('register');
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:10,1')->name('verify-otp');
 

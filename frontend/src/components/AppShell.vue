@@ -95,14 +95,14 @@
         <customer-manager      v-else-if="active === 'customers'" @open-quotation="openQuotation" @view-orders="go('orders')" />
         <quotation-manager     v-else-if="active === 'quotations'" :open-id="quotationOpenId" :prefill="quotationPrefill" @order-created="go('orders')" />
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />
-        <order-manager         v-else-if="active === 'orders'"      @view-quotation="go('quotations')" @view-batch="go('batches')" />
-        <batch-manager         v-else-if="active === 'batches'"     @view-order="go('orders')" />
-        <production-planner     v-else-if="active === 'planner'"     @view-order="go('orders')" @view-runs="go('runs')" />
-        <production-runs        v-else-if="active === 'runs'"        @view-order="go('orders')" @go-planner="go('planner')" />
-        <qc-dashboard          v-else-if="active === 'qc'"          @view-batch="go('batches')" />
+        <order-manager         v-else-if="active === 'orders'"      :open-id="orderOpenId"     @view-quotation="(id) => go('quotations', id)" @view-batch="(id) => go('batches', id)" />
+        <batch-manager         v-else-if="active === 'batches'"     :open-id="batchOpenId"     @view-order="(id) => go('orders', id)" />
+        <production-planner     v-else-if="active === 'planner'"     @view-order="(id) => go('orders', id)" @view-runs="go('runs')" />
+        <production-runs        v-else-if="active === 'runs'"        @view-order="(id) => go('orders', id)" @go-planner="go('planner')" />
+        <qc-dashboard          v-else-if="active === 'qc'"          @view-batch="(id) => go('batches', id)" />
         <stock-manager         v-else-if="active === 'stock'" />
         <procurement-manager   v-else-if="active === 'procurement'" />
-        <dispatch-manager      v-else-if="active === 'dispatches'"  @view-batch="go('batches')" />
+        <dispatch-manager      v-else-if="active === 'dispatches'"  :open-id="dispatchOpenId"  @view-batch="(id) => go('batches', id)" />
         <invoice-manager       v-else-if="active === 'invoices'" />
         <accounts-receivable   v-else-if="active === 'receivables'" @view-invoice="go('invoices')" />
         <business-reports      v-else-if="active === 'reports'" />
@@ -114,7 +114,6 @@
         <master-data-manager   v-else-if="active === 'master'" />
         <user-management       v-else-if="active === 'users'" />
         <super-admin           v-else-if="active === 'superadmin'" />
-        <user-guide            v-else-if="active === 'guide'" />
       </main>
     </div>
     </div>
@@ -154,7 +153,6 @@ import AuditLog           from './AuditLog.vue'
 import MasterDataManager  from './MasterDataManager.vue'
 import UserManagement     from './UserManagement.vue'
 import SuperAdmin         from './SuperAdmin.vue'
-import UserGuide          from './UserGuide.vue'
 
 defineEmits(['logout'])
 
@@ -188,6 +186,12 @@ const badges      = ref({})
 const alertCount  = ref(0)
 const quotationOpenId = ref(null)
 const quotationPrefill = ref(null)
+// Cross-module deep-link: when a child fires @view-order/@view-batch/@view-dispatch
+// with a record id, we land on the target module's detail view directly instead of
+// the list. Closes audit finding L7.
+const orderOpenId    = ref(null)
+const batchOpenId    = ref(null)
+const dispatchOpenId = ref(null)
 
 function onLeadConvert(payload) {
   quotationPrefill.value = payload   // { customer_id, lead_id }
@@ -255,9 +259,6 @@ const nav = [
     { key: 'audit',       label: 'Audit Log',       icon: ic.qc, admin: true },
     { key: 'superadmin',  label: 'Platform Admin',  icon: ic.building, superadmin: true },
   ]},
-  { label: 'Help', items: [
-    { key: 'guide',       label: 'Guide',           icon: ic.quote },
-  ]},
 ]
 
 const allItems    = nav.flatMap(g => g.items)
@@ -287,7 +288,24 @@ function can(key) {
   return p.includes('*') || p.includes(key)
 }
 
-function go(key) { quotationOpenId.value = null; quotationPrefill.value = null; active.value = key; mobileOpen.value = false }
+function go(key, id = null) {
+  // Reset every per-module openId, then set the one for the target module so
+  // the manager's openId watcher fires fresh (re-firing even on same id).
+  quotationOpenId.value  = null
+  quotationPrefill.value = null
+  orderOpenId.value      = null
+  batchOpenId.value      = null
+  dispatchOpenId.value   = null
+  if (id != null) {
+    const numId = typeof id === 'object' ? id?.id : id
+    if (key === 'quotations') quotationOpenId.value = numId
+    else if (key === 'orders') orderOpenId.value    = numId
+    else if (key === 'batches') batchOpenId.value   = numId
+    else if (key === 'dispatches') dispatchOpenId.value = numId
+  }
+  active.value = key
+  mobileOpen.value = false
+}
 
 // Quick-jump: match the typed text against nav labels and navigate.
 function quickJump() {

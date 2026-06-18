@@ -45,11 +45,9 @@ class Company extends Model
         'financial_year_start',
         'e_invoice_applicable',
         'tcs_applicable',
-        'subscription_plan',
-        'subscription_status',
-        'trial_ends_at',
-        'subscription_ends_at',
-        'is_active',
+        // subscription_plan, subscription_status, trial_ends_at, subscription_ends_at,
+        // is_active are guarded — only SubscriptionService / SuperAdminController may
+        // mutate them via forceFill(). A tenant admin must never be able to flip these.
         'settings',
         'utm_source',
         'utm_medium',

@@ -1,19 +1,58 @@
-node_modules
-npm-debug.log
+# Anything listed here is excluded from the `COPY . .` step in the Dockerfile.
+# Keep this in lockstep with .gitignore + a few extras for build hygiene.
+
+# ── Local dev artifacts ────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Source-control / IDE noise ─────────────────────────────────
 .git
 .gitignore
-README.md
-.env
-.env.example
-.DS_Store
+.gitattributes
 .idea
 .vscode
 *.swp
 *.swo
-.editorconfig
-.env.*.local
-dist
-build
-coverage
-.php-cs-fixer.cache
+
+# ── Composer + PHP build artifacts ────────────────────────────
+# vendor/ is INSTALLED inside the image (multi-stage); we don't ship
+# whatever was on the developer's laptop.
+vendor
+composer.phar
+
+# ── Laravel runtime artifacts ──────────────────────────────────
+storage/logs/*.log
+storage/framework/cache/data
+storage/framework/sessions
+storage/framework/views
+storage/framework/testing
+bootstrap/cache/*.php
+
+# ── Tests + docs (not needed in the prod image) ────────────────
+tests
+phpunit.xml
+phpunit.xml.dist
+docs
+*.md
+!README.md
+DATABASE_SCHEMA.md
+API_ENDPOINTS.md
+ARCHITECTURE.md
+
+# ── Node / frontend (the backend image doesn't need any of it) ─
+node_modules
+package.json
+package-lock.json
+vite.config.js
+public/build
+public/hot
+
+# ── OS / misc ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+
+# ── Sibling project artifacts (defensive — should already be gone) ─
 docker-compose.*.yml

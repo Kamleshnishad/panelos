@@ -62,8 +62,13 @@ class Invoice extends BaseModel
 
     protected static function generateInvoiceNumber($companyId)
     {
-        $year = now()->format('Y');
-        $prefix = "INV-{$year}";
+        // Indian fiscal year (April–March). Invoices must align with FY for
+        // GSTR-1 reporting, so an invoice issued in March 2027 and one issued
+        // in April 2026 share the same FY prefix INV-2026. Previous behaviour
+        // used calendar year which mis-grouped Q4 invoices.
+        $now    = now();
+        $fyYear = $now->month >= 4 ? $now->year : $now->year - 1;
+        $prefix = "INV-{$fyYear}";
 
         $lastInvoice = static::where('company_id', $companyId)
             ->where('invoice_no', 'like', "{$prefix}%")
@@ -107,10 +112,17 @@ class Invoice extends BaseModel
         return $this->hasOne(TaxCalculation::class);
     }
 
+    public function getTotal(): float
+    {
+        $stored = (float) $this->total_amount;
+        if ($stored > 0) return $stored;
+        return (float) $this->subtotal + (float) ($this->taxCalculation->tax_amount ?? $this->tax_amount ?? 0);
+    }
+
     public function getRemainingDueAttribute()
     {
         $paid = $this->payments->sum('amount') ?? 0;
-        return $this->total_amount - $paid;
+        return $this->getTotal() - $paid;
     }
 
     public function getIsPaidAttribute()

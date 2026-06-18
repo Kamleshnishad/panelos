@@ -27,17 +27,22 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import BatchList   from './BatchList.vue'
 import BatchDetail from './BatchDetail.vue'
 import BatchCreate from './BatchCreate.vue'
 
+const props = defineProps({ openId: { type: Number, default: null } })
 const emit = defineEmits(['view-order'])
 
 const view       = ref('list')
 const detailId   = ref(null)
 const showCreate = ref(false)
 const listRef    = ref(null)
+
+// Deep-link from another module: jump straight into the detail view.
+watch(() => props.openId, (id) => { if (id) openDetail(id) })
+onMounted(() => { if (props.openId) openDetail(props.openId) })
 
 function openDetail(id) {
   detailId.value = id

@@ -18,6 +18,17 @@ class InvoiceService
         $this->taxService = $taxService;
     }
 
+    private function persistTotals(Invoice $invoice): Invoice
+    {
+        $invoice->refresh()->loadMissing('taxCalculation');
+        $taxAmount = (float) ($invoice->taxCalculation->tax_amount ?? 0);
+        $invoice->update([
+            'tax_amount'   => $taxAmount,
+            'total_amount' => (float) $invoice->subtotal + $taxAmount,
+        ]);
+        return $invoice->refresh();
+    }
+
     public function createFromDispatch($dispatchId, $data = [], $companyId = null)
     {
         return DB::transaction(function () use ($dispatchId, $data, $companyId) {
@@ -70,10 +81,9 @@ class InvoiceService
 
             $invoice->update(['subtotal' => $subtotal]);
 
-            // Apply tax
+            // Apply tax then persist total_amount/tax_amount so accessors and PDFs don't drift
             $this->taxService->applyTaxToInvoice($invoice->id, $companyId);
-
-            return $invoice->refresh();
+            return $this->persistTotals($invoice);
         });
     }
 
@@ -123,10 +133,9 @@ class InvoiceService
 
             $invoice->update(['subtotal' => $subtotal]);
 
-            // Apply tax
+            // Apply tax then persist total_amount/tax_amount so accessors and PDFs don't drift
             $this->taxService->applyTaxToInvoice($invoice->id, $companyId);
-
-            return $invoice->refresh();
+            return $this->persistTotals($invoice);
         });
     }
 
@@ -169,7 +178,7 @@ class InvoiceService
 
         $this->taxService->applyTaxToInvoice($invoiceId, $companyId);
 
-        return $invoice->refresh();
+        return $this->persistTotals($invoice);
     }
 
     public function sendInvoice($invoiceId, $companyId = null)
@@ -326,7 +335,7 @@ class InvoiceService
 
             $this->taxService->applyTaxToInvoice($newInvoice->id, $companyId);
 
-            return $newInvoice->refresh();
+            return $this->persistTotals($newInvoice);
         });
     }
 

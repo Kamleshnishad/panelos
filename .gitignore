@@ -36,3 +36,7 @@ Thumbs.db
 
 # ── Claude local settings (keep secrets/local state out) ──
 /.claude/settings.local.json
+
+# Local backups (never commit)
+frontend-app-backup-*.zip
+panelos-PRE-GIT-INIT-*.zip
