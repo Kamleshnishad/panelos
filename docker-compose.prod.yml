@@ -94,19 +94,21 @@ services:
         max-file: "5"
 
 # ═══════════════════════════════════════════════════════════════
-#  Networks — pinned subnet so MySQL bind-address can name it
+#  Networks — external because we pre-create the network manually so
+#  the host MySQL can bind to its gateway IP (172.30.0.1) BEFORE any
+#  compose run touches it.
+#
+#  Required one-time setup (done in Phase 5):
+#    docker network create --driver bridge \
+#      --subnet=172.30.0.0/16 --gateway=172.30.0.1 panelos_net
+#
+#  Then mysqld.cnf needs:
+#    bind-address = 127.0.0.1,172.30.0.1
 # ═══════════════════════════════════════════════════════════════
 networks:
   panelos_net:
     name: panelos_net
-    driver: bridge
-    ipam:
-      config:
-        # Pinned to 172.30.x — see Phase 5 note about MySQL bind-address.
-        # If 172.30.0.0/16 is already in use on the host, change BOTH this
-        # subnet AND the corresponding bind-address line in mysqld.cnf.
-        - subnet: 172.30.0.0/16
-          gateway: 172.30.0.1
+    external: true
 
 # ═══════════════════════════════════════════════════════════════
 #  Volumes — persisted between deploys
