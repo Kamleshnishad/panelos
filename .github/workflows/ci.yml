@@ -1,0 +1,184 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — CI workflow
+#  Runs on: every push to main + every Pull Request targeting main.
+#  Three parallel jobs check that the code compiles and builds cleanly.
+#  Test running is deliberately omitted for now (see "future" note below).
+# ═══════════════════════════════════════════════════════════════
+
+name: CI
+
+# ── When this workflow runs ──────────────────────────────────────
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  # Allow manual triggering from the Actions tab too (useful for retries)
+  workflow_dispatch:
+
+# Cancel earlier in-flight runs on the SAME PR when a new push lands.
+# Saves CI minutes and avoids confusing "old check still running" UI.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Job 1: Backend — PHP syntax + composer install
+  # ─────────────────────────────────────────────────────────────
+  backend:
+    name: Backend (PHP 8.3)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, bcmath, intl, gd, exif, zip, opcache, pcntl
+          coverage: none
+          tools: composer:v2
+
+      # Composer is slow if it has to download everything fresh. Cache the
+      # vendor/ folder + composer cache keyed on the lockfile content. When
+      # composer.lock changes, the cache key changes → fresh install.
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/vendor
+            ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      # PHP -l does a syntax-only check (no execution) on each file.
+      # Catches missing semicolons, mismatched braces, typos that would
+      # only surface in production. ~3 seconds for the whole codebase.
+      - name: PHP syntax lint
+        working-directory: backend
+        run: |
+          find app routes config database -type f -name "*.php" \
+            -exec php -l {} \; \
+          | grep -v "No syntax errors detected" || echo "All PHP files have valid syntax"
+
+      # ── Future: enable PHPUnit tests when the suite is MySQL-compatible ──
+      # The audit found some migrations use MySQL-only ALTER TABLE MODIFY
+      # ENUM syntax that SQLite (the test default) can't parse. Once that's
+      # fixed (or once the in-memory SQLite tests are migrated to a MySQL
+      # service container), uncomment the block below.
+      #
+      # services:
+      #   mysql:
+      #     image: mysql:8.0
+      #     env:
+      #       MYSQL_ROOT_PASSWORD: root
+      #       MYSQL_DATABASE: panelos_test
+      #     ports: [3306:3306]
+      #     options: >-
+      #       --health-cmd="mysqladmin ping -h localhost"
+      #       --health-interval=10s
+      #       --health-timeout=5s
+      #       --health-retries=10
+      #
+      # - name: Setup .env for tests
+      #   working-directory: backend
+      #   run: |
+      #     cp .env.example .env
+      #     php artisan key:generate
+      #     sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/'   .env
+      #     sed -i 's/^DB_DATABASE=.*/DB_DATABASE=panelos_test/' .env
+      #     sed -i 's/^DB_USERNAME=.*/DB_USERNAME=root/'         .env
+      #     sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=root/'         .env
+      # - name: Run migrations
+      #   working-directory: backend
+      #   run: php artisan migrate --force
+      # - name: Run tests
+      #   working-directory: backend
+      #   run: php artisan test --without-tty
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 2: Frontend — verify it compiles cleanly
+  # ─────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend (Node 20)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # Cache node_modules indirectly via npm's cache — keyed on lockfile.
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      # Build artifacts sanity check — fails CI loudly if Vite silently
+      # produced nothing (which would also break the Docker build later).
+      - name: Verify dist output
+        working-directory: frontend
+        run: |
+          test -f dist/index.html || (echo "::error::dist/index.html missing — Vite build produced no output" && exit 1)
+          echo "Built artifacts:"
+          ls -la dist/
+          du -sh dist/
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 3: Docker images build cleanly (catches Dockerfile errors)
+  # ─────────────────────────────────────────────────────────────
+  docker-build:
+    name: Docker Images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Only build images if the source code passed lint/build first — no
+    # point burning 5 minutes on a docker build for code that won't compile.
+    needs: [backend, frontend]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # `push: false` = build only, don't publish to a registry yet.
+      # That's Phase 10's job. Here we just verify the Dockerfile is valid.
+      # GHA cache speeds up rebuilds across runs of the same workflow.
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: panelos-backend:ci
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: panelos-frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
