@@ -30,9 +30,12 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  # Image names — use the repo owner so tags work for any fork.
-  IMAGE_BACKEND: ghcr.io/${{ github.repository_owner }}/panelos-backend
-  IMAGE_FRONTEND: ghcr.io/${{ github.repository_owner }}/panelos-frontend
+  # Image names — Docker registry rule requires repository paths to be
+  # lowercase. `github.repository_owner` preserves the original case
+  # (Kamleshnishad), which Docker rejects. Hardcoding lowercase here.
+  # Matches the names already in docker-compose.prod.yml on the server.
+  IMAGE_BACKEND: ghcr.io/kamleshnishad/panelos-backend
+  IMAGE_FRONTEND: ghcr.io/kamleshnishad/panelos-frontend
 
 jobs:
   deploy:
