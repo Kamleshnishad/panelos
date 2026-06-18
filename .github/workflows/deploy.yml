@@ -42,9 +42,12 @@ jobs:
     # `environment: production` enables GitHub's environment protection
     # (required reviewers, wait timer) if we later want to gate deploys.
     # For now it just labels runs in the UI.
+    # NOTE: We don't set `url:` here because GitHub doesn't allow
+    # secrets in that field (it's evaluated at workflow-load time, before
+    # secrets are available). If you want the env URL clickable in the UI
+    # later, hardcode it or move DEPLOY_HOST to a `vars` instead of a secret.
     environment:
       name: production
-      url: http://${{ secrets.DEPLOY_HOST }}:3030
 
     steps:
       # ── 1. Checkout the code being deployed ────────────────────
