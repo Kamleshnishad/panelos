@@ -77,12 +77,24 @@ COPY --from=deps /app/vendor ./vendor
 # Now the rest of the source — .dockerignore controls what's excluded.
 COPY . .
 
+# .dockerignore deliberately excludes runtime dirs (storage/framework/*, etc.)
+# so we create the expected Laravel structure here. Without these, the image
+# would have no place to write compiled views, sessions, cached configs.
+RUN mkdir -p \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/views \
+        storage/framework/testing \
+        storage/logs \
+        storage/app/public \
+        bootstrap/cache
+
 # Re-dump autoload now that all PHP files are present, with all optimisations.
 # We deliberately do NOT bake `config:cache` — env values are injected at run
 # time by docker-compose, and a baked cache would freeze them at build time.
-RUN composer dump-autoload --optimize --classmap-authoritative --no-dev \
-    && php artisan view:clear \
-    && php artisan config:clear
+# We also skip view:clear / config:clear here — nothing to clear in a fresh image,
+# and they'd error if the dirs we just created are empty.
+RUN composer dump-autoload --optimize --classmap-authoritative --no-dev
 
 # storage/ and bootstrap/cache/ must be writable by the runtime user.
 # Everything else can stay root-owned + world-readable.
