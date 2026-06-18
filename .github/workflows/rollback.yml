@@ -1,0 +1,204 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — Rollback workflow
+#  Manual trigger only. Re-deploys an OLDER image tag (the heavy work
+#  was already done at the original deploy time). Total runtime: ~1 min.
+#
+#  When to use:
+#    Production at :3030 is broken and you need it working again NOW.
+#    Find the last-known-good SHA in the Actions tab and run this workflow
+#    with that SHA as input.
+#
+#  When NOT to use:
+#    - You want to undo a database migration → SSH manually and run
+#      `php artisan migrate:rollback --step=N` (this workflow doesn't).
+#    - The bug is in the rollback target too → just deploy a forward fix.
+# ═══════════════════════════════════════════════════════════════
+
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Git SHA (full 40-char or 7-char short) of the deploy to roll back to'
+        required: true
+        type: string
+      run_migrations:
+        description: 'Run php artisan migrate after rollback (DEFAULT: off — see docs)'
+        required: false
+        default: false
+        type: boolean
+      reason:
+        description: 'Why are we rolling back? (required — goes into the audit log)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  # We don't need packages:write here — rollback only pulls existing images.
+
+# Use the same group as deploy.yml so a rollback can't race a deploy.
+# If a deploy is mid-flight, the rollback waits for it.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Rollback to ${{ inputs.version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Banner
+        run: |
+          echo "═════════════════════════════════════════════════════════"
+          echo "  ROLLBACK INITIATED"
+          echo "  Target SHA:     ${{ inputs.version }}"
+          echo "  Reason:         ${{ inputs.reason }}"
+          echo "  Triggered by:   @${{ github.actor }}"
+          echo "  Run migrations: ${{ inputs.run_migrations }}"
+          echo "═════════════════════════════════════════════════════════"
+
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          name: panelos_deploy
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Rollback on server
+        env:
+          ROLLBACK_VERSION: ${{ inputs.version }}
+          RUN_MIGRATIONS: ${{ inputs.run_migrations }}
+          REASON: ${{ inputs.reason }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/panelos_deploy \
+              -o StrictHostKeyChecking=accept-new \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "bash -s" <<ENDSSH
+            set -euo pipefail
+            echo ""
+            echo "═════════════════════════════════════════════════════════"
+            echo "  ROLLBACK on server"
+            echo "  Target: ${ROLLBACK_VERSION}"
+            echo "  Reason: ${REASON}"
+            echo "═════════════════════════════════════════════════════════"
+
+            cd /opt/panelos
+
+            echo ""
+            echo "▸ Resolving SHA + syncing repo"
+            git fetch --all --tags
+            # git resolves both short SHAs and full SHAs; reset --hard
+            # makes the working tree match exactly that commit.
+            git reset --hard "${ROLLBACK_VERSION}"
+            RESOLVED_SHA=\$(git rev-parse HEAD)
+            echo "  Resolved to: \$RESOLVED_SHA"
+
+            echo ""
+            echo "▸ Pulling rollback image: ghcr.io/kamleshnishad/panelos-{backend,frontend}:${ROLLBACK_VERSION}"
+            export PANELOS_VERSION="${ROLLBACK_VERSION}"
+            docker compose -f docker-compose.prod.yml --env-file .env.production pull
+
+            echo ""
+            echo "▸ Recreating containers with rolled-back images"
+            docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
+
+            echo ""
+            echo "▸ Waiting up to 60s for backend to report healthy"
+            for i in {1..12}; do
+              status=\$(docker inspect panelos_backend --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+              echo "  attempt \$i/12: \$status"
+              if [ "\$status" = "healthy" ]; then break; fi
+              sleep 5
+            done
+            if [ "\$status" != "healthy" ]; then
+              echo "✗ backend did not become healthy in 60s — ROLLBACK FAILED"
+              docker compose -f docker-compose.prod.yml logs backend --tail=50
+              exit 1
+            fi
+
+            if [ "${RUN_MIGRATIONS}" = "true" ]; then
+              echo ""
+              echo "▸ Running migrations (forward) per explicit request"
+              docker exec panelos_backend php artisan migrate --force
+            else
+              echo ""
+              echo "▸ Skipping migrations (default behaviour)"
+              echo "  If the rolled-back code is incompatible with the current"
+              echo "  schema, SSH manually and run: php artisan migrate:rollback"
+            fi
+
+            echo ""
+            echo "▸ Container status"
+            docker compose -f docker-compose.prod.yml ps
+
+            echo ""
+            echo "✓ Rollback complete — production now serves ${ROLLBACK_VERSION}"
+          ENDSSH
+
+      - name: Verify production from outside
+        run: |
+          set -e
+          echo "▸ Frontend (root):"
+          curl -fsS -o /dev/null -w "  HTTP %{http_code}  total %{time_total}s\n" \
+            "http://${{ secrets.DEPLOY_HOST }}:3030/" \
+            || (echo "✗ frontend not responding after rollback" && exit 1)
+
+          echo "▸ API health:"
+          response=$(curl -fsS "http://${{ secrets.DEPLOY_HOST }}:3030/api/health")
+          echo "  $response"
+          echo "$response" | grep -q '"status":"OK"' || (echo "✗ /api/health not OK after rollback" && exit 1)
+
+          echo ""
+          echo "✓ Production verified live on rolled-back SHA: ${{ inputs.version }}"
+
+      - name: Write rollback summary
+        if: always()
+        run: |
+          {
+            echo "# 🔄 PanelOS Rollback"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Rolled back to | \`${{ inputs.version }}\` |"
+            echo "| Reason | ${{ inputs.reason }} |"
+            echo "| Triggered by | @${{ github.actor }} |"
+            echo "| Migrations run | ${{ inputs.run_migrations }} |"
+            echo "| Production URL | <http://${{ secrets.DEPLOY_HOST }}:3030> |"
+            echo "| Result | ${{ job.status }} |"
+            echo ""
+            if [ "${{ inputs.run_migrations }}" = "false" ]; then
+              echo "## ⚠️ Schema warning"
+              echo ""
+              echo "Database migrations were **NOT** run as part of this rollback."
+              echo "If the rolled-back code expects an older schema (e.g., a column"
+              echo "that's been added by a later migration is missing from the model"
+              echo "definitions in this SHA), behaviour may be unexpected."
+              echo ""
+              echo "Common follow-ups:"
+              echo "- If old code crashes on schema mismatch: SSH and run \`php artisan migrate:rollback --step=N\`"
+              echo "- If old code works fine ignoring new columns: nothing further needed"
+            fi
+            echo ""
+            echo "## Next steps"
+            echo ""
+            echo "1. Investigate what broke on the previous deploy (check the failed Deploy workflow run logs)"
+            echo "2. Open a PR with the fix"
+            echo "3. Once fix is merged to main, a normal Deploy will replace this rollback"
+          } >> "$GITHUB_STEP_SUMMARY"
