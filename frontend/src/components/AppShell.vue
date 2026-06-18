@@ -388,7 +388,11 @@ onMounted(async () => {
 .brand-name { font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.01em; line-height: 1.15; }
 .brand-sub { font-size: 9.5px; color: #6b7299; letter-spacing: 2px; font-weight: 600; margin-top: 1px; }
 
-.side-nav { flex: 1; overflow-y: auto; padding: 6px 12px 12px; }
+/* `flex: 0 1 auto` (default flex behaviour) makes nav size to its content
+   when items fit, OR shrink-and-scroll when items overflow. With min-height: 0
+   the flex shrink can actually take effect. Result: user card hugs the last
+   visible item — no dead space between them. */
+.side-nav { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: 6px 12px 12px; }
 .nav-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.3px; color: #5a6088; margin: 16px 10px 7px; font-weight: 700; }
 .nav-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 12px; border: none; background: none; color: #aeb4c9; border-radius: var(--r); cursor: pointer; font-size: 13.5px; font-weight: 500; text-align: left; margin-bottom: 2px; transition: background var(--t-fast), color var(--t-fast); }
 .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
