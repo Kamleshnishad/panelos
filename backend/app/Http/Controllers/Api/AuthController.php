@@ -139,6 +139,7 @@ class AuthController extends Controller
         $user->forceFill([
             'two_factor_code'       => Hash::make($code),
             'two_factor_expires_at' => now()->addMinutes(10),
+            'two_factor_attempts'   => 0,   // fresh code → reset the failure counter (SEC-H2)
         ])->save();
 
         $body = "Your PanelOS verification code is: {$code}\nIt expires in 10 minutes.";
@@ -162,13 +163,25 @@ class AuthController extends Controller
         $request->validate(['email' => 'required|email', 'code' => 'required|string']);
 
         $user = User::where('email', $request->email)->where('is_active', true)->first();
-        if (!$user || !$user->two_factor_code || !$user->two_factor_expires_at
-            || $user->two_factor_expires_at->isPast()
-            || !Hash::check($request->code, $user->two_factor_code)) {
+
+        // No active/pending code (or expired) → generic failure (don't leak which).
+        if (!$user || !$user->two_factor_code || !$user->two_factor_expires_at || $user->two_factor_expires_at->isPast()) {
             return $this->errorResponse(['code' => ['Invalid or expired code']], 'Invalid or expired code', 'OTP_INVALID', 401);
         }
 
-        $user->forceFill(['two_factor_code' => null, 'two_factor_expires_at' => null])->save();
+        // Wrong code → count the attempt; after 5 fails, invalidate the code so a
+        // brute-forcer must sign in again to get a fresh one (SEC-H2).
+        if (!Hash::check($request->code, $user->two_factor_code)) {
+            $attempts = (int) ($user->two_factor_attempts ?? 0) + 1;
+            if ($attempts >= 5) {
+                $user->forceFill(['two_factor_code' => null, 'two_factor_expires_at' => null, 'two_factor_attempts' => 0])->save();
+                return $this->errorResponse(['code' => ['Too many incorrect attempts. Please sign in again to get a new code.']], 'Too many incorrect attempts. Please sign in again to get a new code.', 'OTP_LOCKED', 429);
+            }
+            $user->forceFill(['two_factor_attempts' => $attempts])->save();
+            return $this->errorResponse(['code' => ['Invalid or expired code']], 'Invalid or expired code', 'OTP_INVALID', 401);
+        }
+
+        $user->forceFill(['two_factor_code' => null, 'two_factor_expires_at' => null, 'two_factor_attempts' => 0])->save();
         return $this->issueLogin($user);
     }
 

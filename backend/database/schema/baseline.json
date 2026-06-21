@@ -1013,6 +1013,7 @@
         "remember_token": "varchar(100)",
         "created_at": "timestamp",
         "updated_at": "timestamp",
-        "deleted_at": "timestamp"
+        "deleted_at": "timestamp",
+        "two_factor_attempts": "tinyint unsigned"
     }
 }

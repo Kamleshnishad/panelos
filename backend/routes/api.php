@@ -37,11 +37,30 @@ RateLimiter::for('login', function (Request $request) {
     ];
 });
 
+// OTP verify: per-IP AND per-email so a single account can't be brute-forced
+// across rotating IPs (pairs with the per-account attempt lockout in SEC-H2).
+RateLimiter::for('otp', function (Request $request) {
+    $email = Str::lower((string) $request->input('email', ''));
+    return [
+        Limit::perMinute(10)->by($request->ip()),
+        Limit::perMinute(5)->by($email . '|' . $request->ip()),
+    ];
+});
+
+// Signup: tight per-IP caps so a script can't mass-create trial tenants (SEC-M4).
+RateLimiter::for('signup', function (Request $request) {
+    return [
+        Limit::perMinute(2)->by($request->ip()),
+        Limit::perHour(5)->by($request->ip()),
+        Limit::perDay(15)->by($request->ip()),
+    ];
+});
+
 Route::prefix('auth')->group(function () {
     // Public routes — rate-limited per-IP AND per-email (see RateLimiter::for('login') above)
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login')->name('login');
-    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1')->name('register');
-    Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:10,1')->name('verify-otp');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:signup')->name('register');
+    Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp')->name('verify-otp');
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {
