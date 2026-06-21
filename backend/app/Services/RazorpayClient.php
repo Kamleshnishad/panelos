@@ -74,6 +74,35 @@ class RazorpayClient
         return $data;
     }
 
+    /**
+     * Fetch an order to read its SERVER-SIDE amount / status / notes.
+     * Used by verify() so plan/months/amount come from Razorpay, never the client.
+     * @return array Razorpay order (id, amount, amount_paid, status, notes, ...)
+     */
+    public function fetchOrder(string $orderId): array
+    {
+        $auth    = base64_encode("{$this->keyId}:{$this->keySecret}");
+        $context = stream_context_create([
+            'http' => [
+                'method'        => 'GET',
+                'header'        => 'Authorization: Basic ' . $auth,
+                'ignore_errors' => true,
+                'timeout'       => 20,
+            ],
+            'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
+        ]);
+
+        $raw  = @file_get_contents('https://api.razorpay.com/v1/orders/' . rawurlencode($orderId), false, $context);
+        $data = $raw ? (json_decode($raw, true) ?? []) : [];
+        $status = isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m) ? (int) $m[1] : 0;
+
+        if ($status < 200 || $status >= 300 || empty($data['id'])) {
+            $err = $data['error']['description'] ?? ('HTTP ' . $status);
+            throw new \RuntimeException("Razorpay order fetch failed: {$err}");
+        }
+        return $data;
+    }
+
     /** Verify the checkout payment signature returned by Razorpay Checkout. */
     public function verifyPaymentSignature(string $orderId, string $paymentId, string $signature): bool
     {

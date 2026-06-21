@@ -195,6 +195,10 @@ jobs:
             echo ""
             echo "▸ Pre-migration DB backup (so a bad migration is recoverable)"
             docker exec panelos_backend php artisan db:backup || echo "  ⚠ backup step failed — continuing; check storage/app/backups"
+            # Copy newest dump out of the container so the runner can archive it off-host (OPS-C2)
+            rm -f /tmp/panelos-deploy-backup.sql
+            LATEST_BAK=\$(docker exec panelos_backend sh -c 'ls -t /var/www/html/storage/app/backups/*.sql 2>/dev/null | head -1' || true)
+            if [ -n "\$LATEST_BAK" ]; then docker cp "panelos_backend:\$LATEST_BAK" /tmp/panelos-deploy-backup.sql || true; fi
 
             echo ""
             echo "▸ Running database migrations"
@@ -211,6 +215,26 @@ jobs:
             echo ""
             echo "✓ Deploy complete"
           ENDSSH
+
+      # ── 9b. Archive the pre-migration backup off-host (OPS-C2) ──
+      # Pulls the dump the deploy step staged at /tmp on the server and keeps it
+      # as a GitHub artifact (90 days) — an off-host copy with no extra infra.
+      - name: Fetch DB backup from server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          scp -i ~/.ssh/panelos_deploy -o StrictHostKeyChecking=accept-new \
+            "$DEPLOY_USER@$DEPLOY_HOST:/tmp/panelos-deploy-backup.sql" ./panelos-deploy-backup.sql \
+            || echo "no backup file to fetch (continuing)"
+
+      - name: Upload DB backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ steps.tags.outputs.short_sha }}
+          path: ./panelos-deploy-backup.sql
+          retention-days: 90
+          if-no-files-found: warn
 
       # ── 10. Final verification from the runner ────────────────
       # Independent check: ask the server from OUTSIDE (from GitHub's
