@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PanelOS — UI/UX Audit & Enhancement Roadmap</title>
+<style>
+:root{--b:#1a237e;--b2:#3d5af1;--ink:#15181E;--mut:#5B6472;--line:#E4E7EC;--bg:#eef0f5;
+      --g:#2e7d32;--gb:#e8f5e9;--a:#b5740a;--ab:#fff8e1;--r:#c62828;--rb:#fff5f5;--s2:#f5f7fb;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;padding:24px;}
+.sheet{max-width:1080px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:14px;padding:38px 46px 56px;box-shadow:0 6px 28px rgba(0,0,0,.07);}
+h1{font-size:27px;color:var(--b);letter-spacing:-.02em;}
+h2{font-size:19px;color:var(--b);margin:34px 0 12px;padding-top:14px;border-top:2px solid var(--b);}
+h3{font-size:15px;color:var(--ink);margin:16px 0 6px;}
+p,li{font-size:13.5px;color:#2d333d;}
+.sub{color:var(--mut);font-size:13px;margin-top:4px;}
+.lead{font-size:14px;background:#eef1fe;border:1px solid #d6defb;border-radius:10px;padding:14px 18px;margin-top:16px;}
+.score{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0;}
+.scell{border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center;}
+.scell .n{font-size:24px;font-weight:800;color:var(--b);} .scell .l{font-size:10.5px;text-transform:uppercase;color:var(--mut);font-weight:700;letter-spacing:.4px;}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.8px;}
+th{background:var(--b);color:#fff;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.3px;}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+tr:nth-child(even) td{background:#fafbff;}
+.pill{display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;text-transform:uppercase;white-space:nowrap;}
+.p0{background:var(--rb);color:var(--r);border:1px solid #f3b4b4;}
+.p1{background:var(--ab);color:var(--a);border:1px solid #ffe082;}
+.p2{background:#eef1fe;color:var(--b);border:1px solid #c5cae9;}
+.p3{background:var(--s2);color:var(--mut);border:1px solid var(--line);}
+.eff{font-weight:700;}
+code{background:#f3f5f9;border:1px solid #e4e7ec;border-radius:4px;padding:1px 5px;font-size:11.5px;font-family:Consolas,monospace;color:#3a3f4b;}
+.box{border:1px solid var(--line);border-left:4px solid var(--b);border-radius:0 10px 10px 0;padding:12px 16px;margin:10px 0;background:#fafbff;}
+.box.win{border-left-color:var(--g);} .box.warn{border-left-color:var(--a);}
+ul{margin:6px 0 6px 20px;} li{margin:3px 0;}
+.tag{font-size:10px;color:var(--mut);background:var(--s2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-left:4px;}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--mut);text-align:center;}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<h1>PanelOS — UI/UX Audit &amp; Enhancement Roadmap</h1>
+<div class="sub">Complete review of the Vue 3 ERP/SaaS front-end · grounded in the live screens + best-practice rules (UI/UX Pro Max)</div>
+
+<div class="lead">
+<b>Verdict:</b> The product is <b>functionally complete and structurally sound</b> — consistent shell, sensible
+information architecture, and a clear brand. What separates it from a "looks like a polished enterprise SaaS"
+feel is mostly <b>consistency + finish</b>: emoji icons, duplicated button/card CSS across 29 files, two competing
+blues, plain "Loading…" text, and missing inline form errors. Fixing the <b>P0 quick wins</b> below will lift the
+perceived quality the most for the least effort.
+</div>
+
+<div class="score">
+  <div class="scell"><div class="n">8/10</div><div class="l">Structure / IA</div></div>
+  <div class="scell"><div class="n">6/10</div><div class="l">Visual consistency</div></div>
+  <div class="scell"><div class="n">5/10</div><div class="l">Accessibility</div></div>
+  <div class="scell"><div class="n">6/10</div><div class="l">Feedback / states</div></div>
+</div>
+
+<h2>Tier 0 — Quick wins (highest impact / least effort)</h2>
+<table>
+<thead><tr><th style="width:34%">Enhancement</th><th>What &amp; why</th><th style="width:13%">Where</th><th style="width:8%">Effort</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="pill p0">P0</span> <b>Centralize design tokens + base components</b></td>
+  <td><code>.btn {</code> is redefined in <b>29 components</b>; cards, status-chips and modals are re-styled per file. Move <code>.btn / .btn-primary / .card / .chip / .modal / .input</code> into <code>styles.css</code> as global classes driven by CSS variables. One source of truth → instant consistency + faster future work. <span class="tag">rule: consistency, color-semantic</span></td>
+  <td><code>styles.css</code> + remove dup CSS</td>
+  <td class="eff">M</td>
+</tr>
+<tr>
+  <td><span class="pill p0">P0</span> <b>One brand blue</b></td>
+  <td>Two primaries are in use: <code>#1a237e</code> (app, 14×) and <code>#2B50E0</code> (PDFs/older components, 5×) plus <code>#3d5af1</code>. Pick one indigo, expose as <code>--brand</code>/<code>--brand-600</code> tokens, replace all raw hexes. Inconsistent blue is the most visible "unpolished" tell. <span class="tag">rule: color-semantic</span></td>
+  <td>all components, PDF blades</td>
+  <td class="eff">S</td>
+</tr>
+<tr>
+  <td><span class="pill p0">P0</span> <b>Replace emoji icons with the SVG set</b></td>
+  <td>Buttons use 📄 ⬇ 🛒 ⚠ 📦 ↻ ✕ 📤 💬 🚚 etc. Emojis render differently per OS and can't be themed. You already have a clean SVG <code>ic</code> map in <code>AppShell.vue</code> — extend it into a shared <code>icons.js</code> and use everywhere (refresh, close, download, pdf, send, truck…). <span class="tag">rule: no-emoji-icons, icon-style-consistent</span></td>
+  <td>~all components</td>
+  <td class="eff">M</td>
+</tr>
+<tr>
+  <td><span class="pill p0">P0</span> <b>Skeleton loaders</b></td>
+  <td><b>20 components</b> show a bare "Loading…". Replace with shimmer skeletons that mirror the layout (KPI cards, table rows). Removes the blank-flash and reads as premium. Add a reusable <code>&lt;SkeletonRow/&gt;</code> / <code>.skeleton</code> shimmer class. <span class="tag">rule: progressive-loading, loading-states, content-jumping</span></td>
+  <td>list + dashboard + detail pages</td>
+  <td class="eff">M</td>
+</tr>
+<tr>
+  <td><span class="pill p0">P0</span> <b>Inline field-level form errors</b></td>
+  <td>Backend now returns the specific message, but forms still show ONE banner. Show the error <b>under the offending field</b> (red text + red border), and auto-focus the first invalid field on submit. Biggest day-to-day friction reducer. <span class="tag">rule: error-placement, focus-management, aria-live-errors</span></td>
+  <td>CompanySettings, all create/edit modals</td>
+  <td class="eff">M</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Tier 1 — High impact</h2>
+<table>
+<thead><tr><th style="width:34%">Enhancement</th><th>What &amp; why</th><th style="width:13%">Where</th><th style="width:8%">Effort</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="pill p1">P1</span> <b>Data-table upgrade</b></td>
+  <td>List tables (quotations/orders/invoices/customers) need: <b>sortable headers</b> (with <code>aria-sort</code>), a <b>sticky header</b> on scroll, <b>right-aligned money columns</b> with <code>font-variant-numeric: tabular-nums</code>, zebra rows, and a clear row-hover. Tables are the heart of an ERP — this is where polish shows. <span class="tag">rule: sortable-table, number-tabular, data-table</span></td>
+  <td>*List.vue, tables in managers</td>
+  <td class="eff">M-L</td>
+</tr>
+<tr>
+  <td><span class="pill p1">P1</span> <b>Richer empty states</b></td>
+  <td>Replace italic "No records" with an icon + one-line explanation + a primary CTA ("No quotations yet — Create your first quote"). Turns dead-ends into next actions. <span class="tag">rule: empty-states, empty-data-state</span></td>
+  <td>all lists, dashboard widgets</td>
+  <td class="eff">S</td>
+</tr>
+<tr>
+  <td><span class="pill p1">P1</span> <b>Accessibility pass</b></td>
+  <td>Add <code>aria-label</code> to every icon-only button (↻, ✕, ⬇ — currently ~20 labels for many more buttons); ensure a visible <code>:focus-visible</code> ring (2px brand) on all interactive elements; verify gray hint text meets 4.5:1; add <code>role="alert"</code>/<code>aria-live</code> to toasts &amp; error banners. <span class="tag">rule: aria-labels, focus-states, color-contrast, toast-accessibility</span></td>
+  <td>global + AppShell + ui.js</td>
+  <td class="eff">M</td>
+</tr>
+<tr>
+  <td><span class="pill p1">P1</span> <b>Mobile-responsive tables</b></td>
+  <td>Wide tables overflow on phones. Wrap in a horizontal-scroll container with a fade hint, OR switch to a stacked card layout below 640px (label:value rows). The shell already collapses the sidebar — finish the job on data views. <span class="tag">rule: horizontal-scroll, responsive-chart, content-priority</span></td>
+  <td>*List.vue, reports</td>
+  <td class="eff">M</td>
+</tr>
+<tr>
+  <td><span class="pill p1">P1</span> <b>Consistent toasts &amp; confirms</b></td>
+  <td>You have <code>ui.js</code> toasts/confirm — standardize: success/error/info variants with icon, auto-dismiss 4s, slide+fade in, stack top-right, <code>aria-live="polite"</code>. Use confirm dialog for every destructive action (some still use native prompt — e.g. impersonate/cancel reasons). <span class="tag">rule: toast-dismiss, confirmation-dialogs, success-feedback</span></td>
+  <td>ui.js, SuperAdmin, InvoiceDetail</td>
+  <td class="eff">S-M</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Tier 2 — Polish &amp; micro-interactions</h2>
+<table>
+<thead><tr><th style="width:34%">Enhancement</th><th>What &amp; why</th><th style="width:13%">Where</th><th style="width:8%">Effort</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="pill p2">P2</span> <b>Motion system</b></td>
+  <td>Define global tokens (<code>--t-fast:150ms</code>, <code>--ease-out</code>). Modals scale+fade from center, drawers slide, rows stagger-in 30ms, buttons press-scale 0.97. Wrap in <code>@media (prefers-reduced-motion: reduce)</code> to disable. Subtle motion = expensive feel. <span class="tag">rule: duration-timing, modal-motion, reduced-motion, scale-feedback</span></td>
+  <td>styles.css, modals</td>
+  <td class="eff">M</td>
+</tr>
+<tr>
+  <td><span class="pill p2">P2</span> <b>Typography scale + font</b></td>
+  <td>Adopt a fixed type scale (12/13/14/16/20/24/30) and one weight ladder (400 body / 600 labels / 800 headings). Optionally load <b>Inter</b> (via <code>font-display:swap</code>) for a sharper SaaS look than system Segoe UI. Use tabular numerals for all money/quantities. <span class="tag">rule: font-scale, weight-hierarchy, number-tabular</span></td>
+  <td>styles.css</td>
+  <td class="eff">S-M</td>
+</tr>
+<tr>
+  <td><span class="pill p2">P2</span> <b>Spacing rhythm (4/8px)</b></td>
+  <td>Page paddings vary (24/32/48 ad-hoc). Adopt a 4/8 scale via vars (<code>--sp-2..--sp-8</code>) for card padding, gaps and section spacing. Consistent rhythm reads as "designed". <span class="tag">rule: spacing-scale, whitespace-balance</span></td>
+  <td>global</td>
+  <td class="eff">M</td>
+</tr>
+<tr>
+  <td><span class="pill p2">P2</span> <b>Chart finish</b></td>
+  <td>CSS bar charts need: tooltips on every bar (some have <code>title</code>), axis/value labels, an accessible text summary (<code>aria-label</code>), and a proper empty/loading state instead of a blank frame. Consider a tiny lib (e.g. uPlot/Chart.js) only if charts grow. <span class="tag">rule: tooltip-on-interact, empty-data-state, screen-reader-summary, gridline-subtle</span></td>
+  <td>BusinessReports, SuperAdmin</td>
+  <td class="eff">M</td>
+</tr>
+<tr>
+  <td><span class="pill p2">P2</span> <b>Detail-page hierarchy</b></td>
+  <td>Invoice/Order/Quotation detail pages have many equal-weight cards. Introduce a sticky summary header (status + total + primary action), then secondary cards. One clear primary CTA per screen. <span class="tag">rule: primary-action, visual-hierarchy</span></td>
+  <td>InvoiceDetail, QuotationDetail</td>
+  <td class="eff">M</td>
+</tr>
+<tr>
+  <td><span class="pill p2">P2</span> <b>Global search / command palette</b></td>
+  <td>The topbar "Jump to a section" can become a real <kbd>Ctrl/⌘K</kbd> palette: jump to any module + recent records. Power-user signal for an ERP. <span class="tag">rule: search-accessible</span></td>
+  <td>AppShell</td>
+  <td class="eff">M-L</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Tier 3 — Advanced / brand</h2>
+<table>
+<thead><tr><th style="width:34%">Enhancement</th><th>What &amp; why</th><th style="width:13%">Where</th><th style="width:8%">Effort</th></tr></thead>
+<tbody>
+<tr><td><span class="pill p3">P3</span> <b>Dark mode</b></td><td>Token-driven theme (you already have CSS vars). High-value for shop-floor screens at night; design light/dark together for contrast parity. <span class="tag">rule: dark-mode-pairing, color-dark-mode</span></td><td>styles.css</td><td class="eff">L</td></tr>
+<tr><td><span class="pill p3">P3</span> <b>Per-tenant theming</b></td><td>Company primary/secondary colors already stored — actually apply them as the running theme (logo + accent) so each factory's PanelOS feels their own. <span class="tag">rule: state-clarity</span></td><td>AppShell, CompanySettings</td><td class="eff">M</td></tr>
+<tr><td><span class="pill p3">P3</span> <b>List virtualization</b></td><td>When a tenant crosses ~500 rows, virtualize long lists for smooth scroll. <span class="tag">rule: virtualize-lists</span></td><td>large lists</td><td class="eff">M</td></tr>
+<tr><td><span class="pill p3">P3</span> <b>Onboarding checklist</b></td><td>First-login checklist (add company details → first panel type → first quote) to activate new trial tenants. Drives conversion. <span class="tag">rule: progressive-disclosure</span></td><td>Dashboard</td><td class="eff">M</td></tr>
+</tbody>
+</table>
+
+<h2>Suggested order</h2>
+<div class="box win">
+<b>Sprint 1 (biggest visual lift):</b> Tier 0 entirely — tokens + one blue + SVG icons + skeletons + inline form errors.
+Do the token/base-component centralization FIRST; every later change rides on it.
+</div>
+<div class="box">
+<b>Sprint 2:</b> Tier 1 — tables, empty states, a11y pass, responsive tables, toasts/confirms.
+</div>
+<div class="box warn">
+<b>Sprint 3+:</b> Tier 2 polish (motion, type, spacing, charts, detail hierarchy, ⌘K) then Tier 3 (dark mode, per-tenant theming).
+</div>
+
+<h2>Notes grounded in the codebase</h2>
+<ul>
+<li><code>.btn {</code> appears in <b>29</b> component files — the single biggest consistency debt; fixing it is leverage for everything else.</li>
+<li>Brand hex audit: <code>#1a237e</code> ×14, <code>#2B50E0</code> ×5, <code>#3d5af1</code> ×2 → unify to one token scale.</li>
+<li>Plain "Loading…" in <b>20</b> components → skeletons.</li>
+<li>~20 <code>aria-label</code>s total against far more icon-only buttons → a11y gap.</li>
+<li>Good foundations already present: CSS variables in <code>styles.css</code>, an SVG icon map in <code>AppShell</code>, a <code>ui.js</code> toast/confirm system, responsive sidebar, consistent page gutters — build the system on these.</li>
+</ul>
+
+<div class="foot">PanelOS UI/UX Audit · generated with UI/UX Pro Max design intelligence · prioritise Tier 0 first.</div>
+</div>
+</body>
+</html>
