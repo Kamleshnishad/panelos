@@ -247,6 +247,26 @@ class SuperAdminController extends Controller
     }
 
     /** Platform settings (Razorpay creds + GST seller identity). Secrets masked. */
+    /** TEMP diagnostic: dump column types per table (super-admin only). */
+    public function schemaDump(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        $db = config('database.connections.' . config('database.default') . '.database');
+        $rows = \Illuminate\Support\Facades\DB::select(
+            'SELECT table_name AS t, column_name AS c, column_type AS ty, is_nullable AS n, column_default AS d, extra AS e
+             FROM information_schema.columns WHERE table_schema = ? ORDER BY table_name, ordinal_position', [$db]
+        );
+        $out = [];
+        foreach ($rows as $x) {
+            $t = $x->t ?? $x->T; $c = $x->c ?? $x->C;
+            $out[$t][$c] = [
+                'type' => $x->ty ?? $x->TY, 'null' => $x->n ?? $x->N,
+                'default' => $x->d ?? $x->D, 'extra' => $x->e ?? $x->E,
+            ];
+        }
+        return $this->successResponse($out, 'Schema dump');
+    }
+
     public function getSettings(Request $r)
     {
         $this->requireSuperAdmin($r);
