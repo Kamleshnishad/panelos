@@ -140,6 +140,20 @@ class ReportingService
         ];
     }
 
+    /**
+     * Bulk paid-amount-per-invoice map (one grouped query) — replaces per-invoice
+     * SUM N+1 across AR / reconcile / top-customers (SCALE-C4). Numbers identical.
+     */
+    private function paidByInvoice($invoiceIds): \Illuminate\Support\Collection
+    {
+        $ids = collect($invoiceIds)->filter()->values();
+        if ($ids->isEmpty()) return collect();
+        return PaymentTransaction::whereIn('invoice_id', $ids)
+            ->groupBy('invoice_id')
+            ->selectRaw('invoice_id, SUM(amount) as paid')
+            ->pluck('paid', 'invoice_id');
+    }
+
     public function getAccountsReceivable($companyId = null, $asOf = null)
     {
         $companyId = $companyId ?? auth()->user()->company_id;
@@ -151,9 +165,11 @@ class ReportingService
             ->with('dispatch.batch.order.customer', 'items', 'taxCalculation')
             ->get();
 
-        $arData = $invoices->map(function ($invoice) {
+        $paidMap = $this->paidByInvoice($invoices->pluck('id'));
+
+        $arData = $invoices->map(function ($invoice) use ($paidMap) {
             $total = $invoice->subtotal + ($invoice->taxCalculation->tax_amount ?? 0);
-            $paid = PaymentTransaction::where('invoice_id', $invoice->id)->sum('amount');
+            $paid = (float) ($paidMap[$invoice->id] ?? 0);
             $remaining = max(0, $total - $paid);
             // Whole days past due as a positive integer; 0 if not yet due
             $daysOverdue = $invoice->due_date && $invoice->due_date->isPast()
@@ -315,9 +331,11 @@ class ReportingService
             'discrepancies' => []
         ];
 
+        $paidMap = $this->paidByInvoice($invoices->pluck('id'));
+
         foreach ($invoices as $invoice) {
             $total = $invoice->subtotal + ($invoice->taxCalculation->tax_amount ?? 0);
-            $paid = PaymentTransaction::where('invoice_id', $invoice->id)->sum('amount');
+            $paid = (float) ($paidMap[$invoice->id] ?? 0);
 
             $reconciliation['total_invoiced'] += $total;
             $reconciliation['total_paid'] += $paid;
@@ -396,6 +414,8 @@ class ReportingService
             ->with('dispatch.batch.order.customer', 'order.customer')
             ->get();
 
+        $paidMap = $this->paidByInvoice($invoices->pluck('id'));
+
         $byCustomer = [];
         foreach ($invoices as $inv) {
             $customer = $inv->dispatch?->batch?->order?->customer ?? $inv->order?->customer;
@@ -404,7 +424,7 @@ class ReportingService
             if (!isset($byCustomer[$cid])) {
                 $byCustomer[$cid] = ['customer_id' => $cid, 'customer_name' => $cname, 'invoiced' => 0, 'paid' => 0, 'invoice_count' => 0];
             }
-            $paid = PaymentTransaction::where('invoice_id', $inv->id)->sum('amount');
+            $paid = (float) ($paidMap[$inv->id] ?? 0);
             $byCustomer[$cid]['invoiced'] += (float) $inv->total_amount;
             $byCustomer[$cid]['paid']     += (float) $paid;
             $byCustomer[$cid]['invoice_count']++;

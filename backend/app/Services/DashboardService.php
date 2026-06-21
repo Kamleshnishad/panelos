@@ -225,10 +225,15 @@ class DashboardService
             ->whereNotIn('status', ['draft', 'cancelled', 'paid'])
             ->get();
 
+        // One grouped query for paid-per-invoice instead of a SUM per invoice (SCALE-C2).
+        $paid = PaymentTransaction::whereIn('invoice_id', $invoices->pluck('id'))
+            ->groupBy('invoice_id')
+            ->selectRaw('invoice_id, SUM(amount) as paid')
+            ->pluck('paid', 'invoice_id');
+
         $total = 0;
         foreach ($invoices as $inv) {
-            $paid = PaymentTransaction::where('invoice_id', $inv->id)->sum('amount');
-            $total += max(0, $inv->total_amount - $paid);
+            $total += max(0, $inv->total_amount - (float) ($paid[$inv->id] ?? 0));
         }
         return $total;
     }
