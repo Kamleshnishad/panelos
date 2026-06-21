@@ -11,6 +11,7 @@ use App\Models\CoilStock;
 use App\Models\ChemicalStock;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardService
 {
@@ -18,13 +19,15 @@ class DashboardService
 
     public function getDashboard(int $companyId): array
     {
-        return [
+        // Cache 60s per company — the dashboard runs ~25+ aggregate queries and is
+        // polled often; a short TTL cuts DB load with no user-visible staleness (SCALE-H1).
+        return Cache::remember("dashboard:{$companyId}", 60, fn () => [
             'kpis'           => $this->kpis($companyId),
             'pipeline'       => $this->pipeline($companyId),
             'receivables'    => $this->receivables($companyId),
             'alerts'         => $this->alerts($companyId),
             'recent_activity'=> $this->recentActivity($companyId),
-        ];
+        ]);
     }
 
     private function kpis(int $companyId): array
@@ -57,7 +60,7 @@ class DashboardService
 
         $ordersOverdue = Order::where('company_id', $companyId)
             ->whereIn('status', ['pending', 'in_production'])
-            ->whereDate('expected_delivery_date', '<', now())->count();
+            ->where('expected_delivery_date', '<', now()->startOfDay())->count();
 
         $batchesOnSchedule = ProductionBatch::where('company_id', $companyId)
             ->where('status', 'in_progress')->count();
@@ -68,7 +71,7 @@ class DashboardService
 
         $overdueInvoices = Invoice::where('company_id', $companyId)
             ->whereNotIn('status', ['draft', 'cancelled', 'paid'])
-            ->whereDate('due_date', '<', now())->count();
+            ->where('due_date', '<', now()->startOfDay())->count();
 
         $collectedLastFy = $this->collectedLastFinancialYear($companyId);
         $yoyPct = $collectedLastFy > 0
@@ -146,8 +149,8 @@ class DashboardService
         // Expiring chemicals (next 30 days)
         $expiring = ChemicalStock::where('company_id', $companyId)
             ->whereNotNull('expiry_date')
-            ->whereDate('expiry_date', '<=', now()->addDays(30))
-            ->whereDate('expiry_date', '>=', now())
+            ->where('expiry_date', '>=', now()->startOfDay())
+            ->where('expiry_date', '<', now()->addDays(31)->startOfDay())
             ->count();
         if ($expiring > 0) {
             $alerts[] = ['type' => 'expiring', 'severity' => 'warning', 'message' => "{$expiring} chemical(s) expiring within 30 days"];
@@ -156,7 +159,7 @@ class DashboardService
         // Expired chemicals
         $expired = ChemicalStock::where('company_id', $companyId)
             ->whereNotNull('expiry_date')
-            ->whereDate('expiry_date', '<', now())
+            ->where('expiry_date', '<', now()->startOfDay())
             ->where('quantity_in_stock', '>', 0)
             ->count();
         if ($expired > 0) {
@@ -166,7 +169,7 @@ class DashboardService
         // Overdue invoices
         $overdue = Invoice::where('company_id', $companyId)
             ->whereNotIn('status', ['draft', 'cancelled', 'paid'])
-            ->whereDate('due_date', '<', now())
+            ->where('due_date', '<', now()->startOfDay())
             ->count();
         if ($overdue > 0) {
             $alerts[] = ['type' => 'overdue', 'severity' => 'danger', 'message' => "{$overdue} invoice(s) overdue for payment"];
@@ -176,7 +179,7 @@ class DashboardService
         $expiredQuotes = Quotation::where('company_id', $companyId)
             ->whereIn('status', ['draft', 'sent'])
             ->whereNotNull('valid_until')
-            ->whereDate('valid_until', '<', now())
+            ->where('valid_until', '<', now()->startOfDay())
             ->count();
         if ($expiredQuotes > 0) {
             $alerts[] = ['type' => 'quote_expired', 'severity' => 'info', 'message' => "{$expiredQuotes} quotation(s) past validity date"];

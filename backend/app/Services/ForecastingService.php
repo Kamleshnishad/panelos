@@ -22,7 +22,7 @@ class ForecastingService
         return DB::transaction(function () use ($companyId, $panelTypeId, $daysAhead) {
             $panelTypes = $panelTypeId
                 ? PanelType::where('id', $panelTypeId)->get()
-                : PanelType::all();
+                : PanelType::where('company_id', $companyId)->get();
 
             $forecasts = [];
             $today = now();
@@ -35,7 +35,7 @@ class ForecastingService
                 }
 
                 for ($i = 1; $i <= $daysAhead; $i++) {
-                    $forecastDate = $today->addDays($i);
+                    $forecastDate = $today->copy()->addDays($i);
                     $prediction = $this->predictUsingMovingAverage($historicalData, $i);
 
                     $forecast = InventoryForecast::create([
@@ -63,7 +63,7 @@ class ForecastingService
         return DB::transaction(function () use ($companyId, $panelTypeId, $forecastPeriod) {
             $panelTypes = $panelTypeId
                 ? PanelType::where('id', $panelTypeId)->get()
-                : PanelType::all();
+                : PanelType::where('company_id', $companyId)->get();
 
             $forecasts = [];
             $today = now();
@@ -239,7 +239,7 @@ class ForecastingService
         return DB::table('coil_stocks')
             ->where('company_id', $companyId)
             ->where('panel_type_id', $panelTypeId)
-            ->sum('quantity') ?? 0;
+            ->sum('quantity_in_stock') ?? 0;
     }
 
     public function getDemandForecast($companyId, $panelTypeId = null)

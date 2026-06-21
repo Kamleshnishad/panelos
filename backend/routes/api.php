@@ -382,13 +382,13 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
     Route::post('/billing/checkout',[\App\Http\Controllers\Api\BillingController::class, 'checkout'])->name('billing.checkout');
     Route::post('/billing/verify',  [\App\Http\Controllers\Api\BillingController::class, 'verify'])->name('billing.verify');
 
-    // Super-admin — platform-owner tenant management (is_super_admin only)
-    Route::prefix('admin')->group(function () {
+    // Super-admin — platform-owner tenant management (is_super_admin only).
+    // Route-level guard is defense-in-depth on top of each method's requireSuperAdmin().
+    Route::prefix('admin')->middleware('super.admin')->group(function () {
         Route::get('/overview',              [\App\Http\Controllers\Api\SuperAdminController::class, 'overview'])->name('admin.overview');
         Route::get('/expiring',              [\App\Http\Controllers\Api\SuperAdminController::class, 'expiring'])->name('admin.expiring');
         Route::get('/revenue',               [\App\Http\Controllers\Api\SuperAdminController::class, 'revenue'])->name('admin.revenue');
         Route::get('/funnel',                [\App\Http\Controllers\Api\SuperAdminController::class, 'funnel'])->name('admin.funnel');
-        Route::get('/_schema',               [\App\Http\Controllers\Api\SuperAdminController::class, 'schemaDump'])->name('admin.schema');
         Route::get('/settings',              [\App\Http\Controllers\Api\SuperAdminController::class, 'getSettings'])->name('admin.settings.get');
         Route::put('/settings',              [\App\Http\Controllers\Api\SuperAdminController::class, 'updateSettings'])->name('admin.settings.update');
         Route::post('/settings/test-razorpay', [\App\Http\Controllers\Api\SuperAdminController::class, 'testRazorpay'])->name('admin.settings.test');
@@ -421,7 +421,19 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
 Route::post('/webhooks/stripe', [PaymentController::class, 'handleStripeWebhook'])->name('webhooks.stripe');
 Route::post('/webhooks/razorpay', [\App\Http\Controllers\Api\BillingController::class, 'webhook'])->name('billing.webhook');
 
-// Health check endpoint
+// Health check endpoint — also verifies DB connectivity so a downed database
+// reports DEGRADED (503) instead of falsely staying "OK" (OPS-M3).
 Route::get('/health', function () {
-    return response()->json(['status' => 'OK', 'timestamp' => now()]);
+    try {
+        \Illuminate\Support\Facades\DB::select('select 1');
+        $db = 'OK';
+    } catch (\Throwable $e) {
+        $db = 'DOWN';
+    }
+    $ok = $db === 'OK';
+    return response()->json([
+        'status'    => $ok ? 'OK' : 'DEGRADED',
+        'database'  => $db,
+        'timestamp' => now(),
+    ], $ok ? 200 : 503);
 });

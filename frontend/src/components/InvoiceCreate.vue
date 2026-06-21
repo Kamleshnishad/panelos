@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import invoiceService from '../services/invoiceService.js'
 
 const emit = defineEmits(['created', 'cancel'])
@@ -137,7 +137,15 @@ async function loadSources() {
 
 function fmtNum(n) { return Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }) }
 
-onMounted(loadSources)
+// Unsaved-changes guard (OPS-L1): warn before a refresh/close loses entered data.
+const dirty = ref(false)
+function beforeUnloadGuard(e) { if (dirty.value && !saving.value) { e.preventDefault(); e.returnValue = '' } }
+onMounted(async () => {
+  await loadSources()
+  watch(form, () => { dirty.value = true }, { deep: true })
+  window.addEventListener('beforeunload', beforeUnloadGuard)
+})
+onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadGuard))
 </script>
 
 <style scoped>

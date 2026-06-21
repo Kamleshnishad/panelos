@@ -63,6 +63,7 @@ class StockController extends Controller
                 ->with('panelType', 'transactions')
                 ->findOrFail($id);
 
+            if (!auth()->user()->canViewCost()) $stock->makeHidden('unit_cost');
             return $this->apiResponse(true, $stock, 'Coil detail retrieved successfully');
         } catch (\Exception $e) {
             return $this->apiResponse(false, null, $e->getMessage(), 404);
@@ -205,6 +206,7 @@ class StockController extends Controller
                 ->with('transactions')
                 ->findOrFail($id);
 
+            if (!auth()->user()->canViewCost()) $stock->makeHidden('unit_cost');
             return $this->apiResponse(true, $stock, 'Chemical detail retrieved successfully');
         } catch (\Exception $e) {
             return $this->apiResponse(false, null, $e->getMessage(), 404);
@@ -386,6 +388,7 @@ class StockController extends Controller
         try {
             $stock = \App\Models\ConsumableStock::where('company_id', auth()->user()->company_id)
                 ->with('transactions')->findOrFail($id);
+            if (!auth()->user()->canViewCost()) $stock->makeHidden('unit_cost');
             return $this->apiResponse(true, $stock, 'Consumable detail retrieved successfully');
         } catch (\Exception $e) {
             return $this->apiResponse(false, null, $e->getMessage(), 404);

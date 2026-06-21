@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'tenant.active' => \App\Http\Middleware\EnsureActiveTenant::class,
+            'super.admin'   => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -49,5 +50,43 @@ return Application::configure(basePath: dirname(__DIR__))
                     ],
                 ], 422);
             }
+        });
+
+        // Catch-all: turn any other uncaught throwable into a clean JSON envelope
+        // with a reference id, instead of a bare "Server Error" 500 (OPS-H5).
+        // Exceptions that already map to a proper HTTP status are passed through.
+        $exceptions->render(function (\Throwable $e, $request) {
+            if (!$request->expectsJson()) {
+                return null;
+            }
+            $passthrough = [
+                \Illuminate\Validation\ValidationException::class,
+                \Illuminate\Auth\AuthenticationException::class,
+                \Illuminate\Auth\Access\AuthorizationException::class,
+                \Illuminate\Database\Eloquent\ModelNotFoundException::class,
+                \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface::class,
+            ];
+            foreach ($passthrough as $type) {
+                if ($e instanceof $type) {
+                    return null; // let the framework's own handler set the right status
+                }
+            }
+            if (config('app.debug')) {
+                return null; // keep Laravel's detailed trace locally
+            }
+
+            $ref = substr(md5(uniqid('', true)), 0, 8);
+            \Illuminate\Support\Facades\Log::error("[{$ref}] " . $e->getMessage(), ['exception' => $e]);
+
+            return response()->json([
+                'success'    => false,
+                'message'    => 'Something went wrong on our end. Please retry, or contact support with reference ' . $ref . '.',
+                'error_code' => 'SERVER_ERROR',
+                'reference'  => $ref,
+                'meta' => [
+                    'timestamp' => now()->toIso8601String(),
+                    'version' => '1.0',
+                ],
+            ], 500);
         });
     })->create();

@@ -149,8 +149,11 @@ class AuthController extends Controller
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('2FA email send failed', ['error' => $e->getMessage()]);
         }
-        // Dev fallback: code is in the log (MAIL_MAILER=log) so login still works without SMTP.
-        \Illuminate\Support\Facades\Log::info("2FA code for {$user->email}: {$code}");
+        // Dev-only fallback: surface the code in the log so local login works without SMTP.
+        // NEVER log the code in production — anyone with log access could bypass 2FA.
+        if (app()->environment('local')) {
+            \Illuminate\Support\Facades\Log::info("2FA code for {$user->email}: {$code}");
+        }
     }
 
     /** Step 2 of login — verify the OTP and issue the token. */

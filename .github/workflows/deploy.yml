@@ -193,6 +193,10 @@ jobs:
             fi
 
             echo ""
+            echo "▸ Pre-migration DB backup (so a bad migration is recoverable)"
+            docker exec panelos_backend php artisan db:backup || echo "  ⚠ backup step failed — continuing; check storage/app/backups"
+
+            echo ""
             echo "▸ Running database migrations"
             docker exec panelos_backend php artisan migrate --force
 

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PanelOS — System Audit (Scale · Concurrency · Security · Reliability)</title>
+<style>
+:root{--b:#2B50E0;--ink:#15181E;--mut:#5B6472;--line:#E4E7EC;--bg:#eef0f5;
+      --crit:#b3261e;--critb:#fdecea;--hi:#c25e00;--hib:#fff3e6;--med:#1a73c2;--medb:#eaf3fc;--low:#5B6472;--lowb:#f3f5f9;
+      --g:#1f7a3d;--gb:#e8f5ec;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;padding:24px;}
+.sheet{max-width:1120px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:14px;padding:38px 46px 56px;box-shadow:0 6px 28px rgba(0,0,0,.07);}
+h1{font-size:27px;color:var(--b);letter-spacing:-.02em;}
+h2{font-size:20px;color:var(--b);margin:36px 0 6px;padding-top:16px;border-top:3px solid var(--b);}
+h2 .em{font-weight:400;color:var(--mut);font-size:14px;}
+h3{font-size:14px;color:var(--ink);margin:18px 0 4px;text-transform:uppercase;letter-spacing:.5px;}
+p,li,td{font-size:13.5px;color:#2d333d;}
+.sub{color:var(--mut);font-size:13px;margin-top:4px;}
+.lead{font-size:14px;background:#eef1fe;border:1px solid #d6defb;border-radius:10px;padding:15px 18px;margin-top:16px;}
+.score{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0;}
+.scell{border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center;}
+.scell .n{font-size:22px;font-weight:800;} .scell .l{font-size:10.5px;text-transform:uppercase;color:var(--mut);font-weight:700;letter-spacing:.4px;margin-top:3px;}
+.scell .g{font-size:11px;color:var(--mut);margin-top:6px;}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;}
+.pill{display:inline-block;font-size:10px;font-weight:800;padding:2px 9px;border-radius:20px;text-transform:uppercase;white-space:nowrap;letter-spacing:.3px;}
+.crit{background:#fdecea;color:var(--crit);border:1px solid #f3b4ae;}
+.hi{background:#fff3e6;color:var(--hi);border:1px solid #f5cfa0;}
+.med{background:#eaf3fc;color:var(--med);border:1px solid #bcdcf5;}
+.low{background:#f3f5f9;color:var(--low);border:1px solid var(--line);}
+.ok{background:var(--gb);color:var(--g);border:1px solid #b6e0c3;}
+.find{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:0 10px 10px 0;padding:12px 16px 13px;margin:11px 0;background:#fafbff;}
+.find.c{border-left-color:var(--crit);} .find.h{border-left-color:var(--hi);} .find.m{border-left-color:var(--med);} .find.l{border-left-color:var(--low);}
+.find .ttl{font-size:14.5px;font-weight:800;margin:3px 0 6px;display:flex;align-items:center;gap:8px;}
+.find .ttl .id{font-family:Consolas,monospace;font-size:11px;background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--mut);}
+.find .row{margin:4px 0;font-size:13px;}
+.find .row b{color:var(--ink);}
+.ev{font-family:Consolas,monospace;font-size:11.5px;background:#f3f5f9;border:1px solid #e4e7ec;border-radius:4px;padding:1px 5px;color:#3a3f4b;}
+code{font-family:Consolas,monospace;font-size:11.5px;background:#f3f5f9;border:1px solid #e4e7ec;border-radius:4px;padding:1px 5px;color:#3a3f4b;}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.8px;}
+th{background:var(--b);color:#fff;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.3px;}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+tr:nth-child(even) td{background:#fafbff;}
+.good{background:var(--gb);border:1px solid #b6e0c3;border-radius:10px;padding:13px 17px;margin:12px 0;}
+.good b{color:var(--g);}
+ul{margin:6px 0 6px 20px;} li{margin:3px 0;}
+.foot{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--mut);text-align:center;}
+.tocrow{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:7px 0;font-size:13px;}
+.tocrow b{color:var(--b);}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<h1>PanelOS — System Audit</h1>
+<div class="sub">Daily-usage reliability · Huge-data scale · Concurrency · Security &nbsp;|&nbsp; Read-only, code-grounded (file:line) · Prepared for review — no changes made</div>
+
+<div class="lead">
+<b>Headline:</b> The <b>architecture is genuinely sound</b> — real multi-tenant global scope (no cross-tenant IDOR found), no mass-assignment/SQL-injection holes, secrets not committed, most lists paginated, core tables indexed, transactions used widely, and a health-gated rolling deploy. The risks are <b>not structural</b> — they cluster in four fixable areas: <b>(1) billing integrity &amp; auth hardening</b>, <b>(2) concurrency locking</b> (stock oversell, double-credit, double-conversion), <b>(3) the dashboard/reports/exports loading whole tables with N+1 sums and no cache</b>, and <b>(4) operational safety that is wired-but-switched-off</b> — most critically, <b>the production scheduler never runs, so the "nightly backup" does not exist.</b>
+</div>
+
+<div class="score">
+  <div class="scell"><div class="n" style="color:var(--crit)">NO-GO*</div><div class="l">Security</div><div class="g">*until billing+auth fixes</div></div>
+  <div class="scell"><div class="n" style="color:var(--hi)">AT RISK</div><div class="l">Concurrency</div><div class="g">safe at low users only</div></div>
+  <div class="scell"><div class="n" style="color:var(--hi)">PARTIAL</div><div class="l">Scale / Huge data</div><div class="g">3 hotspots blow up</div></div>
+  <div class="scell"><div class="n" style="color:var(--crit)">NOT YET</div><div class="l">Daily reliability</div><div class="g">no real backups</div></div>
+</div>
+
+<div class="legend">
+  <span class="pill crit">Critical 7</span>
+  <span class="pill hi">High 16</span>
+  <span class="pill med">Medium 13</span>
+  <span class="pill low">Low / Info 6</span>
+  <span class="pill ok">Already solid ✓</span>
+</div>
+
+<h3>Top 8 — fix before onboarding strangers / heavy daily use</h3>
+<div class="tocrow"><span><b>SEC-C1</b> · Billing verify trusts client plan/amount → pay Starter, activate Enterprise</span><span class="pill crit">Critical</span></div>
+<div class="tocrow"><span><b>OPS-C1</b> · Scheduler never runs in prod → <b>nightly DB backup never happens</b> (+ reminders dead)</span><span class="pill crit">Critical</span></div>
+<div class="tocrow"><span><b>OPS-C2</b> · Even when run, backups stay on same host, no off-site, restore untested</span><span class="pill crit">Critical</span></div>
+<div class="tocrow"><span><b>SCALE-C1/C2</b> · Dashboard loads all invoices + per-invoice SUM N+1, twice, no cache</span><span class="pill crit">Critical</span></div>
+<div class="tocrow"><span><b>SCALE-C3</b> · CSV / Tally exports buffer entire tables in memory → OOM</span><span class="pill crit">Critical</span></div>
+<div class="tocrow"><span><b>CONC-H1</b> · Stock deduct = read-modify-write, no row lock → oversell / negative stock</span><span class="pill hi">High</span></div>
+<div class="tocrow"><span><b>CONC-H2</b> · Razorpay double-credit (verify + webhook, no idempotency on payment id)</span><span class="pill hi">High</span></div>
+<div class="tocrow"><span><b>SEC-H1</b> · 2FA OTP written to app log on every login (prod) → 2FA bypass</span><span class="pill hi">High</span></div>
+
+<!-- ============================ SECURITY ============================ -->
+<h2>1 · Security <span class="em">— highest stakes; system onboards strangers via public trial signup</span></h2>
+
+<div class="find c">
+  <div class="ttl"><span class="pill crit">Critical</span> <span class="id">SEC-C1</span> Billing <code>verify</code> trusts client-supplied plan / months / amount</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">BillingController.php:106-137</span> verifies only the Razorpay <i>signature</i> (<span class="ev">RazorpayClient.php:78-82</span>) then activates the <b>client-sent</b> <code>plan</code>, <code>months</code>, <code>amount</code> — never re-fetches the order to confirm captured amount/plan.</div>
+  <div class="row"><b>Exploit:</b> Checkout Starter×1 (cheapest), pay it, then call verify with the valid signature but <code>plan=enterprise, months=36</code>. Signature still matches (same order/payment id) → tenant activated on Enterprise for 3 years for the Starter price; revenue record corrupted.</div>
+  <div class="row"><b>Fix:</b> Re-fetch the order via Razorpay API; derive plan/months/amount from server-side order <code>notes</code> + captured amount (checkout already stamps these at <span class="ev">BillingController.php:86</span>). Never trust client plan/amount on verify.</div>
+</div>
+
+<div class="find h">
+  <div class="ttl"><span class="pill hi">High</span> <span class="id">SEC-H1</span> 2FA OTP written to application log on every login (production)</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">AuthController.php:153</span> logs <code>"2FA code for {email}: {code}"</code> unconditionally; prod uses <code>MAIL_MAILER=log</code> so the email body with the code also lands in logs.</div>
+  <div class="row"><b>Impact:</b> Anyone with log access (ops, aggregator, a future log-exposure bug) fully bypasses 2FA.</div>
+  <div class="row"><b>Fix:</b> Remove the unconditional log; gate any dev fallback behind <code>app()->environment('local')</code>; use a real mailer in prod.</div>
+</div>
+
+<div class="find h">
+  <div class="ttl"><span class="pill hi">High</span> <span class="id">SEC-H2</span> OTP has no per-account attempt lockout (brute-forceable)</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">AuthController.php:157-170</span>; route throttle is only <code>throttle:10,1</code> per IP (<span class="ev">routes/api.php:44</span>). 6-digit code, 10-min window, no failure counter.</div>
+  <div class="row"><b>Fix:</b> Add an attempt counter; invalidate the OTP after ~5 fails; add a per-email throttle (login already has one at <span class="ev">routes/api.php:32-38</span>).</div>
+</div>
+
+<div class="find h">
+  <div class="ttl"><span class="pill hi">High</span> <span class="id">SEC-H3</span> Production served over plain HTTP — no TLS / HSTS / secure cookies</div>
+  <div class="row"><b>Evidence:</b> <code>APP_URL=http://208.87.135.37:3030</code>, <code>SESSION_DRIVER=cookie</code>, no <code>forceScheme('https')</code> anywhere.</div>
+  <div class="row"><b>Impact:</b> Sanctum tokens + 30-min impersonation tokens travel in cleartext; cookies not marked secure.</div>
+  <div class="row"><b>Fix:</b> Terminate TLS (domain + cert), set <code>APP_URL</code> https, force https scheme, enable <code>SESSION_SECURE_COOKIE</code>.</div>
+</div>
+
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:11%">Severity</th><th style="width:42%">Finding</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>SEC-M1</td><td><span class="pill med">Medium</span></td><td>Cost/valuation leaks on stock <b>detail</b> endpoints — lists mask <code>unit_cost</code> but <span class="ev">StockController.php:57-70</span> (coil/chemical/consumable detail) return it with no permission check (cost-mask bypass via direct GET).</td><td>Apply the same <code>makeHidden('unit_cost')</code> guard in detail methods.</td></tr>
+<tr><td>SEC-M2</td><td><span class="pill med">Medium</span></td><td>Leftover diagnostic schema-dump endpoint <span class="ev">routes/api.php:391</span> → <span class="ev">SuperAdminController::schemaDump</span> (gated to super-admin, but a debug endpoint widening attack surface).</td><td>Remove route + method before onboarding.</td></tr>
+<tr><td>SEC-M3</td><td><span class="pill med">Medium</span></td><td>Super-admin <code>admin/*</code> group (<span class="ev">routes/api.php:386-412</span>) has <b>no route middleware</b> — relies on each method calling <code>requireSuperAdmin()</code>. Safe today; one forgotten call = full platform breach.</td><td>Add a <code>super.admin</code> middleware on the group (defense-in-depth).</td></tr>
+<tr><td>SEC-M4</td><td><span class="pill med">Medium</span></td><td>Self-signup public, only <code>throttle:5,1</code>/IP, no email verification before provisioning a full trial tenant → unlimited trial-tenant spam.</td><td>Require email verification; per-email/global signup limits; consider CAPTCHA.</td></tr>
+</tbody>
+</table>
+
+<div class="good"><b>Already solid ✓</b> Real tenant isolation via <code>BelongsToTenant</code> global scope (<span class="ev">Concerns/BelongsToTenant.php:25-48</span>) — <b>no IDOR found</b>. Mass-assignment locked (<code>is_super_admin</code> excluded from fillable). No SQL injection (all raw SQL bound). Uploads validated (mime/size, integer dirs). No committed secrets (<code>.env*</code> gitignored). Login dual IP+email throttle; <code>tenant.active</code> middleware; password-change revokes tokens; impersonation tokens 30-min + audited. &nbsp;<b>Action:</b> rotate the GitHub PAT that was exposed in chat.</div>
+
+<!-- ============================ CONCURRENCY ============================ -->
+<h2>2 · Concurrency <span class="em">— correctness under simultaneous users; <code>lockForUpdate</code> appears exactly once in the whole codebase</span></h2>
+
+<div class="find h">
+  <div class="ttl"><span class="pill hi">High</span> <span class="id">CONC-H1</span> Stock deduction is read-modify-write with no row lock → oversell / lost-update</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">StockService.php:37-61 / 114-138 / 183-204</span> — <code>find()</code> → check qty → <code>update(qty ± n)</code> inside a transaction but <b>without</b> <code>lockForUpdate</code>. Production consumption routes through these (<span class="ev">ProductionMaterialService.php:99-123</span>).</div>
+  <div class="row"><b>Race:</b> Coil = 100kg. Run A &amp; Run B start together, both read 100, both pass availability, A writes 20, B (stale 100) also writes 20 → 160kg consumed, stock shows 20 not −60. Valuation &amp; BOM now wrong.</div>
+  <div class="row"><b>Fix:</b> <code>...->lockForUpdate()->findOrFail($id)</code> inside the existing transaction, or atomic <code>UPDATE … SET qty=qty-? WHERE qty>=?</code> and check affected rows.</div>
+</div>
+
+<div class="find h">
+  <div class="ttl"><span class="pill hi">High</span> <span class="id">CONC-H2</span> Razorpay double-credit — verify + webhook, no idempotency on payment id</div>
+  <div class="row"><b>Evidence:</b> Two entry points both call <code>activate()</code>: <span class="ev">BillingController.php:106-137</span> (client) and <span class="ev">:140-164</span> (webhook). <code>activate()</code> <i>stacks</i> months onto current end date (<span class="ev">SubscriptionService.php:19-31</span>); webhook's only guard is <code>status !== 'active'</code> — which verify already cleared. <code>razorpay_payment_id</code> stored but never checked for reuse.</div>
+  <div class="row"><b>Impact:</b> Webhook racing/after verify → customer credited twice (double months) + a duplicate subscription invoice number.</div>
+  <div class="row"><b>Fix:</b> Dedupe on <code>razorpay_payment_id</code> (unique index on <code>subscription_payments.reference</code> or explicit check inside a transaction) before activating, in both paths. <i>(Stripe path already does this correctly — <span class="ev">PaymentGatewayService.php:171-228</span>.)</i></div>
+</div>
+
+<div class="find h">
+  <div class="ttl"><span class="pill hi">High</span> <span class="id">CONC-H3</span> Subscription invoice number race with <b>no</b> unique backstop</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">SubscriptionService.php:60-69</span> reads max then +1; <code>subscription_payments.invoice_no</code> has <b>no unique constraint</b> (<span class="ev">2026_06_15_000004…:22</span>). Whole <code>activate()</code> is not in a transaction (<span class="ev">:19-57</span>).</div>
+  <div class="row"><b>Impact:</b> Two near-simultaneous activations mint the same <code>PINV-2026-NNNN</code> with zero DB protection — silent duplicate GST invoice numbers (compliance issue).</div>
+  <div class="row"><b>Fix:</b> Add unique index on <code>subscription_payments.invoice_no</code>; wrap <code>activate()</code> in <code>DB::transaction</code> with a locked counter.</div>
+</div>
+
+<div class="find h">
+  <div class="ttl"><span class="pill hi">High</span> <span class="id">CONC-H4</span> Double quotation→order &amp; double-dispatch via pre-transaction <code>exists()</code> check</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">OrderService.php:18</span> checks <code>$quotation->orders()->exists()</code> <b>before</b> the transaction; no unique on <code>orders.quotation_id</code>. Same shape for dispatch: <span class="ev">DispatchService.php:42</span> checks <code>batch_id</code> exists but only <code>dispatch_no</code> is unique.</div>
+  <div class="row"><b>Impact:</b> Two concurrent conversions → two orders (later two invoices) for one quotation; one batch dispatched twice.</div>
+  <div class="row"><b>Fix:</b> Unique index on <code>orders.quotation_id</code> and on <code>dispatches.batch_id</code>; load the parent with <code>lockForUpdate()</code> before the check.</div>
+</div>
+
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:11%">Severity</th><th style="width:42%">Finding</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>CONC-M1</td><td><span class="pill med">Medium</span></td><td>Doc numbering (invoice/quote/order/PO/run/batch) = read-max-then-+1 with no lock; unique indexes block duplicates but the loser gets an <b>unhandled 500</b> (and for invoices the whole creation rolls back) under burst load.</td><td>Locked counter row, or catch unique-violation &amp; retry the number.</td></tr>
+<tr><td>CONC-M2</td><td><span class="pill med">Medium</span></td><td>Credit-limit TOCTOU — <span class="ev">QuotationController.php:170-198</span> checks outstanding then creates order; two concurrent orders both pass → limit breached.</td><td>Re-check credit inside the order transaction after locking the customer's outstanding scope.</td></tr>
+<tr><td>CONC-M3</td><td><span class="pill med">Medium</span></td><td><code>SubscriptionService::activate()</code> and <code>BillingController::verify()</code> coupon-increment+activate are not atomic → company marked active with no payment record on partial failure.</td><td>Wrap both in <code>DB::transaction</code>.</td></tr>
+</tbody>
+</table>
+<div class="good"><b>Already solid ✓</b> Multi-row writes broadly wrapped in <code>DB::transaction</code> (invoice/order/quotation/PO/run/payment). Thoughtful unique-index layer on all ERP doc numbers. Stripe webhook is correctly lock-and-dedupe idempotent.</div>
+
+<!-- ============================ SCALE ============================ -->
+<h2>3 · Huge data / Scale <span class="em">— behaviour at hundreds of thousands of rows after years of use</span></h2>
+
+<div class="find c">
+  <div class="ttl"><span class="pill crit">Critical</span> <span class="id">SCALE-C1/C2</span> Dashboard loads all invoices + per-invoice SUM N+1 — twice — with no cache</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">ReportingService.php:148-156</span> loads every non-draft invoice (no date floor, 4-level eager load) then runs <code>PaymentTransaction::where('invoice_id',$inv->id)->sum()</code> <b>per invoice</b>; <span class="ev">DashboardService.php:219-231</span> does a second full scan + same N+1; zero <code>Cache::remember</code> (<span class="ev">DashboardController.php:16-24</span>).</div>
+  <div class="row"><b>Impact:</b> At 200k invoices = one huge hydration + ~400k queries on <b>every</b> dashboard load/poll, by every user.</div>
+  <div class="row"><b>Fix:</b> One grouped SQL aggregate for paid-per-invoice (or a denormalized <code>balance_due</code> column); compute aging in SQL; cache dashboard 60s per company; delete the duplicate method.</div>
+</div>
+
+<div class="find c">
+  <div class="ttl"><span class="pill crit">Critical</span> <span class="id">SCALE-C3</span> CSV &amp; Tally exports buffer the entire table in memory</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">ExportController.php:39-74</span> <code>->get()->map()</code> + the <code>csv()</code> helper concatenates everything into one string; <code>customers()</code> has no date filter; <code>invoices()</code> eager-loads 4 deep + sums per row. Tally builds one giant XML/CSV string (<span class="ev">ReportingService.php:629-672</span>).</div>
+  <div class="row"><b>Impact:</b> Three in-memory copies of a full table → OOM / timeout on large tenants; a fiscal-year Tally export OOMs.</div>
+  <div class="row"><b>Fix:</b> <code>StreamedResponse</code> + <code>fputcsv</code> driven by <code>lazy()</code>/<code>chunkById()</code>; queue very large exports.</div>
+</div>
+
+<table>
+<thead><tr><th style="width:11%">ID</th><th style="width:10%">Severity</th><th style="width:43%">Finding</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>SCALE-C4</td><td><span class="pill crit">Critical</span></td><td>Tally / AR / top-customers / reconcile repeat per-row <code>PaymentTransaction::sum()</code> in loops (<span class="ev">ReportingService.php:156,320,407</span>).</td><td>Single grouped aggregate keyed by <code>invoice_id</code>; stream Tally output.</td></tr>
+<tr><td>SCALE-H1</td><td><span class="pill hi">High</span></td><td>No caching anywhere on dashboard; ~25+ separate COUNT queries per load.</td><td><code>Cache::remember</code>; collapse same-table counts into one <code>groupBy('status')</code>.</td></tr>
+<tr><td>SCALE-H2</td><td><span class="pill hi">High</span></td><td><code>whereDate('col', …)</code> wraps the column in DATE() → <b>can't use the index</b> on valid_until/due_date/expected_delivery (<span class="ev">DashboardService.php:60,71,149…</span>) → full scans.</td><td>Use sargable <code>where('col','&lt;',now()->startOfDay())</code>.</td></tr>
+<tr><td>SCALE-H3</td><td><span class="pill hi">High</span></td><td>Reports (P&amp;L, balance sheet, cash-flow, sales, monthly trend, MIS) hydrate entire history to sum a few scalars in PHP; some have no date bound (<span class="ev">ReportingService.php:34-360,548-576</span>).</td><td>SQL aggregates (<code>selectRaw('SUM…')</code>, <code>groupBy(DATE_FORMAT…)</code>); hydrate zero models.</td></tr>
+<tr><td>SCALE-H4</td><td><span class="pill hi">High</span></td><td>ForecastingService: <code>PanelType::all()</code> <b>not</b> tenant-scoped (cross-tenant), ×365 days = ~18k individual INSERTs in one txn; mutates shared Carbon → wrong dates; wrong column name <code>quantity</code> vs <code>quantity_in_stock</code> (<span class="ev">ForecastingService.php:20-59,237</span>).</td><td>Scope by company; batch <code>insert()</code>; <code>$today->copy()</code>; fix column.</td></tr>
+<tr><td>SCALE-H5</td><td><span class="pill hi">High</span></td><td>Leads (<span class="ev">LeadController.php:24</span>) &amp; Production Runs (<span class="ev">ProductionRunController.php:50</span>) return <code>->get()</code> (all rows) and the Vue lists render them unbounded.</td><td>Server-side pagination; aggregate funnel counts separately.</td></tr>
+<tr><td>SCALE-H6</td><td><span class="pill hi">High</span></td><td>Missing indexes: <code>invoices.due_date</code> (hottest AR-aging filter filesorts) and <code>lead_activities.activity_date</code>.</td><td>Add <code>(company_id, due_date)</code> and <code>(company_id, activity_date)</code>.</td></tr>
+<tr><td>SCALE-M1</td><td><span class="pill med">Medium</span></td><td>Frontend stock/customer/accessory pages send no page params &amp; show no pager → rows beyond page 1 are <b>silently invisible</b>, and low-stock/expiring counts under-count (<span class="ev">CoilStock.vue:212</span> etc.). Master pickers cap at <code>per_page:100</code>.</td><td>Real pagers; server-side typeahead for dropdowns. <b>Do not</b> "fix" with per_page:9999.</td></tr>
+<tr><td>SCALE-M2</td><td><span class="pill med">Medium</span></td><td>Correctness bug: <code>accessories.code</code> has a <b>global</b> unique (<span class="ev">create_accessories_table.php:15</span>) — a second tenant can't reuse a code another tenant used (the cross-tenant fix applied to invoices/customers missed accessories).</td><td>Make it <code>(company_id, code)</code> unique.</td></tr>
+</tbody>
+</table>
+<div class="good"><b>Already solid ✓</b> Most transactional lists paginate (shared <code>paginatedResponse</code> helper). Core high-volume tables (invoices, orders, quotations, dispatches, batches, stock) carry <code>(company_id, status)</code> composite + FK indexes — the catastrophic per-tenant full-scan baseline is avoided. Single-document PDFs eager-load correctly.</div>
+
+<!-- ============================ RELIABILITY ============================ -->
+<h2>4 · Daily-operations reliability <span class="em">— all-day factory use; safety net is wired but switched off</span></h2>
+
+<div class="find c">
+  <div class="ttl"><span class="pill crit">Critical</span> <span class="id">OPS-C1</span> The production scheduler never runs → backups &amp; reminders never fire</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">Console/Kernel.php:10-38</span> schedules 4 jobs (incl. nightly DB backup 01:30), but nothing runs <code>schedule:run</code> — the container (<span class="ev">supervisord.conf</span>) runs only php-fpm + nginx. No cron, no <code>schedule:work</code>.</div>
+  <div class="row"><b>Impact:</b> The advertised <b>nightly DB backup does not exist in prod</b>; payment + SMS reminders never send. Silent total failure of every recurring task.</div>
+  <div class="row"><b>Fix:</b> Add a supervisord program running the scheduler each minute (or real cron / <code>schedule:work</code>); verify a backup file appears.</div>
+</div>
+
+<div class="find c">
+  <div class="ttl"><span class="pill crit">Critical</span> <span class="id">OPS-C2</span> Backups (even if run) are same-host, no off-site, restore never tested</div>
+  <div class="row"><b>Evidence:</b> <span class="ev">BackupDatabase.php:27</span> writes to <code>storage/app/backups</code> — same host/volume as the DB. Deploy has no pre-migrate dump; no restore procedure anywhere.</div>
+  <div class="row"><b>Impact:</b> A disk failure / bad migration / <code>git reset --hard</code> mishap loses all factory data with no recovery. Same-host copy is not a backup.</div>
+  <div class="row"><b>Fix:</b> Ship dumps off-host (S3/rsync); take a pre-<code>migrate --force</code> dump in deploy; document &amp; test a restore.</div>
+</div>
+
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:11%">Severity</th><th style="width:42%">Finding</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>OPS-H1</td><td><span class="pill hi">High</span></td><td>Slow/external work runs synchronously in web requests — no queue worker exists. WhatsApp/SMS (20s timeout each, <span class="ev">NotificationDispatchService.php:113-138</span>), email+PDF, Razorpay order-create all inline. A slow Twilio stalls order-confirm/dispatch up to ~20s.</td><td>Move to queued Jobs; run a <code>queue:work</code> process (DB driver already set).</td></tr>
+<tr><td>OPS-H2</td><td><span class="pill hi">High</span></td><td>Sanctum tokens never expire (<span class="ev">sanctum.php:53</span> = null), stored in localStorage forever → stolen token = permanent access.</td><td>Set 8–12h expiry + graceful re-login.</td></tr>
+<tr><td>OPS-H3</td><td><span class="pill hi">High</span></td><td>Notification / payment / e-Invoice failures are invisible — no delivery-status table; failures only <code>Log::error</code> and are swallowed (<span class="ev">OrderService.php:102-104</span>). Operator can't tell if customer got the WhatsApp / e-Way generated.</td><td>Persist a notification log row (status+error); surface a "failed" badge.</td></tr>
+<tr><td>OPS-H4</td><td><span class="pill hi">High</span></td><td>The audit trail logs almost nothing — the <code>Auditable</code> trait exists but <b>no model uses it</b>; only manual super-admin actions are logged. AuditLog UI filters an empty table.</td><td>Add <code>use Auditable;</code> to Order/Quotation/Invoice/Customer/Payment.</td></tr>
+<tr><td>OPS-H5</td><td><span class="pill hi">High</span></td><td>No catch-all exception renderer — only 401/422 are shaped (<span class="ev">bootstrap/app.php:21-52</span>); any other throw returns a bare <code>{"message":"Server Error"}</code> 500 with <code>APP_DEBUG=false</code>. (This is the "Server Error" the panel-type bug showed.)</td><td>Add a <code>render(Throwable…)</code> returning the standard envelope + safe message + log id.</td></tr>
+<tr><td>OPS-M1</td><td><span class="pill med">Medium</span></td><td><code>migrate --force</code> on prod with no pre-backup; MySQL DDL isn't transactional → a mid-migration failure leaves a half-migrated schema with no rollback.</td><td>Pre-migrate dump; keep migrations idempotent (already using <code>hasColumn</code> — good).</td></tr>
+<tr><td>OPS-M2</td><td><span class="pill med">Medium</span></td><td>SoftDeletes trap live — <span class="ev">BaseModel.php:11</span> forces SoftDeletes on 23 models; any without <code>deleted_at</code> throws 500 on every query (pairs with OPS-H5 to produce an opaque 500).</td><td>Ensure every BaseModel migration has <code>softDeletes()</code>, or split a non-soft base class.</td></tr>
+<tr><td>OPS-M3</td><td><span class="pill med">Medium</span></td><td><code>/api/health</code> doesn't check DB connectivity — stays "healthy" even if MySQL is down, so deploy passes while the app 500s. No error tracker (Sentry), no alerting.</td><td>Make health ping the DB; add Sentry + uptime alerting.</td></tr>
+<tr><td>OPS-M4</td><td><span class="pill med">Medium</span></td><td>No <code>config:cache</code>/<code>route:cache</code> at container start (skipped because env injected at runtime) → config/routes re-parsed every request. (OPcache is on — good.)</td><td>Run config/route cache in an entrypoint after env is present.</td></tr>
+<tr><td>OPS-L1</td><td><span class="pill low">Low</span></td><td>Unsaved-changes guard only on QuotationCreate; a 401 wipes token immediately → other long forms lose data on mid-edit auth failure (rare today since tokens don't expire).</td><td>Add dirty-guard to order/invoice/BOQ forms.</td></tr>
+</tbody>
+</table>
+<div class="good"><b>Already solid ✓</b> Health-gated rolling deploy that verifies from outside + serializes concurrency; OPcache enabled; signature-verified idempotent payment webhooks; real tenant isolation; clean field-specific validation/auth error envelopes; log rotation configured.</div>
+
+<!-- ============================ FIX-RISK FILTER ============================ -->
+<h2>Fix-risk filter <span class="em">— how much each fix can disturb the running system</span></h2>
+<div class="lead" style="margin-top:8px;">
+<b>How to read this:</b> severity = how bad the problem is; <b>fix-risk = how likely the <i>fix</i> is to break something that currently works.</b>
+🟢 <b>Easy/Safe</b> = additive or mechanical, no behavior change — ship freely. 🟡 <b>Moderate</b> = focused change, small blast radius, needs testing. 🔴 <b>Hard/Risky</b> = touches a core/live flow (money, inventory, infra, auth) — real chance of regression, test hard + have rollback.
+<br><b>Tip:</b> Easy ≠ unimportant — several Easy fixes are also Critical/High. Bank all the 🟢 first (safe wins), then schedule 🟡, treat 🔴 as projects.
+</div>
+
+<div class="legend">
+  <span class="pill ok">🟢 Easy / Safe&nbsp; 14</span>
+  <span class="pill med">🟡 Moderate&nbsp; 18</span>
+  <span class="pill crit">🔴 Hard / Risky&nbsp; 6</span>
+</div>
+
+<h3>🟢 Easy / Safe — won't disturb the system (do these first)</h3>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:11%">Severity</th><th style="width:42%">Fix</th><th>Why it's safe</th></tr></thead>
+<tbody>
+<tr><td>SEC-H1</td><td><span class="pill hi">High</span></td><td>Remove OTP-code <code>Log::info</code> line; gate dev fallback to local.</td><td>Deleting a log line changes no behavior.</td></tr>
+<tr><td>SEC-M1</td><td><span class="pill med">Medium</span></td><td>Add <code>makeHidden('unit_cost')</code> on the 3 stock detail endpoints.</td><td>Mirrors logic already in the list endpoints.</td></tr>
+<tr><td>SEC-M2</td><td><span class="pill med">Medium</span></td><td>Delete the <code>/admin/_schema</code> dump route + method.</td><td>Removing an unused debug endpoint.</td></tr>
+<tr><td>SEC-M3</td><td><span class="pill med">Medium</span></td><td>Add <code>super.admin</code> middleware on the admin route group.</td><td>Pure defense-in-depth; every method already self-guards, so no current route changes behavior.</td></tr>
+<tr><td>SCALE-H1</td><td><span class="pill hi">High</span></td><td>Wrap dashboard in <code>Cache::remember(...,60,...)</code>.</td><td>Only effect = up to 60s stale numbers; instant relief.</td></tr>
+<tr><td>SCALE-H2</td><td><span class="pill hi">High</span></td><td>Swap <code>whereDate('c',…)</code> → <code>where('c','&lt;',now()->startOfDay())</code>.</td><td>Same result set, just index-usable. Mechanical.</td></tr>
+<tr><td>SCALE-H6</td><td><span class="pill hi">High</span></td><td>Add indexes: <code>(company_id,due_date)</code>, <code>(company_id,activity_date)</code>.</td><td>Adding an index never changes results, only speed.</td></tr>
+<tr><td>SCALE-H4a</td><td><span class="pill hi">High</span></td><td>Forecasting: scope <code>PanelType</code> by company + fix <code>quantity</code>→<code>quantity_in_stock</code> column.</td><td>Bug fixes; current output is already wrong/crashing.</td></tr>
+<tr><td>OPS-H4</td><td><span class="pill hi">High</span></td><td>Add <code>use Auditable;</code> to Order/Quotation/Invoice/Customer/Payment.</td><td>Additive write-logging; doesn't alter business logic.</td></tr>
+<tr><td>OPS-H5</td><td><span class="pill hi">High</span></td><td>Add a catch-all <code>render(Throwable)</code> JSON envelope.</td><td>Turns a bare 500 into a clean message — strictly better.</td></tr>
+<tr><td>OPS-M1</td><td><span class="pill med">Medium</span></td><td>Add a pre-<code>migrate --force</code> DB dump step in deploy.</td><td>Extra safety step; adds nothing to runtime.</td></tr>
+<tr><td>OPS-M3</td><td><span class="pill med">Medium</span></td><td>Make <code>/api/health</code> ping the DB.</td><td>One query added to a tiny endpoint.</td></tr>
+<tr><td>OPS-L1</td><td><span class="pill low">Low</span></td><td>Add unsaved-changes dirty guard to order/invoice/BOQ forms.</td><td>Frontend-only safety prompt.</td></tr>
+<tr><td>CONC-M3</td><td><span class="pill med">Medium</span></td><td>Wrap <code>SubscriptionService::activate()</code> in <code>DB::transaction</code>.</td><td>Adds atomicity; same writes, just all-or-nothing.</td></tr>
+</tbody>
+</table>
+
+<h3>🟡 Moderate — focused change, test before ship</h3>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:11%">Severity</th><th style="width:42%">Fix</th><th>Watch out for</th></tr></thead>
+<tbody>
+<tr><td>SEC-C1</td><td><span class="pill crit">Critical</span></td><td>Billing verify re-fetches order from Razorpay; derive plan/amount server-side.</td><td>Isolated to <code>verify()</code>, but it's the money path — test the full pay→activate flow.</td></tr>
+<tr><td>SEC-H2</td><td><span class="pill hi">High</span></td><td>OTP attempt counter + per-email throttle.</td><td>Don't lock out legitimate retries; tune the limit.</td></tr>
+<tr><td>SEC-M4</td><td><span class="pill med">Medium</span></td><td>Email verification before trial activates + signup limits.</td><td>Adds a step to onboarding funnel — keep it smooth.</td></tr>
+<tr><td>CONC-H2</td><td><span class="pill hi">High</span></td><td>Razorpay idempotency: dedupe on <code>payment_id</code> + unique index.</td><td>Additive guard; verify webhook + verify paths still activate once.</td></tr>
+<tr><td>CONC-H3</td><td><span class="pill hi">High</span></td><td>Unique index on <code>subscription_payments.invoice_no</code> + locked counter.</td><td><b>Migration fails if duplicate data already exists</b> — dedupe rows first.</td></tr>
+<tr><td>CONC-H4</td><td><span class="pill hi">High</span></td><td>Unique index on <code>orders.quotation_id</code> &amp; <code>dispatches.batch_id</code>.</td><td>Same — <b>check/clean existing duplicates before adding the constraint</b>, else deploy migration errors.</td></tr>
+<tr><td>CONC-M1</td><td><span class="pill med">Medium</span></td><td>Catch unique-violation on numbering &amp; retry next number.</td><td>Ensure retry loop is bounded.</td></tr>
+<tr><td>SCALE-C1/C2</td><td><span class="pill crit">Critical</span></td><td>Replace dashboard N+1 with one grouped SQL aggregate.</td><td><b>Numbers must match the old output exactly</b> — diff before/after on real data.</td></tr>
+<tr><td>SCALE-C3</td><td><span class="pill crit">Critical</span></td><td>Stream CSV/Tally via <code>fputcsv</code> + <code>lazy()</code>.</td><td>Isolated endpoints; verify exported file is byte-equal.</td></tr>
+<tr><td>SCALE-C4</td><td><span class="pill crit">Critical</span></td><td>Grouped aggregate for AR/top-customers/reconcile sums.</td><td>Verify totals match.</td></tr>
+<tr><td>SCALE-H3</td><td><span class="pill hi">High</span></td><td>Push P&amp;L / balance-sheet / sales / MIS sums into SQL.</td><td>Financial numbers — reconcile against current values.</td></tr>
+<tr><td>SCALE-H4b</td><td><span class="pill hi">High</span></td><td>Batch forecasting INSERTs; <code>$today->copy()</code>.</td><td>Verify generated dates/rows unchanged.</td></tr>
+<tr><td>SCALE-H5</td><td><span class="pill hi">High</span></td><td>Paginate Leads &amp; Production Runs (server-side).</td><td>Move funnel/summary counts to a separate aggregate so they don't shrink to one page.</td></tr>
+<tr><td>SCALE-M1</td><td><span class="pill med">Medium</span></td><td>Add real pagers to stock/customer/accessory frontend pages.</td><td>Currently hides page 2+ data — fixing reveals it; check low-stock counts.</td></tr>
+<tr><td>SCALE-M2</td><td><span class="pill med">Medium</span></td><td>Change <code>accessories.code</code> unique → <code>(company_id,code)</code>.</td><td>Migration alters a unique index — safe re data (relaxing), but test create flow.</td></tr>
+<tr><td>OPS-C1</td><td><span class="pill crit">Critical</span></td><td>Run the scheduler (supervisord program / cron).</td><td>Container/supervisord change + rebuild — additive (won't break running features), but verify a backup file actually appears.</td></tr>
+<tr><td>OPS-C2</td><td><span class="pill crit">Critical</span></td><td>Ship backups off-host (S3/rsync) + test a restore.</td><td>Additive; low runtime disturbance.</td></tr>
+<tr><td>OPS-H3</td><td><span class="pill hi">High</span></td><td>Notification/e-Invoice delivery-status log + UI badge.</td><td>New table + UI; additive.</td></tr>
+<tr><td>OPS-M2</td><td><span class="pill med">Medium</span></td><td>Ensure every BaseModel table has <code>deleted_at</code> (or split base class).</td><td>Structural — audit all 23 models.</td></tr>
+</tbody>
+</table>
+
+<h3>🔴 Hard / Risky — can disturb the live system; treat as projects</h3>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:11%">Severity</th><th style="width:42%">Fix</th><th>Why it's risky</th></tr></thead>
+<tbody>
+<tr><td>CONC-H1</td><td><span class="pill hi">High</span></td><td>Add <code>lockForUpdate</code> (or atomic conditional UPDATE) to all stock mutations.</td><td>Changes locking on the hottest inventory path — <b>deadlock risk</b>, throughput impact; must test under concurrency.</td></tr>
+<tr><td>CONC-M2</td><td><span class="pill med">Medium</span></td><td>Lock customer outstanding scope for credit-limit recheck.</td><td>Same locking-on-hot-path concern; can serialize order creation.</td></tr>
+<tr><td>SEC-H3</td><td><span class="pill hi">High</span></td><td>Terminate TLS, force HTTPS, secure cookies.</td><td>Infra change — a cert/redirect misconfig can <b>lock everyone out</b>; needs domain + careful rollout.</td></tr>
+<tr><td>OPS-H1</td><td><span class="pill hi">High</span></td><td>Move WhatsApp/email/PDF/gateway to queued Jobs + run a worker.</td><td>Sync→async is a behavior change; <b>if the worker stops, things silently don't send</b> — needs monitoring + retries.</td></tr>
+<tr><td>OPS-H2</td><td><span class="pill hi">High</span></td><td>Set Sanctum token expiry (8–12h) + refresh/re-login.</td><td>Can <b>log users out mid-shift</b> and lose unsaved work unless paired with refresh + dirty-guard (OPS-L1).</td></tr>
+<tr><td>OPS-M4</td><td><span class="pill med">Medium</span></td><td><code>config:cache</code>/<code>route:cache</code> at container start.</td><td>Was deliberately skipped because env is injected at runtime — <b>caching the wrong env breaks the app</b>; needs an entrypoint ordered after env load.</td></tr>
+</tbody>
+</table>
+
+<!-- ============================ ROADMAP ============================ -->
+<h2>Recommended fix order</h2>
+<table>
+<thead><tr><th style="width:14%">Phase</th><th style="width:50%">Do</th><th>Why first</th></tr></thead>
+<tbody>
+<tr><td><b>P0 — this week</b></td><td>OPS-C1/C2 (scheduler + off-site backups), SEC-C1 (billing verify), SEC-H1/H2 (OTP log + lockout), CONC-H2 (Razorpay idempotency).</td><td>Data-loss &amp; money/security holes. Cheap, high-stakes.</td></tr>
+<tr><td><b>P1 — before scale / ads</b></td><td>SCALE-C1/C2/C3/C4 (dashboard aggregates + cache, streamed exports), CONC-H1/H3/H4 (stock lock + the 3 missing unique indexes), SEC-H3 (TLS), OPS-H1 (queue worker).</td><td>Break the moment data grows or users go concurrent.</td></tr>
+<tr><td><b>P2 — hardening</b></td><td>SCALE-H2/H3/H4/H5/H6 + M1/M2, OPS-H3/H4/H5 (visibility, audit, error envelope), SEC-M1–M4, CONC-M1–M3.</td><td>Correctness, observability, polish.</td></tr>
+<tr><td><b>P3 — nice-to-have</b></td><td>OPS-M3/M4 (DB health, config cache), OPS-L1, virtualization.</td><td>Performance &amp; resilience margins.</td></tr>
+</tbody>
+</table>
+
+<div class="lead" style="margin-top:18px;">
+<b>Bottom line:</b> No re-architecture needed. The foundations a SaaS ERP must get right — tenant isolation, transactions, indexing, deploy safety — are already in place. What's missing is the <b>operational + integrity layer on top</b>: turn on the scheduler with real off-site backups, close the billing-verify hole, add row-locking where money &amp; stock change hands, and push the dashboard/report/export work into SQL with a cache. The seven P0/P1 criticals are days of focused work, not weeks.
+</div>
+
+<div class="foot">PanelOS System Audit · read-only, code-grounded · 7 Critical · 16 High · 13 Medium · 6 Low · no files changed</div>
+</div>
+</body>
+</html>

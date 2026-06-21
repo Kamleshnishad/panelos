@@ -18,6 +18,8 @@ class SubscriptionService
      */
     public function activate(Company $company, string $plan, int $months = 1, string $method = 'manual', ?string $reference = null, bool $record = true, ?int $byUserId = null, ?float $totalOverride = null): Company
     {
+        // Atomic: company state + payment record must both land, or neither (CONC-M3).
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($company, $plan, $months, $method, $reference, $record, $byUserId, $totalOverride) {
         $base = ($company->subscription_ends_at && $company->subscription_ends_at->isFuture())
             ? $company->subscription_ends_at : now();
         $periodStart = $base->copy();
@@ -54,6 +56,7 @@ class SubscriptionService
         }
 
         return $company->fresh();
+        });
     }
 
     /** Sequential platform subscription-invoice number, e.g. PINV-2026-0001. */
