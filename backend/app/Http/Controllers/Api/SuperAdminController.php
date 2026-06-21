@@ -258,10 +258,10 @@ class SuperAdminController extends Controller
         );
         $out = [];
         foreach ($rows as $x) {
-            $t = $x->t ?? $x->T; $c = $x->c ?? $x->C;
-            $out[$t][$c] = [
-                'type' => $x->ty ?? $x->TY, 'null' => $x->n ?? $x->N,
-                'default' => $x->d ?? $x->D, 'extra' => $x->e ?? $x->E,
+            $x = (array) $x;                       // normalise; MySQL may upper/lower-case keys
+            $x = array_change_key_case($x, CASE_LOWER);
+            $out[$x['t']][$x['c']] = [
+                'type' => $x['ty'], 'null' => $x['n'], 'default' => $x['d'], 'extra' => $x['e'],
             ];
         }
         return $this->successResponse($out, 'Schema dump');
