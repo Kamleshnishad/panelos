@@ -35,10 +35,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (ValidationException $e, $request) {
             if ($request->expectsJson()) {
+                // Surface the FIRST specific field error as the message so every
+                // form shows the real reason (not a generic "Validation failed").
+                $first = collect($e->errors())->flatten()->first();
                 return response()->json([
                     'success' => false,
                     'errors' => $e->errors(),
-                    'message' => 'Validation failed',
+                    'message' => $first ?: 'Validation failed',
                     'error_code' => 'VALIDATION_ERROR',
                     'meta' => [
                         'timestamp' => now()->toIso8601String(),

@@ -39,6 +39,14 @@ class CompanyController extends Controller
                 return $this->errorResponse([], 'Only company admins can edit company settings', 'FORBIDDEN', 403);
             }
 
+            // Normalise: trim strings and turn blanks into null so optional
+            // fields never trip "nullable" rules across environments.
+            $clean = collect($request->all())->map(function ($v) {
+                if (is_string($v)) { $v = trim($v); return $v === '' ? null : $v; }
+                return $v;
+            })->all();
+            $request->merge($clean);
+
             $validated = $request->validate([
                 'name'                 => 'required|string|max:255',
                 'gstin'                => 'nullable|string|max:20',
