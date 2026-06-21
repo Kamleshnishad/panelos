@@ -26,6 +26,9 @@ class PanelTypeController extends Controller
     {
         $companyId = auth()->user()->company_id;
 
+        // Normalise category to lowercase so 'Wall' etc. never trip the enum.
+        if ($request->filled('category')) $request->merge(['category' => strtolower($request->input('category'))]);
+
         $validated = $request->validate([
             'name'                  => 'required|string|max:100',
             'code'                  => ['required', 'string', 'max:20', Rule::unique('panel_types', 'code')->where('company_id', $companyId)],
@@ -37,29 +40,39 @@ class PanelTypeController extends Controller
             'available_thicknesses.*' => 'integer|min:20|max:300',
         ]);
 
-        $pt = PanelType::create([
-            'company_id'            => $companyId,
-            'name'                  => $validated['name'],
-            'code'                  => strtoupper($validated['code']),
-            'category'              => $validated['category'],
-            'hsn_code'              => $validated['hsn_code'] ?? '39259010',
-            'description'           => $validated['description'] ?? null,
-            'base_price'            => $validated['base_price'],
-            'available_thicknesses' => $validated['available_thicknesses'] ?? null,
-            'thickness'             => $validated['available_thicknesses'][0] ?? 50,
-            'width'                 => 1000,
-            'length'                => 3000,
-            'thermal_resistance'    => 2.5,
-            'is_active'             => true,
-        ]);
+        try {
+            $pt = PanelType::create([
+                'company_id'            => $companyId,
+                'name'                  => $validated['name'],
+                'code'                  => strtoupper($validated['code']),
+                'category'              => $validated['category'],
+                'hsn_code'              => $validated['hsn_code'] ?? '39259010',
+                'description'           => $validated['description'] ?? null,
+                'base_price'            => $validated['base_price'],
+                'available_thicknesses' => $validated['available_thicknesses'] ?? null,
+                'thickness'             => $validated['available_thicknesses'][0] ?? 50,
+                'width'                 => 1000,
+                'length'                => 3000,
+                'thermal_resistance'    => 2.5,
+                'is_active'             => true,
+            ]);
 
-        return response()->json(['success' => true, 'data' => $pt], 201);
+            return response()->json(['success' => true, 'data' => $pt], 201);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not save panel type: ' . $e->getMessage(),
+                'error_code' => 'PANEL_TYPE_ERROR',
+            ], 400);
+        }
     }
 
     public function update(Request $request, $id)
     {
         $companyId = auth()->user()->company_id;
         $pt = PanelType::where('company_id', $companyId)->findOrFail($id);
+
+        if ($request->filled('category')) $request->merge(['category' => strtolower($request->input('category'))]);
 
         $validated = $request->validate([
             'name'                  => 'sometimes|required|string|max:100',
@@ -73,8 +86,16 @@ class PanelTypeController extends Controller
             'is_active'             => 'sometimes|boolean',
         ]);
 
-        $pt->update($validated);
-        return response()->json(['success' => true, 'data' => $pt->fresh()]);
+        try {
+            $pt->update($validated);
+            return response()->json(['success' => true, 'data' => $pt->fresh()]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not update panel type: ' . $e->getMessage(),
+                'error_code' => 'PANEL_TYPE_ERROR',
+            ], 400);
+        }
     }
 
     public function destroy(Request $request, $id)
