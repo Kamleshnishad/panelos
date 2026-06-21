@@ -31,7 +31,7 @@ class InvoiceService
 
     public function createFromDispatch($dispatchId, $data = [], $companyId = null)
     {
-        return DB::transaction(function () use ($dispatchId, $data, $companyId) {
+        return \App\Support\DocNumber::retry(fn () => DB::transaction(function () use ($dispatchId, $data, $companyId) {
             $companyId = $companyId ?? auth()->user()->company_id;
 
             $dispatch = Dispatch::where('company_id', $companyId)
@@ -84,12 +84,12 @@ class InvoiceService
             // Apply tax then persist total_amount/tax_amount so accessors and PDFs don't drift
             $this->taxService->applyTaxToInvoice($invoice->id, $companyId);
             return $this->persistTotals($invoice);
-        });
+        }));
     }
 
     public function createFromOrder($orderId, $data = [], $companyId = null)
     {
-        return DB::transaction(function () use ($orderId, $data, $companyId) {
+        return \App\Support\DocNumber::retry(fn () => DB::transaction(function () use ($orderId, $data, $companyId) {
             $companyId = $companyId ?? auth()->user()->company_id;
 
             $order = Order::where('company_id', $companyId)
@@ -136,7 +136,7 @@ class InvoiceService
             // Apply tax then persist total_amount/tax_amount so accessors and PDFs don't drift
             $this->taxService->applyTaxToInvoice($invoice->id, $companyId);
             return $this->persistTotals($invoice);
-        });
+        }));
     }
 
     public function addItem($invoiceId, $panelTypeId, $quantity, $unitPrice, $companyId = null)

@@ -19,7 +19,7 @@ class OrderService
             throw new \Exception('An order already exists for this quotation.');
         }
 
-        return DB::transaction(function () use ($quotation) {
+        return \App\Support\DocNumber::retry(fn () => DB::transaction(function () use ($quotation) {
             $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer');
 
             $order = Order::create([
@@ -104,7 +104,7 @@ class OrderService
             } catch (\Throwable) {}
 
             return $loaded;
-        });
+        }));
     }
 
     public function update(Order $order, array $data): Order

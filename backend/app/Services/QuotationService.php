@@ -36,7 +36,7 @@ class QuotationService
 
     public function create(array $data): Quotation
     {
-        return DB::transaction(function () use ($data) {
+        return \App\Support\DocNumber::retry(fn () => DB::transaction(function () use ($data) {
             $companyId = $data['company_id'];
             $company   = Company::findOrFail($companyId);
             $customer  = Customer::where('company_id', $companyId)->findOrFail($data['customer_id']);
@@ -84,7 +84,7 @@ class QuotationService
             }
 
             return $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer');
-        });
+        }));
     }
 
     // ── Update ────────────────────────────────────────────────────────────
