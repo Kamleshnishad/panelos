@@ -24,8 +24,9 @@ class ForecastingService
                 ? PanelType::where('id', $panelTypeId)->get()
                 : PanelType::where('company_id', $companyId)->get();
 
-            $forecasts = [];
             $today = now();
+            $nowTs = $today->toDateTimeString();
+            $rows  = [];
 
             foreach ($panelTypes as $panelType) {
                 $historicalData = $this->getHistoricalSalesData($companyId, $panelType->id, 90);
@@ -35,26 +36,31 @@ class ForecastingService
                 }
 
                 for ($i = 1; $i <= $daysAhead; $i++) {
-                    $forecastDate = $today->copy()->addDays($i);
                     $prediction = $this->predictUsingMovingAverage($historicalData, $i);
 
-                    $forecast = InventoryForecast::create([
+                    $rows[] = [
                         'company_id' => $companyId,
                         'panel_type_id' => $panelType->id,
-                        'forecast_date' => $today,
-                        'forecast_for_date' => $forecastDate,
+                        'forecast_date' => $today->toDateString(),
+                        'forecast_for_date' => $today->copy()->addDays($i)->toDateString(),
                         'predicted_quantity' => $prediction['quantity'],
                         'forecast_type' => 'moderate',
                         'confidence_score' => $prediction['confidence'],
                         'method' => 'moving_average',
-                        'notes' => 'Auto-generated forecast'
-                    ]);
-
-                    $forecasts[] = $forecast;
+                        'notes' => 'Auto-generated forecast',
+                        'created_at' => $nowTs,
+                        'updated_at' => $nowTs,
+                    ];
                 }
             }
 
-            return $forecasts;
+            // One bulk insert (chunked) instead of up to daysAhead×panelTypes
+            // individual INSERTs in the transaction (SCALE-H4b).
+            foreach (array_chunk($rows, 500) as $chunk) {
+                InventoryForecast::insert($chunk);
+            }
+
+            return $rows;
         });
     }
 
