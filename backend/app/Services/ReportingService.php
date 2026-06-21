@@ -362,20 +362,19 @@ class ReportingService
         $start = now()->copy()->subMonths($months - 1)->startOfMonth();
 
         // Invoiced per month (by invoice_date, non-draft/cancelled)
+        // Grouped in SQL (was: load every row then groupBy in PHP) — SCALE-H3. Same sums.
         $invoiced = Invoice::where('company_id', $companyId)
             ->whereNotIn('status', ['draft', 'cancelled'])
             ->where('invoice_date', '>=', $start)
-            ->get()
-            ->groupBy(fn ($inv) => $inv->invoice_date->format('Y-m'))
-            ->map(fn ($g) => $g->sum('total_amount'));
+            ->selectRaw("DATE_FORMAT(invoice_date, '%Y-%m') as k, SUM(total_amount) as t")
+            ->groupBy('k')->pluck('t', 'k');
 
         // Collected per month (by payment date, excluding write-offs)
         $collected = PaymentTransaction::where('company_id', $companyId)
             ->where('transaction_date', '>=', $start)
             ->where('payment_method', '!=', 'write_off')
-            ->get()
-            ->groupBy(fn ($p) => \Carbon\Carbon::parse($p->transaction_date)->format('Y-m'))
-            ->map(fn ($g) => $g->sum('amount'));
+            ->selectRaw("DATE_FORMAT(transaction_date, '%Y-%m') as k, SUM(amount) as a")
+            ->groupBy('k')->pluck('a', 'k');
 
         $series = [];
         for ($i = 0; $i < $months; $i++) {
@@ -586,15 +585,16 @@ class ReportingService
             }
         }
 
-        // Orders
-        $orders = Order::where('company_id', $companyId)
-            ->whereBetween('created_at', [$from, $to])->get();
+        // Orders / runs aggregated in SQL (were loaded as full collections just to
+        // count / sum) — SCALE-H3. Identical results.
+        $ordersCount = Order::where('company_id', $companyId)
+            ->whereBetween('created_at', [$from, $to])->count();
 
-        // Production runs completed in period
-        $runs = ProductionRun::where('company_id', $companyId)
+        $runsQuery = ProductionRun::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->whereBetween('completed_at', [$from, $to])->get();
-        $sqmProduced = round((float) $runs->sum('planned_sqm'), 2);
+            ->whereBetween('completed_at', [$from, $to]);
+        $runsCount   = (clone $runsQuery)->count();
+        $sqmProduced = round((float) (clone $runsQuery)->sum('planned_sqm'), 2);
 
         // Monthly invoice breakdown
         $monthly = $invoices->groupBy(fn ($i) => $i->invoice_date->format('Y-m'))
@@ -633,8 +633,8 @@ class ReportingService
                 'igst' => round($igst, 2),
                 'total'=> round($cgst + $sgst + $igst, 2),
             ],
-            'orders'     => ['count' => $orders->count()],
-            'production' => ['runs' => $runs->count(), 'sqm_produced' => $sqmProduced],
+            'orders'     => ['count' => $ordersCount],
+            'production' => ['runs' => $runsCount, 'sqm_produced' => $sqmProduced],
             'aging'      => array_map(fn ($v) => round($v, 2), $aging),
             'monthly'    => $monthly,
         ];
