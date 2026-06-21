@@ -197,6 +197,10 @@ jobs:
             docker exec panelos_backend php artisan migrate --force
 
             echo ""
+            echo "▸ Verifying DB schema against committed baseline"
+            docker exec panelos_backend php artisan schema:check
+
+            echo ""
             echo "▸ Container status"
             docker compose -f docker-compose.prod.yml ps
 
