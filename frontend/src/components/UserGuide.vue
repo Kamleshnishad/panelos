@@ -562,7 +562,7 @@ const sections = [
 .ug-link.on { background: var(--primary-tint); color: var(--primary); font-weight: 600; }
 
 .ug-content { flex: 1; min-width: 0; }
-.ug-hero { background: linear-gradient(135deg, #1a237e, #3d5af1); color: #fff; border-radius: 14px; padding: 24px 28px; margin-bottom: 22px; scroll-margin-top: 16px; }
+.ug-hero { background: linear-gradient(135deg, var(--primary), var(--primary)); color: #fff; border-radius: 14px; padding: 24px 28px; margin-bottom: 22px; scroll-margin-top: 16px; }
 .ug-hero h2 { margin: 0 0 6px; font-size: 22px; }
 .ug-hero p { margin: 0 0 12px; font-size: 13.5px; opacity: .92; line-height: 1.6; }
 .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }

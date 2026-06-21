@@ -220,7 +220,7 @@ async function submitOtp() {
   position: relative; overflow: hidden; color: #fff; padding: 38px 48px;
   display: flex; flex-direction: column;
   background: radial-gradient(900px 500px at 15% -10%, #2a35a0 0%, transparent 55%),
-              linear-gradient(135deg, var(--brand-900, #1a237e) 0%, var(--brand-ink, #0d1333) 100%);
+              linear-gradient(135deg, var(--brand-900, var(--primary)) 0%, var(--brand-ink, var(--brand-ink)) 100%);
 }
 .hero-brand { display: flex; align-items: center; gap: 12px; }
 .hero-mark { width: 44px; height: 44px; border-radius: 13px; background: linear-gradient(135deg, #4863e0, #2a35a0); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
@@ -242,8 +242,8 @@ async function submitOtp() {
 .auth-form { width: 100%; max-width: 400px; }
 
 .form-brand { display: none; align-items: center; gap: 9px; margin-bottom: 24px; }
-.fb-mark { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--brand-700, #283593), var(--brand-900, #1a237e)); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; }
-.form-brand span { font-size: 17px; font-weight: 800; color: var(--brand-900, #1a237e); }
+.fb-mark { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--brand-700, #283593), var(--brand-900, var(--primary))); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+.form-brand span { font-size: 17px; font-weight: 800; color: var(--brand-900, var(--primary)); }
 
 h2 { margin: 0 0 6px; font-size: 25px; color: var(--text, #15181E); letter-spacing: -.01em; }
 .muted { color: var(--text-3, #8a93a0); font-size: 13.5px; margin: 0 0 26px; line-height: 1.5; }
@@ -251,13 +251,13 @@ h2 { margin: 0 0 6px; font-size: 25px; color: var(--text, #15181E); letter-spaci
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .field label { font-size: 11px; font-weight: 700; color: var(--text-2, #5b6472); text-transform: uppercase; letter-spacing: .5px; }
 .field input { padding: 12px 14px; border: 1px solid var(--border-2, #d9dee6); border-radius: var(--r, 9px); font-size: 14px; transition: all .15s; background: var(--surface-2, #f7f9fc); }
-.field input:focus { outline: none; border-color: var(--brand-500, #3d5af1); box-shadow: 0 0 0 3px var(--brand-50, #eef1fe); background: #fff; }
+.field input:focus { outline: none; border-color: var(--brand-500, var(--primary)); box-shadow: 0 0 0 3px var(--brand-50, #eef1fe); background: #fff; }
 
 .error-msg { background: var(--danger-bg, #ffebee); border: 1px solid var(--danger-bd, #ef9a9a); color: var(--danger, #c62828); padding: 10px 14px; border-radius: var(--r-sm, 7px); font-size: 13px; margin-bottom: 15px; }
 
 .btn-login {
   width: 100%; padding: 13px; color: #fff; border: none; border-radius: var(--r, 9px);
-  background: linear-gradient(135deg, var(--brand-700, #283593), var(--brand-900, #1a237e));
+  background: linear-gradient(135deg, var(--brand-700, #283593), var(--brand-900, var(--primary)));
   font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(26,35,126,.25);
   transition: transform .15s, box-shadow .15s, opacity .15s;
 }

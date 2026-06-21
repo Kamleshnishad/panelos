@@ -113,6 +113,18 @@ a { color: var(--primary); }
 
 :focus-visible { outline: 2px solid var(--brand-400); outline-offset: 2px; border-radius: 4px; }
 
+/* ----------------------------------------------------------------
+   Global interaction polish — additive, low-specificity so any
+   component's own rules win. Improves the whole app at once:
+   pointer cursor on controls, no 300ms tap delay, no blue tap flash,
+   disabled affordance, smooth in-page scroll, image safety.
+   ---------------------------------------------------------------- */
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a, summary, label[for], select { cursor: pointer; }
+button, a, [role="button"], input, select, textarea { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+button:disabled, [disabled], [aria-disabled="true"] { cursor: not-allowed; }
+img { max-width: 100%; }
+html { scroll-behavior: smooth; }
+
 * { scrollbar-width: thin; scrollbar-color: #cbd3e0 transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb { background: #cbd3e0; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
@@ -122,7 +134,8 @@ a { color: var(--primary); }
 ::selection { background: var(--primary-tint); color: var(--primary-hover); }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
 
 /* ============================================================

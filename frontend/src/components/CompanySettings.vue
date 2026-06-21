@@ -38,7 +38,7 @@
             <label>Primary Color</label>
             <div class="color-row">
               <input type="color" v-model="form.primary_color" :disabled="!canEdit" />
-              <input v-model="form.primary_color" :disabled="!canEdit" placeholder="#1a237e" />
+              <input v-model="form.primary_color" :disabled="!canEdit" placeholder="#2B50E0" />
             </div>
           </div>
           <div class="form-group">
@@ -144,8 +144,8 @@ async function load() {
     fields.forEach(k => { f[k] = c[k] ?? (k === 'financial_year_start' ? 4 : '') })
     f.e_invoice_applicable = !!c.e_invoice_applicable
     f.tcs_applicable       = !!c.tcs_applicable
-    f.primary_color        = c.primary_color || '#1a237e'
-    f.secondary_color      = c.secondary_color || '#3949ab'
+    f.primary_color        = c.primary_color || '#2B50E0'
+    f.secondary_color      = c.secondary_color || '#2140C0'
     form.value  = f
     logoUrl.value = c.logo_url ?? null
   } catch (e) {

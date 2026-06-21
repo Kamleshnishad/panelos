@@ -89,29 +89,29 @@ onMounted(loadStatus)
 
 <style scoped>
 .sg-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
-  background: linear-gradient(135deg, #1a237e 0%, #0d1333 100%); }
+  background: linear-gradient(135deg, var(--primary) 0%, var(--brand-ink) 100%); }
 .sg-card { background: #fff; border-radius: 18px; padding: 40px; max-width: 780px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
 .sg-icon { font-size: 44px; margin-bottom: 8px; }
-.sg-card h2 { margin: 0 0 8px; font-size: 24px; color: #1a237e; }
+.sg-card h2 { margin: 0 0 8px; font-size: 24px; color: var(--primary); }
 .sg-msg { color: #555; font-size: 14px; margin-bottom: 22px; }
 .sg-err { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
 
 .sg-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
 .sg-plan { border: 1px solid #e2e6ec; border-radius: 12px; padding: 18px 16px; text-align: left; display: flex; flex-direction: column; }
-.sg-plan.featured { border-color: #1a237e; box-shadow: 0 4px 16px rgba(26,35,126,.12); }
-.sg-plan-name { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #1a237e; }
+.sg-plan.featured { border-color: var(--primary); box-shadow: 0 4px 16px rgba(26,35,126,.12); }
+.sg-plan-name { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--primary); }
 .sg-plan-price { font-size: 26px; font-weight: 800; color: #15181E; margin: 6px 0 10px; }
 .sg-plan-price span { font-size: 13px; font-weight: 500; color: #888; }
 .sg-plan ul { margin: 0 0 14px; padding-left: 18px; flex: 1; }
 .sg-plan li { font-size: 12.5px; color: #444; margin: 4px 0; }
-.sg-pay { width: 100%; padding: 9px; background: #1a237e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.sg-pay { width: 100%; padding: 9px; background: var(--primary); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
 .sg-pay:disabled { opacity: .6; cursor: not-allowed; }
 
 .sg-contact { font-size: 13px; color: #667085; margin-bottom: 20px; }
-.sg-contact a { color: #1a237e; font-weight: 600; }
+.sg-contact a { color: var(--primary); font-weight: 600; }
 .sg-actions { display: flex; gap: 12px; justify-content: center; }
 .btn-ghost { padding: 11px 22px; border: 1px solid #ddd; background: #fff; color: #555; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; }
-.btn-primary { padding: 11px 22px; border: none; background: #1a237e; color: #fff; border-radius: 9px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.btn-primary { padding: 11px 22px; border: none; background: var(--primary); color: #fff; border-radius: 9px; font-size: 14px; font-weight: 700; cursor: pointer; }
 
 @media (max-width: 640px) { .sg-plans { grid-template-columns: 1fr; } }
 </style>
