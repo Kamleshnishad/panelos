@@ -243,7 +243,7 @@ onMounted(load)
 .kpi-delta.down { color: var(--danger); }
 .kpi-delta.mut  { color: var(--text-3); }
 
-.dash-cols { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; }
+.dash-cols { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; align-items: start; }
 .dash-col { display: flex; flex-direction: column; gap: 16px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 20px 22px; box-shadow: var(--shadow-xs); }
 .card h3 { margin: 0 0 14px; font-size: 14px; color: var(--text); font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
