@@ -20,8 +20,31 @@ class LeadController extends Controller
 
     public function index(Request $r)
     {
+        $cid = $this->cid($r);
         $filters = $r->only(['status', 'source', 'assigned_to', 'follow_up', 'search']);
-        return $this->successResponse($this->leads->list($this->cid($r), $filters)->get(), 'Leads retrieved');
+        $page    = (int) $r->input('page', 1);
+        $perPage = (int) $r->input('per_page', 50);
+
+        $paginated = $this->leads->list($cid, $filters)->paginate($perPage, ['*'], 'page', $page);
+
+        // Per-status counts for the tabs — unfiltered, server-side (cheap groupBy)
+        $byStatus = Lead::where('company_id', $cid)
+            ->selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status');
+        $counts = ['' => (int) $byStatus->sum()];
+        foreach ($byStatus as $st => $c) $counts[(string) $st] = (int) $c;
+
+        return response()->json([
+            'success' => true,
+            'data'    => $paginated->items(),
+            'counts'  => $counts,
+            'meta'    => ['pagination' => [
+                'total'        => $paginated->total(),
+                'current_page' => $paginated->currentPage(),
+                'per_page'     => $paginated->perPage(),
+                'last_page'    => $paginated->lastPage(),
+            ]],
+            'message' => 'Leads retrieved',
+        ]);
     }
 
     public function dashboard(Request $r)

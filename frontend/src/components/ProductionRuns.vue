@@ -111,6 +111,12 @@
           </tbody>
         </table>
       </div>
+
+      <div class="pagination" v-if="pagination.last_page > 1">
+        <button class="pg-btn" :disabled="pagination.current_page <= 1" @click="goPage(pagination.current_page - 1)">← Prev</button>
+        <span class="page-info">Page {{ pagination.current_page }} of {{ pagination.last_page }} · {{ pagination.total }} total</span>
+        <button class="pg-btn" :disabled="pagination.current_page >= pagination.last_page" @click="goPage(pagination.current_page + 1)">Next →</button>
+      </div>
     </template>
 
     <!-- Complete run modal: record actual material consumed -->
@@ -143,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import productionService from '../services/productionService.js'
 import procurementService from '../services/procurementService.js'
 import { toastError, toastSuccess, confirmDialog } from '../services/ui.js'
@@ -171,20 +177,27 @@ function fmt(n) { return Number(n || 0).toLocaleString('en-IN', { minimumFractio
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '' }
 function statusLabel(s) { return { draft: 'Draft', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }[s] || s }
 
-async function load() {
+const pagination = reactive({ current_page: 1, last_page: 1, total: 0 })
+
+async function load(page = 1) {
   loading.value = true
   try {
-    const res = await productionService.listRuns()
-    const list = res?.data ?? res ?? []
-    // in_progress first, then draft, then completed
-    const rank = { in_progress: 0, draft: 1, completed: 2, cancelled: 3 }
-    runs.value = [...list].sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))
+    const res  = await productionService.listRuns({ page, per_page: 30 })
+    const body = res?.data ?? {}
+    // Server now orders by status priority (active first), so no client re-sort needed.
+    runs.value = Array.isArray(body) ? body : (body.data ?? [])
+    const pg = body.meta?.pagination ?? {}
+    pagination.current_page = pg.current_page ?? 1
+    pagination.last_page    = pg.last_page ?? 1
+    pagination.total        = pg.total ?? runs.value.length
   } catch (e) {
     toastError(e?.response?.data?.message ?? 'Could not load runs.')
   } finally {
     loading.value = false
   }
 }
+
+function goPage(p) { if (p < 1 || p > pagination.last_page) return; load(p) }
 
 async function toggleMaterial(run) {
   if (matOpen.value === run.id) { matOpen.value = null; return }
@@ -402,4 +415,8 @@ defineExpose({ reload: load })
 .btn-close { background: none; border: none; font-size: 18px; color: #aaa; cursor: pointer; }
 
 @media (max-width: 900px) { .pr-wrap { padding: 16px 16px 40px; } }
+.pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 16px 0 4px; }
+.page-info  { font-size: 12px; color: #666; font-variant-numeric: tabular-nums; }
+.pg-btn { padding: 5px 12px; border: 1px solid #d0d5dd; background: #fff; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.pg-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>

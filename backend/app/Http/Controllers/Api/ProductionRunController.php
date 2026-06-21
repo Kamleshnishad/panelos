@@ -47,8 +47,21 @@ class ProductionRunController extends Controller
     {
         try {
             $filters = $request->only(['status']);
-            $runs = $this->runService->list($request->user()->company_id, $filters)->get();
-            return $this->successResponse($runs, 'Production runs retrieved');
+            $page    = (int) $request->input('page', 1);
+            $perPage = (int) $request->input('per_page', 30);
+            $paginated = $this->runService->list($request->user()->company_id, $filters)
+                ->paginate($perPage, ['*'], 'page', $page);
+            return response()->json([
+                'success' => true,
+                'data'    => $paginated->items(),
+                'meta'    => ['pagination' => [
+                    'total'        => $paginated->total(),
+                    'current_page' => $paginated->currentPage(),
+                    'per_page'     => $paginated->perPage(),
+                    'last_page'    => $paginated->lastPage(),
+                ]],
+                'message' => 'Production runs retrieved',
+            ]);
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], 'Failed to list runs', 'LIST_ERROR', 500);
         }

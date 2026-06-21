@@ -134,7 +134,11 @@ class ProductionRunService
             $query->where('status', $filters['status']);
         }
 
-        return $query->orderByDesc('created_at');
+        // Active runs first (in_progress → draft → qc → completed → cancelled), newest within each.
+        // Done in SQL so pagination surfaces the most relevant runs on page 1 (SCALE-H5).
+        return $query
+            ->orderByRaw("FIELD(status, 'in_progress', 'draft', 'qc_pending', 'completed', 'cancelled')")
+            ->orderByDesc('created_at');
     }
 
     public function getDetails(ProductionRun $run): ProductionRun
