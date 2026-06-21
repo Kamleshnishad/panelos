@@ -33,7 +33,6 @@ RUN apk add --no-cache \
         curl \
         bash \
         tini \
-        mariadb-client \
         icu-libs \
         libzip \
         libpng \

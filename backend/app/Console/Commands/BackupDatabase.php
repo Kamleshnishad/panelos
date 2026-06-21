@@ -3,13 +3,15 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Storage;
+use Ifsnop\Mysqldump\Mysqldump;
 
 /**
  * Dumps the MySQL database to storage/app/backups and prunes old dumps.
- * mysqldump must be on PATH, or set MYSQLDUMP_PATH in .env (e.g. XAMPP:
- * C:\xampp\mysql\bin\mysqldump.exe). Scheduled daily in Console\Kernel.
+ *
+ * Uses a PURE-PHP dumper (ifsnop/mysqldump-php) over PDO — the SAME driver the
+ * app already uses to talk to MySQL. This avoids the mysqldump binary entirely,
+ * which matters because the container's mariadb-client cannot authenticate to
+ * MySQL 8's caching_sha2_password. Scheduled daily in Console\Kernel.
  */
 class BackupDatabase extends Command
 {
@@ -28,31 +30,30 @@ class BackupDatabase extends Command
         if (!is_dir($dir)) @mkdir($dir, 0775, true);
 
         $file = $dir . DIRECTORY_SEPARATOR . 'panelos-' . now()->format('Ymd-His') . '.sql';
-        $dump = env('MYSQLDUMP_PATH', 'mysqldump');
+        $host = $conn['host'] ?? '127.0.0.1';
+        $port = $conn['port'] ?? '3306';
+        $dbnm = $conn['database'];
+        $dsn  = "mysql:host={$host};port={$port};dbname={$dbnm};charset=" . ($conn['charset'] ?? 'utf8mb4');
 
-        $args = [
-            $dump,
-            '--host=' . ($conn['host'] ?? '127.0.0.1'),
-            '--port=' . ($conn['port'] ?? '3306'),
-            '--user=' . ($conn['username'] ?? 'root'),
-            '--single-transaction',
-            '--skip-lock-tables',
-            '--routines',
-            '--result-file=' . $file,
-            $conn['database'],
-        ];
+        $this->info('Backing up "' . $dbnm . '" → ' . $file);
 
-        $this->info('Backing up "' . $conn['database'] . '" → ' . $file);
-
-        // Pass the password via env so it never appears in the process list.
-        $result = Process::timeout(600)
-            ->env(['MYSQL_PWD' => (string) ($conn['password'] ?? '')])
-            ->run($args);
-
-        if (!$result->successful() || !is_file($file) || filesize($file) === 0) {
+        try {
+            $dump = new Mysqldump($dsn, $conn['username'] ?? 'root', (string) ($conn['password'] ?? ''), [
+                'add-drop-table'        => true,
+                'single-transaction'    => true,
+                'routines'              => true,
+                'default-character-set' => Mysqldump::UTF8MB4,
+            ]);
+            $dump->start($file);
+        } catch (\Throwable $e) {
             @unlink($file);
-            $this->error('Backup failed: ' . trim($result->errorOutput() ?: $result->output() ?: 'unknown error'));
-            $this->line('Tip: ensure mysqldump is installed and on PATH, or set MYSQLDUMP_PATH in .env.');
+            $this->error('Backup failed: ' . $e->getMessage());
+            return self::FAILURE;
+        }
+
+        if (!is_file($file) || filesize($file) === 0) {
+            @unlink($file);
+            $this->error('Backup failed: empty dump produced.');
             return self::FAILURE;
         }
 
