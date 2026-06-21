@@ -114,4 +114,20 @@ class NotificationSettingsController extends Controller
             return $this->errorResponse(['error' => $msg], 'Failed to send: ' . $msg, 'TWILIO_ERROR', 400);
         }
     }
+
+    /** Recent delivery outcomes + 7-day failure count for operator visibility (OPS-H3). */
+    public function logs(Request $r)
+    {
+        $cid = $r->user()->company_id;
+        $logs = \App\Models\NotificationLog::where('company_id', $cid)
+            ->orderByDesc('id')->limit(50)->get();
+        $failed7d = \App\Models\NotificationLog::where('company_id', $cid)
+            ->where('status', 'failed')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->count();
+        return $this->successResponse([
+            'logs'      => $logs,
+            'failed_7d' => $failed7d,
+        ], 'Notification logs');
+    }
 }

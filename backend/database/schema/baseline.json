@@ -467,6 +467,16 @@
         "migration": "varchar(255)",
         "batch": "int"
     },
+    "notification_logs": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "channel": "varchar(20)",
+        "recipient": "varchar(40)",
+        "type": "varchar(40)",
+        "status": "varchar(12)",
+        "error": "text",
+        "created_at": "timestamp"
+    },
     "notification_settings": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

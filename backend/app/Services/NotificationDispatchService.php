@@ -125,16 +125,36 @@ class NotificationDispatchService
             if ($ns->isWhatsappReady()) {
                 $twilio->sendWhatsApp($to, $ns->resolvedWhatsappFrom(), $msg);
                 Log::info("WA notification sent", ['type' => $type, 'to' => $phone, 'company' => $companyId]);
+                $this->logDelivery($companyId, 'whatsapp', $phone, $type, 'sent');
                 return;
             }
 
             if ($ns->isSmsReady()) {
                 $twilio->sendSms($to, $ns->resolvedFromNumber(), $msg);
                 Log::info("SMS notification sent", ['type' => $type, 'to' => $phone, 'company' => $companyId]);
+                $this->logDelivery($companyId, 'sms', $phone, $type, 'sent');
             }
         } catch (\Throwable $e) {
             Log::error("Notification send failed", ['type' => $type, 'error' => $e->getMessage(), 'company' => $companyId]);
+            $channel = $ns->isWhatsappReady() ? 'whatsapp' : 'sms';
+            $this->logDelivery($companyId, $channel, $phone, $type, 'failed', $e->getMessage());
         }
+    }
+
+    /** Persist a delivery outcome — never let logging break the send path (OPS-H3). */
+    private function logDelivery(int $companyId, ?string $channel, ?string $recipient, string $type, string $status, ?string $error = null): void
+    {
+        try {
+            \App\Models\NotificationLog::create([
+                'company_id' => $companyId,
+                'channel'    => $channel,
+                'recipient'  => $recipient,
+                'type'       => $type,
+                'status'     => $status,
+                'error'      => $error ? mb_substr($error, 0, 1000) : null,
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable) { /* swallow — visibility must never break delivery */ }
     }
 
     private function e164(string $phone): string

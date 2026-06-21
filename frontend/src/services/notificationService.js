@@ -12,4 +12,5 @@ export default {
   get()           { return api('get',  '/api/settings/notifications') },
   save(data)      { return api('put',  '/api/settings/notifications', data) },
   test(channel, phone) { return api('post', '/api/settings/notifications/test', { channel, phone }) },
+  logs()          { return api('get',  '/api/settings/notifications/logs') },
 }

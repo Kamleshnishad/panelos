@@ -165,6 +165,30 @@
         </div>
       </section>
 
+      <!-- Recent deliveries (OPS-H3) -->
+      <section class="card">
+        <div class="deliv-head">
+          <h3>Recent Deliveries</h3>
+          <span v-if="failed7d > 0" class="fail-badge">{{ failed7d }} failed in last 7 days</span>
+        </div>
+        <p v-if="!deliveryLogs.length" class="deliv-empty">No notifications sent yet.</p>
+        <table v-else class="log-table">
+          <thead><tr><th>When</th><th>Type</th><th>Channel</th><th>To</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr v-for="l in deliveryLogs" :key="l.id">
+              <td>{{ fmtDateTime(l.created_at) }}</td>
+              <td>{{ l.type }}</td>
+              <td>{{ l.channel || '—' }}</td>
+              <td>{{ l.recipient || '—' }}</td>
+              <td>
+                <span :class="['log-status', l.status]">{{ l.status }}</span>
+                <span v-if="l.error" class="log-err" :title="l.error"> — {{ String(l.error).slice(0, 50) }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
     </template>
   </div>
 </template>
@@ -182,6 +206,22 @@ const testing   = ref(null)
 const testPhone = ref('')
 const testResult = reactive({ sms: null, whatsapp: null })
 const form = ref(null)
+const deliveryLogs = ref([])
+const failed7d = ref(0)
+
+function fmtDateTime(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+async function loadLogs() {
+  try {
+    const lr = await notificationService.logs()
+    const ld = lr?.data ?? lr ?? {}
+    deliveryLogs.value = ld.logs ?? []
+    failed7d.value = ld.failed_7d ?? 0
+  } catch { /* non-fatal */ }
+}
 
 async function load() {
   loading.value = true; error.value = null
@@ -192,6 +232,7 @@ async function load() {
     // drives the "✓ saved" badge. Leaving it blank on save keeps the stored token.
     d.twilio_auth_token = ''
     form.value = d
+    loadLogs()
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Could not load settings.'
   } finally { loading.value = false }
@@ -312,4 +353,14 @@ onMounted(load)
   .ns-wrap { padding: 16px 16px 40px; }
   .form-grid { grid-template-columns: 1fr; }
 }
+.deliv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.fail-badge { background: #fceae9; color: #c62828; border: 1px solid #f3b4ae; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.deliv-empty { color: #888; font-size: 13px; font-style: italic; }
+.log-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.log-table th { text-align: left; padding: 7px 10px; background: var(--surface-3, #f2f4f7); color: #555; font-size: 11px; text-transform: uppercase; }
+.log-table td { padding: 7px 10px; border-bottom: 1px solid #eef0f4; vertical-align: top; }
+.log-status { display: inline-block; padding: 1px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.log-status.sent { background: #e6f4ea; color: #1f7a3d; }
+.log-status.failed { background: #fceae9; color: #c62828; }
+.log-err { color: #c62828; font-size: 11px; }
 </style>
