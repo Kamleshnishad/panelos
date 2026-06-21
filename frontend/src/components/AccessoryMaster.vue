@@ -31,6 +31,12 @@
       </tbody>
     </table>
 
+    <div class="pagination" v-if="pagination.last_page > 1">
+      <button class="pg-btn" :disabled="pagination.current_page <= 1" @click="goPage(pagination.current_page - 1)">← Prev</button>
+      <span class="page-info">Page {{ pagination.current_page }} of {{ pagination.last_page }} · {{ pagination.total }} total</span>
+      <button class="pg-btn" :disabled="pagination.current_page >= pagination.last_page" @click="goPage(pagination.current_page + 1)">Next →</button>
+    </div>
+
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
       <div class="modal-box">
         <div class="modal-header">
@@ -110,14 +116,25 @@ const uploadingImg = ref(false)
 
 const form = reactive({ code: '', name: '', unit: 'NOS', hsn_code: '73089090', rate: null, description: '', is_active: true })
 
-async function load() {
+const pagination = reactive({ current_page: 1, last_page: 1, total: 0 })
+
+async function load(page = 1) {
   loading.value = true; error.value = null
   try {
-    const res = await masterDataService.accessories({ per_page: 100 })
-    rows.value = res?.data?.data ?? res?.data ?? []
+    const res  = await masterDataService.accessories({ page, per_page: 50 })
+    const body = res?.data ?? {}
+    rows.value = body.data ?? (Array.isArray(body) ? body : [])
+    // Handle both paginatedResponse (meta.pagination) and raw-paginator shapes
+    const pg = body.meta?.pagination ?? body
+    const per = pg.per_page ?? 50
+    pagination.current_page = pg.current_page ?? 1
+    pagination.total        = pg.total ?? rows.value.length
+    pagination.last_page    = pg.last_page ?? (per ? Math.max(1, Math.ceil((pg.total ?? 0) / per)) : 1)
   } catch (e) { error.value = e?.response?.data?.message ?? 'Failed to load.' }
   finally { loading.value = false }
 }
+
+function goPage(p) { if (p < 1 || p > pagination.last_page) return; load(p) }
 
 function openCreate() {
   editing.value = false; editId.value = null; modalError.value = null
@@ -229,4 +246,8 @@ onMounted(load)
 .image-actions { display: flex; flex-direction: column; gap: 6px; }
 .btn-secondary { background: var(--primary-tint); color: var(--primary); display: inline-block; padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .img-hint { font-size: 11px; color: #aaa; }
+.pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 14px 0 4px; }
+.page-info  { font-size: 12px; color: #666; font-variant-numeric: tabular-nums; }
+.pg-btn { padding: 5px 12px; border: 1px solid #d0d5dd; background: #fff; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.pg-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>

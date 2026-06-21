@@ -20,15 +20,15 @@
     <!-- Summary -->
     <div class="summary-bar" v-if="rows.length > 0">
       <div class="sum-card">
-        <div class="sum-val">{{ rows.length }}</div>
+        <div class="sum-val">{{ pagination.total }}</div>
         <div class="sum-lbl">Chemicals Tracked</div>
       </div>
-      <div class="sum-card warn" v-if="lowStockCount > 0">
-        <div class="sum-val">{{ lowStockCount }}</div>
+      <div class="sum-card warn" v-if="lowTotal > 0">
+        <div class="sum-val">{{ lowTotal }}</div>
         <div class="sum-lbl">Low Stock</div>
       </div>
-      <div class="sum-card danger" v-if="expiringCount > 0">
-        <div class="sum-val">{{ expiringCount }}</div>
+      <div class="sum-card danger" v-if="expiringTotal > 0">
+        <div class="sum-val">{{ expiringTotal }}</div>
         <div class="sum-lbl">Expiring / Expired</div>
       </div>
     </div>
@@ -78,6 +78,13 @@
           </span>
         </div>
       </div>
+    </div>
+
+    <!-- Pager -->
+    <div class="pagination" v-if="pagination.last_page > 1">
+      <button class="btn btn-ghost btn-sm" :disabled="pagination.current_page <= 1" @click="goPage(pagination.current_page - 1)">← Prev</button>
+      <span class="page-info">Page {{ pagination.current_page }} of {{ pagination.last_page }} · {{ pagination.total }} total</span>
+      <button class="btn btn-ghost btn-sm" :disabled="pagination.current_page >= pagination.last_page" @click="goPage(pagination.current_page + 1)">Next →</button>
     </div>
 
     <!-- Action drawer -->
@@ -260,27 +267,44 @@ const removeForm  = reactive({ quantity: null, notes: '' })
 const adjustForm  = reactive({ new_quantity: null, reason: '' })
 const createForm  = reactive({ name: '', category: '', unit: 'kg', reorder_level: 0 })
 
-const lowStockCount = computed(() => rows.value.filter(r => isLow(r)).length)
-const expiringCount = computed(() => rows.value.filter(r => isExpiring(r) || isExpired(r)).length)
+const pagination    = reactive({ current_page: 1, last_page: 1, total: 0 })
+const lowTotal      = ref(0)
+const expiringTotal = ref(0)
 const adjustDiff    = computed(() => {
   if (adjustForm.new_quantity === null || !activeRow.value) return 0
   return adjustForm.new_quantity - Number(activeRow.value.quantity_in_stock)
 })
 
-async function load() {
+async function load(page = 1) {
   loading.value = true
   error.value   = null
   try {
-    const params = {}
+    const params = { page, per_page: 24 }
     if (showLowOnly.value)  params.low_stock = 1
     if (showExpiring.value) params.expiring  = 1
     const res  = await stockService.getChemicals(params)
-    rows.value = res?.data?.data ?? res?.data ?? []
+    const body = res?.data ?? {}
+    rows.value = body.data ?? (Array.isArray(body) ? body : [])
+    pagination.current_page = body.current_page ?? 1
+    pagination.last_page    = body.last_page ?? 1
+    pagination.total        = body.total ?? rows.value.length
+    // Accurate totals for summary cards (independent of current page)
+    try {
+      const lr = await stockService.getChemicals({ low_stock: 1, per_page: 1 })
+      lowTotal.value = lr?.data?.total ?? 0
+      const er = await stockService.getChemicals({ expiring: 1, per_page: 1 })
+      expiringTotal.value = er?.data?.total ?? 0
+    } catch { /* non-fatal */ }
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Failed to load chemical inventory.'
   } finally {
     loading.value = false
   }
+}
+
+function goPage(p) {
+  if (p < 1 || p > pagination.last_page) return
+  load(p)
 }
 
 function toggleFilter(which) {
@@ -437,6 +461,9 @@ onMounted(load)
 .sum-lbl { font-size: 11px; color: #888; text-transform: uppercase; font-weight: 600; margin-top: 2px; }
 
 .loading-row { text-align: center; padding: 40px; color: #aaa; }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 4px 0 18px; }
+.page-info  { font-size: 12px; color: #666; font-variant-numeric: tabular-nums; }
 .empty-hint  { text-align: center; color: #999; padding: 30px; border: 2px dashed #e0e0e0; border-radius: 8px; }
 
 .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; margin-bottom: 18px; }

@@ -20,11 +20,11 @@
     <!-- Summary cards -->
     <div class="summary-bar" v-if="rows.length > 0">
       <div class="sum-card">
-        <div class="sum-val">{{ rows.length }}</div>
+        <div class="sum-val">{{ pagination.total }}</div>
         <div class="sum-lbl">Panel Types Tracked</div>
       </div>
-      <div class="sum-card warn" v-if="lowStockCount > 0">
-        <div class="sum-val">{{ lowStockCount }}</div>
+      <div class="sum-card warn" v-if="lowTotal > 0">
+        <div class="sum-val">{{ lowTotal }}</div>
         <div class="sum-lbl">Low Stock Alerts</div>
       </div>
       <div class="sum-card ok" v-else>
@@ -68,6 +68,13 @@
           <span v-if="row.last_stock_out">Out: {{ fmtDate(row.last_stock_out) }}</span>
         </div>
       </div>
+    </div>
+
+    <!-- Pager -->
+    <div class="pagination" v-if="pagination.last_page > 1">
+      <button class="btn btn-ghost btn-sm" :disabled="pagination.current_page <= 1" @click="goPage(pagination.current_page - 1)">← Prev</button>
+      <span class="page-info">Page {{ pagination.current_page }} of {{ pagination.last_page }} · {{ pagination.total }} total</span>
+      <button class="btn btn-ghost btn-sm" :disabled="pagination.current_page >= pagination.last_page" @click="goPage(pagination.current_page + 1)">Next →</button>
     </div>
 
     <!-- ── Action drawer (opens below the selected card) ── -->
@@ -203,25 +210,41 @@ const removeForm = reactive({ quantity: null, notes: '' })
 const adjustForm = reactive({ new_quantity: null, reason: '' })
 const reorderForm = reactive({ level: null })
 
-const lowStockCount = computed(() => rows.value.filter(r => isLow(r)).length)
+const pagination    = reactive({ current_page: 1, last_page: 1, total: 0 })
+const lowTotal      = ref(0)
 const adjustDiff    = computed(() => {
   if (adjustForm.new_quantity === null || !activeRow.value) return 0
   return adjustForm.new_quantity - Number(activeRow.value.quantity_in_stock)
 })
 
-async function load() {
+async function load(page = 1) {
   loading.value = true
   error.value   = null
   try {
-    const params = showLowOnly.value ? { low_stock: 1 } : {}
-    const res    = await stockService.getCoils(params)
-    // apiResponse returns { success, data, message }
-    rows.value   = res?.data?.data ?? res?.data ?? []
+    const params = { page, per_page: 24 }
+    if (showLowOnly.value) params.low_stock = 1
+    const res  = await stockService.getCoils(params)
+    // apiResponse wraps a paginator: { success, data: { data:[], current_page, last_page, total }, message }
+    const body = res?.data ?? {}
+    rows.value = body.data ?? (Array.isArray(body) ? body : [])
+    pagination.current_page = body.current_page ?? 1
+    pagination.last_page    = body.last_page ?? 1
+    pagination.total        = body.total ?? rows.value.length
+    // Accurate low-stock total (independent of the current page) for the summary card
+    try {
+      const lr = await stockService.getCoils({ low_stock: 1, per_page: 1 })
+      lowTotal.value = lr?.data?.total ?? 0
+    } catch { /* non-fatal */ }
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Failed to load coil inventory.'
   } finally {
     loading.value = false
   }
+}
+
+function goPage(p) {
+  if (p < 1 || p > pagination.last_page) return
+  load(p)
 }
 
 function toggleLowFilter() {
@@ -389,6 +412,9 @@ onMounted(load)
 .sum-lbl  { font-size: 11px; color: #888; text-transform: uppercase; font-weight: 600; margin-top: 2px; }
 
 .loading-row { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 4px 0 18px; }
+.page-info  { font-size: 12px; color: #666; font-variant-numeric: tabular-nums; }
 
 /* Inventory grid */
 .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 18px; }

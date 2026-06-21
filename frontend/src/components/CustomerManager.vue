@@ -38,12 +38,17 @@
           </tr>
         </tbody>
       </table>
+      <div class="pagination" v-if="pagination.last_page > 1">
+        <button class="pg-btn" :disabled="pagination.current_page <= 1" @click="goPage(pagination.current_page - 1)">← Prev</button>
+        <span class="page-info">Page {{ pagination.current_page }} of {{ pagination.last_page }} · {{ pagination.total }} total</span>
+        <button class="pg-btn" :disabled="pagination.current_page >= pagination.last_page" @click="goPage(pagination.current_page + 1)">Next →</button>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import customerService from '../services/customerService.js'
 import { toastError } from '../services/ui.js'
 import CustomerProfile from './CustomerProfile.vue'
@@ -55,15 +60,22 @@ const loading = ref(false)
 const search = ref('')
 const view = ref('list')
 const profileId = ref(null)
+const pagination = reactive({ current_page: 1, last_page: 1, total: 0 })
 
-async function load() {
+async function load(page = 1) {
   loading.value = true
   try {
-    const res = await customerService.list({ search: search.value, per_page: 100 })
+    const res = await customerService.list({ search: search.value, page, per_page: 50 })
     rows.value = res?.data?.data ?? res?.data ?? []
+    const pg = res?.data?.meta?.pagination ?? {}
+    pagination.current_page = pg.current_page ?? 1
+    pagination.total        = pg.total ?? rows.value.length
+    pagination.last_page    = pg.per_page ? Math.max(1, Math.ceil((pg.total ?? 0) / pg.per_page)) : 1
   } catch (e) { toastError(e?.response?.data?.message ?? 'Could not load customers.') }
   finally { loading.value = false }
 }
+
+function goPage(p) { if (p < 1 || p > pagination.last_page) return; load(p) }
 
 function open(c) { profileId.value = c.id; view.value = 'profile' }
 
@@ -77,6 +89,10 @@ onMounted(load)
 .cm-sub { margin: 4px 0 0; font-size: 13px; color: var(--text-2); }
 .cm-actions { display: flex; gap: 8px; }
 .cm-search { padding: 8px 12px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; width: 260px; }
+.pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 14px 0 4px; }
+.page-info  { font-size: 12px; color: #666; font-variant-numeric: tabular-nums; }
+.pg-btn { padding: 5px 12px; border: 1px solid var(--border-2, #d0d5dd); background: #fff; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.pg-btn:disabled { opacity: .5; cursor: not-allowed; }
 .cm-loading { text-align: center; padding: 60px; color: #888; }
 .empty { text-align: center; color: #aaa; font-style: italic; padding: 40px; }
 
