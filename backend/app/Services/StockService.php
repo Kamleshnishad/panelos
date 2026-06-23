@@ -18,6 +18,7 @@ class StockService
 
             // $stockId is the CoilStock primary id (record keyed by panel_type)
             $stock = CoilStock::where('company_id', $companyId)
+                ->lockForUpdate()
                 ->findOrFail($stockId);
 
             $newQuantity = $stock->quantity_in_stock + $quantity;
@@ -40,6 +41,7 @@ class StockService
             $companyId = $companyId ?? auth()->user()->company_id;
 
             $stock = CoilStock::where('company_id', $companyId)
+                ->lockForUpdate()
                 ->findOrFail($stockId);
 
             if ($stock->getAvailableQuantity() < $quantity) {
@@ -66,6 +68,7 @@ class StockService
             $companyId = $companyId ?? auth()->user()->company_id;
 
             $stock = CoilStock::where('company_id', $companyId)
+                ->lockForUpdate()
                 ->findOrFail($stockId);
 
             $difference = $newQuantity - $stock->quantity_in_stock;
@@ -93,6 +96,7 @@ class StockService
 
             // $stockId is the ChemicalStock primary id
             $stock = ChemicalStock::where('company_id', $companyId)
+                ->lockForUpdate()
                 ->findOrFail($stockId);
 
             $newQuantity = $stock->quantity_in_stock + $quantity;
@@ -117,6 +121,7 @@ class StockService
             $companyId = $companyId ?? auth()->user()->company_id;
 
             $stock = ChemicalStock::where('company_id', $companyId)
+                ->lockForUpdate()
                 ->findOrFail($stockId);
 
             if ($stock->getAvailableQuantity() < $quantity) {
@@ -143,6 +148,7 @@ class StockService
             $companyId = $companyId ?? auth()->user()->company_id;
 
             $stock = ChemicalStock::where('company_id', $companyId)
+                ->lockForUpdate()
                 ->findOrFail($stockId);
 
             $difference = $newQuantity - $stock->quantity_in_stock;
@@ -166,7 +172,7 @@ class StockService
         return DB::transaction(function () use ($stockId, $quantity, $notes, $companyId) {
             $companyId = $companyId ?? auth()->user()->company_id;
 
-            $stock = \App\Models\ConsumableStock::where('company_id', $companyId)->findOrFail($stockId);
+            $stock = \App\Models\ConsumableStock::where('company_id', $companyId)->lockForUpdate()->findOrFail($stockId);
 
             $stock->update([
                 'quantity_in_stock' => $stock->quantity_in_stock + $quantity,
@@ -185,7 +191,7 @@ class StockService
         return DB::transaction(function () use ($stockId, $quantity, $notes, $companyId) {
             $companyId = $companyId ?? auth()->user()->company_id;
 
-            $stock = \App\Models\ConsumableStock::where('company_id', $companyId)->findOrFail($stockId);
+            $stock = \App\Models\ConsumableStock::where('company_id', $companyId)->lockForUpdate()->findOrFail($stockId);
 
             if ($stock->quantity_in_stock < $quantity) {
                 throw new \Exception('Insufficient consumable stock. Available: ' . $stock->quantity_in_stock);
@@ -208,7 +214,7 @@ class StockService
         return DB::transaction(function () use ($stockId, $newQuantity, $reason, $companyId) {
             $companyId = $companyId ?? auth()->user()->company_id;
 
-            $stock = \App\Models\ConsumableStock::where('company_id', $companyId)->findOrFail($stockId);
+            $stock = \App\Models\ConsumableStock::where('company_id', $companyId)->lockForUpdate()->findOrFail($stockId);
 
             $quantity = abs($newQuantity - $stock->quantity_in_stock);
             $stock->update(['quantity_in_stock' => $newQuantity]);
