@@ -176,29 +176,35 @@ class QuotationController extends Controller
             }
 
             // Credit-limit guard. Admins may override; non-admins are always blocked.
+            $override = $request->boolean('override_credit_limit') && $request->user()->isAdmin();
+
+            // Fast pre-check for UX (the authoritative, row-locked re-check runs inside
+            // the order transaction — CONC-M2).
             $customer = Customer::where('company_id', $request->user()->company_id)
                 ->find($quotation->customer_id);
-            if ($customer) {
-                $credit   = $this->creditService->status($customer, (float) $quotation->total_amount);
-                $override = $request->boolean('override_credit_limit') && $request->user()->isAdmin();
-                if (!$credit['within_limit'] && !$override) {
-                    return $this->errorResponse(
-                        $credit,
-                        "Credit limit exceeded for {$customer->name}. Outstanding ₹" . number_format($credit['outstanding'], 2)
-                            . " + this order ₹" . number_format($credit['new_order'], 2)
-                            . " would exceed the ₹" . number_format($credit['credit_limit'], 2)
-                            . " limit by ₹" . number_format($credit['over_by'], 2) . '.',
-                        'CREDIT_LIMIT_EXCEEDED',
-                        422
-                    );
+            if ($customer && !$override) {
+                $credit = $this->creditService->status($customer, (float) $quotation->total_amount);
+                if (!$credit['within_limit']) {
+                    return $this->errorResponse($credit, $this->creditMsg($credit, $customer->name), 'CREDIT_LIMIT_EXCEEDED', 422);
                 }
             }
 
-            $order = $this->orderService->createFromQuotation($quotation);
+            $order = $this->orderService->createFromQuotation($quotation, $override);
             return $this->createdResponse($order, 'Order created', 201);
+        } catch (\App\Exceptions\CreditLimitException $e) {
+            // Lost the credit race inside the transaction.
+            return $this->errorResponse($e->credit, $this->creditMsg($e->credit, $e->customerName), 'CREDIT_LIMIT_EXCEEDED', 422);
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], 'Failed to create order', 'ORDER_ERROR', 500);
         }
+    }
+
+    private function creditMsg(array $credit, string $name): string
+    {
+        return "Credit limit exceeded for {$name}. Exposure ₹" . number_format($credit['exposure'] ?? $credit['outstanding'], 2)
+            . " + this order ₹" . number_format($credit['new_order'], 2)
+            . " would exceed the ₹" . number_format($credit['credit_limit'], 2)
+            . " limit by ₹" . number_format($credit['over_by'], 2) . '.';
     }
 
     public function downloadPdf(Request $request, int $id)

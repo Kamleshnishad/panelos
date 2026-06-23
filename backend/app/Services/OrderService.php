@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class OrderService
 {
-    public function createFromQuotation(Quotation $quotation): Order
+    public function createFromQuotation(Quotation $quotation, bool $overrideCredit = false): Order
     {
         if ($quotation->status !== 'accepted') {
             throw new \Exception('Quotation must be accepted to create an order.');
@@ -19,8 +19,21 @@ class OrderService
             throw new \Exception('An order already exists for this quotation.');
         }
 
-        return \App\Support\DocNumber::retry(fn () => DB::transaction(function () use ($quotation) {
+        return \App\Support\DocNumber::retry(fn () => DB::transaction(function () use ($quotation, $overrideCredit) {
             $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer');
+
+            // Authoritative credit check under a customer-row lock so two concurrent
+            // orders can't both slip past a stale limit (CONC-M2). The lock serialises
+            // order creation per customer; the loser re-checks after the winner commits
+            // and sees the winner's pending-order exposure.
+            $customer = \App\Models\Customer::where('company_id', $quotation->company_id)
+                ->lockForUpdate()->find($quotation->customer_id);
+            if ($customer && !$overrideCredit) {
+                $credit = app(\App\Services\CreditService::class)->status($customer, (float) $quotation->total_amount);
+                if (!$credit['within_limit']) {
+                    throw new \App\Exceptions\CreditLimitException($credit, $customer->name);
+                }
+            }
 
             $order = Order::create([
                 'company_id'              => $quotation->company_id,
