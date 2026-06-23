@@ -93,17 +93,44 @@ class SchemaCheck extends Command
             foreach ($cols as $c => $ty) if (!isset($baseline[$t][$c])) $extra[] = "{$t}.{$c}";
         }
 
+        // OPS-M2 guard: every BaseModel subclass uses SoftDeletes, so its table MUST
+        // have deleted_at — otherwise every query 500s. Catch the trap before it ships.
+        $softGaps = $this->softDeleteGaps($current);
+
         $this->line('Schema check against database/schema/baseline.json');
         if ($missingTables) $this->error('✗ MISSING TABLES: ' . implode(', ', $missingTables));
         if ($missingCols)   $this->error('✗ MISSING COLUMNS: ' . implode(', ', $missingCols));
+        if ($softGaps)      $this->error('✗ SOFT-DELETE GAP (BaseModel table missing deleted_at → 500 on every query): ' . implode(', ', $softGaps));
         if ($typeDiffs)     foreach ($typeDiffs as $d) $this->warn('  ~ type diff: ' . $d);
         if ($extra)         $this->line('  + extra (in DB, not baseline — ok if you just added a migration): ' . implode(', ', $extra));
 
-        if ($missingTables || $missingCols) {
-            $this->error('❌ DRIFT — the DB is missing schema the baseline expects. Run pending migrations or add a heal migration.');
+        if ($missingTables || $missingCols || $softGaps) {
+            $this->error('❌ DRIFT — the DB is missing schema the app expects. Run pending migrations or add a heal migration.');
             return self::FAILURE;
         }
         $this->info('✅ Schema matches baseline' . ($typeDiffs ? ' (only benign type display differences)' : '') . '.');
         return self::SUCCESS;
+    }
+
+    /**
+     * BaseModel subclasses whose (existing) table lacks deleted_at. BaseModel
+     * forces SoftDeletes, so a missing deleted_at means every query on that model
+     * throws "Column not found" — this catches the recurring trap at deploy time.
+     */
+    private function softDeleteGaps(array $current): array
+    {
+        $gaps = [];
+        foreach (glob(app_path('Models') . '/*.php') as $f) {
+            $class = 'App\\Models\\' . basename($f, '.php');
+            if (!class_exists($class)) continue;
+            $ref = new \ReflectionClass($class);
+            if ($ref->isAbstract() || !$ref->isSubclassOf(\App\Models\BaseModel::class)) continue;
+            $table = (new $class)->getTable();
+            // Only flag tables that exist in this DB but are missing the column.
+            if (isset($current[$table]) && !array_key_exists('deleted_at', $current[$table])) {
+                $gaps[] = class_basename($class) . ' → ' . $table;
+            }
+        }
+        return $gaps;
     }
 }
