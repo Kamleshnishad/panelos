@@ -110,6 +110,8 @@ COPY docker/php/php.ini             /usr/local/etc/php/conf.d/zz-panelos.ini
 COPY docker/php/www.conf            /usr/local/etc/php-fpm.d/zz-www.conf
 COPY docker/nginx/conf.d/default.conf /etc/nginx/http.d/default.conf
 COPY docker/supervisord.conf        /etc/supervisord.conf
+COPY docker/entrypoint.sh           /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Runtime dirs + socket dir + log files with correct ownership/permissions.
 RUN mkdir -p /run/php /run/nginx /var/log/supervisor /var/log/nginx \
@@ -130,4 +132,4 @@ EXPOSE 8080
 # tini is a 200 KB init that reaps zombie php-fpm children. Without it,
 # defunct workers accumulate over weeks and eventually exhaust the PID table.
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["/usr/local/bin/entrypoint.sh"]
