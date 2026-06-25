@@ -113,32 +113,12 @@ class NotificationDispatchService
     private function send(NotificationSetting $ns, ?string $phone, string $msg, string $type, int $companyId): void
     {
         if (!$phone) return;
+        // Nothing configured for this tenant — don't queue a job that can't send.
+        if (!$ns->isSmsReady() && !$ns->isWhatsappReady()) return;
 
-        $sid   = $ns->resolvedSid();
-        $token = $ns->resolvedToken();
-        if (!$sid || !$token) return;
-
-        try {
-            $twilio = new TwilioStreamClient($sid, $token);
-            $to     = $this->e164($phone);
-
-            if ($ns->isWhatsappReady()) {
-                $twilio->sendWhatsApp($to, $ns->resolvedWhatsappFrom(), $msg);
-                Log::info("WA notification sent", ['type' => $type, 'to' => $phone, 'company' => $companyId]);
-                $this->logDelivery($companyId, 'whatsapp', $phone, $type, 'sent');
-                return;
-            }
-
-            if ($ns->isSmsReady()) {
-                $twilio->sendSms($to, $ns->resolvedFromNumber(), $msg);
-                Log::info("SMS notification sent", ['type' => $type, 'to' => $phone, 'company' => $companyId]);
-                $this->logDelivery($companyId, 'sms', $phone, $type, 'sent');
-            }
-        } catch (\Throwable $e) {
-            Log::error("Notification send failed", ['type' => $type, 'error' => $e->getMessage(), 'company' => $companyId]);
-            $channel = $ns->isWhatsappReady() ? 'whatsapp' : 'sms';
-            $this->logDelivery($companyId, $channel, $phone, $type, 'failed', $e->getMessage());
-        }
+        // Off-load the (up-to-20s) Twilio call to the queue so it never blocks the
+        // web request (OPS-H1). The worker re-resolves creds + logs the outcome.
+        \App\Jobs\SendNotificationJob::dispatch($companyId, $phone, $msg, $type);
     }
 
     /** Persist a delivery outcome — never let logging break the send path (OPS-H3). */

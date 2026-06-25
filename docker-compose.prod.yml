@@ -36,6 +36,10 @@ services:
       DB_HOST: 172.30.0.1
       APP_ENV: production
       APP_DEBUG: "false"
+      # Force the DB queue (jobs/failed_jobs tables exist) so the queue worker +
+      # job dispatch always agree — and never accidentally point at redis (which
+      # isn't running here) if .env.production inherited QUEUE_CONNECTION=redis (OPS-H1).
+      QUEUE_CONNECTION: database
 
     # Kept for completeness — `host.docker.internal` still resolves to the
     # docker0 gateway, which is harmless. Not used by Laravel (see DB_HOST above).
