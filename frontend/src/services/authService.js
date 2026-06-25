@@ -38,6 +38,18 @@ export default {
     return axios.post('/api/auth/two-factor', { enabled }, { headers: authHeaders() }).then(r => r.data)
   },
 
+  // Sliding session (OPS-H2): exchange the current valid token for a fresh one,
+  // resetting its lifetime. Non-fatal on failure — a genuinely-expired token is
+  // handled by the 401 interceptor (→ login).
+  async refreshToken() {
+    try {
+      const res = await axios.post('/api/auth/refresh-token', {}, { headers: authHeaders() })
+      const data = res.data?.data ?? {}
+      if (data.token) localStorage.setItem('token', data.token)
+      return data
+    } catch { return null }
+  },
+
   async register(payload) {
     const res = await axios.post('/api/auth/register', payload, { headers: { Accept: 'application/json' } })
     const data = res.data?.data ?? {}

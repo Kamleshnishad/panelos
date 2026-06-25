@@ -121,7 +121,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import authService from '../services/authService.js'
 import dashboardService from '../services/dashboardService.js'
@@ -315,7 +315,17 @@ function quickJump() {
   if (hit) { go(hit.key); searchQ.value = '' }
 }
 
+let refreshTimer = null
+onBeforeUnmount(() => { if (refreshTimer) clearInterval(refreshTimer) })
+
 onMounted(async () => {
+  // Sliding session (OPS-H2): tokens now expire after 12h. Refresh to a fresh
+  // window on load, then keep it alive on an interval while the app stays open,
+  // so an active user is never logged out mid-shift. Failure is non-fatal — a
+  // genuinely-expired token is caught by the 401 interceptor (→ login).
+  await authService.refreshToken()
+  refreshTimer = setInterval(() => authService.refreshToken(), 6 * 60 * 60 * 1000)
+
   // Refresh the user so permissions/is_admin are current (drives nav gating).
   try { const u = await authService.me(); if (u) user.value = u } catch { /* ignore */ }
 

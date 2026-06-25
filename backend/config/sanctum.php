@@ -50,7 +50,10 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Tokens expire after 12h (720 min). Active users are kept signed in by the
+    // frontend's sliding refresh (AppShell calls /auth/refresh-token on load + every
+    // 6h); only truly-idle sessions hit this and are sent to login (OPS-H2).
+    'expiration' => 720,
 
     /*
     |--------------------------------------------------------------------------
