@@ -33,6 +33,10 @@
     <!-- RIGHT — form -->
     <main class="auth-panel">
       <div class="auth-form">
+        <button type="button" class="back-home" @click="$emit('back')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="16" height="16"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          Back to site
+        </button>
         <div class="form-brand">
           <div class="fb-mark">P</div><span>PanelOS</span>
         </div>
@@ -133,10 +137,11 @@
 import { ref } from 'vue'
 import authService from '../services/authService.js'
 
-const emit = defineEmits(['logged-in'])
+const props = defineProps({ startMode: { type: String, default: 'login' } })
+const emit = defineEmits(['logged-in', 'back'])
 
 const isDev = import.meta.env.DEV
-const mode = ref('login')
+const mode = ref(props.startMode === 'signup' ? 'signup' : 'login')
 const email = ref(isDev ? 'admin@panelos.local' : '')
 const password = ref(isDev ? 'Admin@123' : '')
 const loading = ref(false)
@@ -282,4 +287,6 @@ h2 { margin: 0 0 6px; font-size: 25px; color: var(--text, #15181E); letter-spaci
   .form-brand { display: flex; }
   .auth-panel { min-height: 100vh; }
 }
+.back-home{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:#667085;font-weight:600;font-size:13.5px;cursor:pointer;padding:4px 0;margin-bottom:14px;transition:color .15s;font-family:inherit;}
+.back-home:hover{color:var(--primary,#2B50E0);}
 </style>
