@@ -24,37 +24,34 @@
       </div>
     </header>
 
-    <!-- ══ HERO ══ -->
+    <!-- ══ HERO (centered, light) ══ -->
     <section class="hero" id="top">
-      <div class="hero-bg"><span class="blob b1"></span><span class="blob b2"></span><span class="grid-fade"></span></div>
+      <div class="hero-bg"><span class="glow"></span><span class="grid-fade"></span></div>
       <div class="lp-wrap hero-in">
-        <div class="hero-copy">
-          <span class="pill anim-up">⚡ Built for PUF / PIR panel manufacturers</span>
-          <h1 class="anim-up d1">Run your entire panel factory on <span class="grad">one system</span> — not 50 Excel sheets.</h1>
-          <p class="sub anim-up d2">From enquiry to dispatch to payment — quotations, BOQ, production, live inventory, GST e-invoicing &amp; reports, all connected. Stop re-typing. Start shipping.</p>
-          <div class="hero-cta anim-up d3">
-            <button class="btn btn-primary lg" @click="$emit('start-trial')">
-              Start 14-day free trial
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-            </button>
-            <button class="btn btn-glass lg" @click="scrollTo('how')">▶ See how it works</button>
-          </div>
-          <div class="trust anim-up d4">
-            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg> No credit card</span>
-            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg> GST &amp; e-Invoice ready</span>
-            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg> Setup in minutes</span>
-          </div>
+        <span class="pill anim-up">⚡ Built for PUF / PIR panel manufacturers</span>
+        <h1 class="anim-up d1">Run your entire panel factory on <span class="grad">one&nbsp;system</span> — not 50 Excel sheets.</h1>
+        <p class="sub anim-up d2">From enquiry to dispatch to payment — quotations, BOQ, production, live inventory, GST e-invoicing &amp; reports, all connected. Stop re-typing. Start shipping.</p>
+        <div class="hero-cta anim-up d3">
+          <button class="btn btn-primary lg" @click="$emit('start-trial')">
+            Start 14-day free trial
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+          <button class="btn btn-ghost lg" @click="scrollTo('how')">▶ See how it works</button>
         </div>
-        <div class="hero-shot anim-in d2">
-          <div class="frame tilt">
+        <div class="trust anim-up d4">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg> No credit card</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg> GST &amp; e-Invoice ready</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg> Setup in minutes</span>
+        </div>
+        <div class="hero-shot anim-in d3">
+          <div class="frame">
             <div class="fbar"><i></i><i></i><i></i><span class="url">app.panelos · Dashboard</span></div>
-            <img src="/guide/dashboard.png" alt="PanelOS dashboard" loading="eager" width="900" height="560">
+            <img src="/guide/dashboard.png" alt="PanelOS dashboard" loading="eager" width="1100" height="680">
           </div>
           <div class="fbadge fb1 floaty"><span class="fi ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span><div>Quote in 10 min<small>not 2 hours in Excel</small></div></div>
           <div class="fbadge fb2 floaty d1"><span class="fi br"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span><div>Live stock &amp; production<small>real-time on every screen</small></div></div>
         </div>
       </div>
-      <!-- marquee -->
       <div class="marquee" aria-hidden="true">
         <div class="mq-track">
           <span v-for="(m,i) in marquee.concat(marquee)" :key="i" class="mq-chip">{{ m }}</span>
@@ -414,59 +411,59 @@ button{font-family:inherit;cursor:pointer;}
 .link-btn{background:none;border:0;color:#C6D0EC;font-weight:700;font-size:15px;padding:6px;}
 .link-btn:hover{color:#fff;}
 
-/* nav */
-.nav{position:sticky;top:0;z-index:60;transition:background .25s,box-shadow .25s,border-color .25s;background:transparent;border-bottom:1px solid transparent;}
-.scrolled .nav{background:rgba(11,18,40,.92);backdrop-filter:blur(12px);border-bottom-color:rgba(255,255,255,.08);box-shadow:0 6px 24px rgba(0,0,0,.18);}
+/* nav (light) */
+.nav{position:sticky;top:0;z-index:60;transition:background .25s,box-shadow .25s,border-color .25s;background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-bottom:1px solid transparent;}
+.scrolled .nav{border-bottom-color:var(--line);box-shadow:0 4px 22px rgba(13,20,48,.07);}
 .nav-in{display:flex;align-items:center;justify-content:space-between;height:70px;}
-.brand{display:flex;align-items:center;gap:11px;color:#fff;font-weight:800;font-size:19px;text-decoration:none;}
-.brand .mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#5C7CFF,#2B50E0);display:grid;place-items:center;color:#fff;font-weight:900;font-size:19px;box-shadow:0 6px 18px rgba(43,80,224,.5);}
+.brand{display:flex;align-items:center;gap:11px;color:var(--ink);font-weight:800;font-size:19px;text-decoration:none;}
+.brand .mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#5C7CFF,#2B50E0);display:grid;place-items:center;color:#fff;font-weight:900;font-size:19px;box-shadow:0 6px 18px rgba(43,80,224,.4);}
 .brand .bn{display:flex;flex-direction:column;line-height:1.05;}
-.brand small{font-size:10.5px;font-weight:600;color:#9FB0D8;}
+.brand small{font-size:10.5px;font-weight:600;color:var(--mut);}
 .nav-links{display:flex;gap:28px;}
-.nav-links a{color:#C6D0EC;font-weight:600;font-size:15px;text-decoration:none;transition:color .15s;}
-.nav-links a:hover{color:#fff;}
+.nav-links a{color:var(--body);font-weight:600;font-size:15px;text-decoration:none;transition:color .15s;}
+.nav-links a:hover{color:var(--c);}
 .nav-cta{display:flex;align-items:center;gap:12px;}
-.burger{display:none;background:none;border:0;color:#fff;padding:6px;}
+.nav .link-btn{color:var(--ink);}
+.nav .link-btn:hover{color:var(--c);}
+.burger{display:none;background:none;border:0;color:var(--ink);padding:6px;}
 .burger svg{width:26px;height:26px;}
 
-/* hero */
-.hero{position:relative;background:linear-gradient(180deg,#0B1228 0%,#0E1738 70%,#101a3e 100%);color:#fff;padding:40px 0 0;overflow:hidden;}
+/* hero (centered, light) */
+.hero{position:relative;background:linear-gradient(180deg,#FFFFFF 0%,#F1F5FE 100%);color:var(--ink);padding:24px 0 0;overflow:hidden;}
 .hero-bg{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
-.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;background:radial-gradient(circle,#3a55d8,transparent 70%);animation:blob 16s ease-in-out infinite;}
-.b1{width:520px;height:520px;top:-160px;right:-120px;background:radial-gradient(circle,#3f5ee6,transparent 70%);}
-.b2{width:420px;height:420px;bottom:-160px;left:-120px;background:radial-gradient(circle,#5C7CFF,transparent 70%);animation-delay:-6s;}
+.glow{position:absolute;top:-240px;left:50%;transform:translateX(-50%);width:1000px;height:720px;background:radial-gradient(circle,rgba(43,80,224,.17),rgba(92,124,255,.06) 45%,transparent 66%);}
+.grid-fade{position:absolute;inset:0;background-image:linear-gradient(rgba(43,80,224,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(43,80,224,.055) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(circle at 50% 0%,#000,transparent 68%);mask-image:radial-gradient(circle at 50% 0%,#000,transparent 68%);}
+/* blobs kept for the dark sections (industry fit / final CTA) */
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;background:radial-gradient(circle,#3a55d8,transparent 70%);animation:blob 16s ease-in-out infinite;}
 .b3{width:600px;height:600px;top:-200px;left:50%;transform:translateX(-50%);background:radial-gradient(circle,#2b50e0,transparent 70%);opacity:.4;}
 .b4{width:500px;height:500px;top:-180px;right:-100px;background:radial-gradient(circle,#5C7CFF,transparent 70%);opacity:.35;}
-.grid-fade{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:46px 46px;mask-image:radial-gradient(circle at 70% 20%,#000,transparent 75%);}
-.hero-in{position:relative;display:grid;grid-template-columns:1.05fr 1fr;gap:50px;align-items:center;padding-top:36px;padding-bottom:70px;}
-.hero .pill{display:inline-block;font-size:13px;font-weight:700;color:#AFC0FF;background:rgba(92,124,255,.14);border:1px solid rgba(92,124,255,.3);padding:6px 14px;border-radius:999px;}
-.hero h1{color:#fff;font-size:clamp(34px,4.7vw,56px);font-weight:900;margin-top:18px;}
-.grad{background:linear-gradient(120deg,#8AA2FF,#5C7CFF 60%,#A9B9FF);-webkit-background-clip:text;background-clip:text;color:transparent;}
-.hero .sub{color:#C6D0EC;font-size:19px;margin-top:20px;max-width:55ch;}
-.hero-cta{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap;}
-.trust{display:flex;gap:20px;flex-wrap:wrap;margin-top:26px;color:#9FB0D8;font-size:14px;font-weight:600;}
+.hero-in{position:relative;text-align:center;max-width:900px;margin:0 auto;padding-top:50px;padding-bottom:64px;}
+.hero .pill{display:inline-block;font-size:13px;font-weight:700;color:var(--c);background:var(--tint);border:1px solid var(--bd);padding:6px 14px;border-radius:999px;}
+.hero h1{color:var(--ink);font-size:clamp(36px,5.2vw,60px);font-weight:900;margin:20px auto 0;max-width:17ch;}
+.grad{background:linear-gradient(120deg,#2B50E0,#5C7CFF);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.hero .sub{color:var(--body);font-size:19px;margin:20px auto 0;max-width:60ch;}
+.hero-cta{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap;justify-content:center;}
+.trust{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;margin-top:24px;color:var(--mut);font-size:14px;font-weight:600;}
 .trust span{display:flex;align-items:center;gap:7px;}
-.trust svg{width:16px;height:16px;color:#5CC98A;}
-.hero-shot{position:relative;}
-.frame{background:#0a1029;border:1px solid rgba(255,255,255,.12);border-radius:14px;box-shadow:0 30px 70px rgba(5,10,30,.55);overflow:hidden;}
-.frame.tilt{transform:perspective(1400px) rotateY(-7deg) rotateX(3deg);transition:transform .5s cubic-bezier(.4,0,.2,1);}
-.hero-shot:hover .frame.tilt{transform:perspective(1400px) rotateY(0) rotateX(0);}
-.fbar{display:flex;align-items:center;gap:7px;padding:11px 14px;background:#11183a;border-bottom:1px solid rgba(255,255,255,.08);}
-.fbar i{width:11px;height:11px;border-radius:50%;background:#3a4570;}
+.trust svg{width:16px;height:16px;color:var(--ok);}
+.hero-shot{position:relative;max-width:980px;margin:52px auto 0;}
+.frame{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 34px 80px rgba(13,20,48,.18);overflow:hidden;}
+.fbar{display:flex;align-items:center;gap:7px;padding:11px 14px;background:var(--bg2);border-bottom:1px solid var(--line);}
+.fbar i{width:11px;height:11px;border-radius:50%;background:#cfd6e6;}
 .fbar i:nth-child(1){background:#ff5f57;}.fbar i:nth-child(2){background:#febc2e;}.fbar i:nth-child(3){background:#28c840;}
-.fbar .url{margin-left:8px;font-size:12px;color:#8290bf;background:#0a1029;padding:4px 12px;border-radius:6px;flex:1;}
+.fbar .url{margin-left:8px;font-size:12px;color:var(--mut);background:#fff;border:1px solid var(--line);padding:4px 12px;border-radius:6px;flex:1;}
 .frame img{width:100%;display:block;}
-.fbadge{position:absolute;background:#fff;color:var(--ink);border-radius:13px;box-shadow:0 14px 36px rgba(5,10,30,.3);padding:12px 15px;display:flex;align-items:center;gap:11px;font-weight:700;font-size:14px;}
+.fbadge{position:absolute;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:13px;box-shadow:0 16px 40px rgba(13,20,48,.16);padding:12px 15px;display:flex;align-items:center;gap:11px;font-weight:700;font-size:14px;}
 .fbadge small{display:block;font-size:11px;color:var(--mut);font-weight:600;}
 .fbadge .fi{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none;}
 .fbadge .fi svg{width:19px;height:19px;}
 .fi.ok{background:#E9F7EF;color:var(--ok);}.fi.br{background:var(--tint);color:var(--c);}
-.fb1{top:-20px;left:-26px;}.fb2{bottom:30px;right:-26px;}
+.fb1{top:56px;left:-26px;}.fb2{bottom:40px;right:-26px;}
 
-/* marquee */
-.marquee{position:relative;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.18);overflow:hidden;padding:14px 0;}
+/* marquee (light) */
+.marquee{position:relative;border-top:1px solid var(--line);background:var(--bg2);overflow:hidden;padding:16px 0;}
 .mq-track{display:flex;gap:14px;width:max-content;animation:marquee 32s linear infinite;}
-.mq-chip{flex:none;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#C6D0EC;font-weight:700;font-size:13.5px;padding:8px 16px;border-radius:999px;}
+.mq-chip{flex:none;background:#fff;border:1px solid var(--line);color:var(--body);font-weight:700;font-size:13.5px;padding:8px 16px;border-radius:999px;}
 
 /* problem */
 .prob-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:42px;text-align:left;}
@@ -597,7 +594,7 @@ button{font-family:inherit;cursor:pointer;}
 }
 @media (max-width:600px){
   .sec{padding:62px 0;}
-  .nav-links{display:none;} .nav-links.open{display:flex;position:absolute;top:70px;left:0;right:0;flex-direction:column;background:var(--navy2);padding:18px 22px;gap:16px;border-bottom:1px solid rgba(255,255,255,.1);}
+  .nav-links{display:none;} .nav-links.open{display:flex;position:absolute;top:70px;left:0;right:0;flex-direction:column;background:#fff;padding:18px 22px;gap:16px;border-bottom:1px solid var(--line);box-shadow:0 14px 30px rgba(13,20,48,.1);}
   .burger{display:block;} .nav-cta .link-btn{display:none;}
   .prob-grid,.price-grid{grid-template-columns:1fr;}
   .cmp-head{display:none;}
