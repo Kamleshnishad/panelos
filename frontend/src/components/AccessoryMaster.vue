@@ -44,18 +44,15 @@
           <button class="btn-close" @click="showModal = false">✕</button>
         </div>
         <div class="form-grid">
-          <div class="form-group"><label>Code *</label><input v-model="form.code" placeholder="ACC-001" /></div>
-          <div class="form-group"><label>Name *</label><input v-model="form.name" placeholder="GI Flashing" /></div>
+          <div class="form-group"><label>Code *</label><FormInput v-model="form.code" name="acc_code" required :rules="[{ maxLength: 50 }]" placeholder="ACC-001" :async-check="editing ? { table: 'accessories', column: 'code', ignoreId: editId } : { table: 'accessories', column: 'code' }" /></div>
+          <div class="form-group"><label>Name *</label><FormInput v-model="form.name" name="acc_name" required :rules="[{ minLength: 2, maxLength: 100 }]" placeholder="GI Flashing" /></div>
           <div class="form-group">
             <label>Unit</label>
-            <select v-model="form.unit">
-              <option value="NOS">NOS</option><option value="MTR">MTR</option><option value="SQM">SQM</option>
-              <option value="KG">KG</option><option value="SET">SET</option>
-            </select>
+            <FormSelect v-model="form.unit" name="acc_unit" :options="['NOS','MTR','SQM','KG','SET']" />
           </div>
-          <div class="form-group"><label>HSN Code</label><input v-model="form.hsn_code" placeholder="73089090" /></div>
-          <div class="form-group"><label>Rate (₹)</label><input v-model.number="form.rate" type="number" min="0" step="0.01" /></div>
-          <div class="form-group full"><label>Description</label><input v-model="form.description" /></div>
+          <div class="form-group"><label>HSN Code</label><FormInput v-model="form.hsn_code" type="hsn" name="acc_hsn" placeholder="73089090" /></div>
+          <div class="form-group"><label>Rate (₹)</label><FormInput v-model.number="form.rate" type="number" name="acc_rate" :rules="[{ min: 0 }]" :step="0.01" /></div>
+          <div class="form-group full"><label>Description</label><FormInput v-model="form.description" name="acc_desc" :rules="[{ maxLength: 500 }]" /></div>
           <div class="form-group" v-if="editing">
             <label>Status</label>
             <select v-model="form.is_active"><option :value="true">Active</option><option :value="false">Inactive</option></select>
@@ -100,6 +97,8 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import masterDataService from '../services/masterDataService.js'
+import FormInput from './Form/FormInput.vue'
+import FormSelect from './Form/FormSelect.vue'
 
 const rows = ref([])
 const loading = ref(false)

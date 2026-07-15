@@ -4,6 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Rules\IndianGstin;
+use App\Rules\IndianIfsc;
+use App\Rules\IndianPan;
+use App\Rules\IndianPhone;
+use App\Rules\IndianPincode;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -49,21 +54,21 @@ class CompanyController extends Controller
 
             $validated = $request->validate([
                 'name'                 => 'required|string|max:255',
-                'gstin'                => 'nullable|string|max:20',
-                'pan'                  => 'nullable|string|max:20',
+                'gstin'                => ['nullable', 'string', 'max:20', new IndianGstin()],
+                'pan'                  => ['nullable', 'string', 'max:20', new IndianPan()],
                 'address_line1'        => 'nullable|string|max:255',
                 'city'                 => 'nullable|string|max:100',
                 'state'                => 'nullable|string|max:100',
                 'state_code'           => 'nullable|string|max:5',
-                'pincode'              => 'nullable|string|max:10',
-                'phone'                => 'nullable|string|max:20',
+                'pincode'              => ['nullable', 'string', 'max:10', new IndianPincode()],
+                'phone'                => ['nullable', 'string', 'max:20', new IndianPhone()],
                 'email'                => 'nullable|email|max:255',
                 'bank_name'            => 'nullable|string|max:255',
                 'bank_account_no'      => 'nullable|string|max:50',
-                'bank_ifsc'            => 'nullable|string|max:20',
+                'bank_ifsc'            => ['nullable', 'string', 'max:20', new IndianIfsc()],
                 'bank_branch'          => 'nullable|string|max:255',
                 'authorized_signatory' => 'nullable|string|max:255',
-                'signatory_phone'      => 'nullable|string|max:20',
+                'signatory_phone'      => ['nullable', 'string', 'max:20', new IndianPhone()],
                 'primary_color'        => 'nullable|string|max:20',
                 'secondary_color'      => 'nullable|string|max:20',
                 'quotation_prefix'     => 'nullable|string|max:10',

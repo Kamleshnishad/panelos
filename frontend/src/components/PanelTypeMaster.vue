@@ -45,20 +45,15 @@
           <button class="btn-close" @click="showModal = false">✕</button>
         </div>
         <div class="form-grid">
-          <div class="form-group"><label>Code *</label><input v-model="form.code" placeholder="PUF50" /></div>
-          <div class="form-group full"><label>Name *</label><input v-model="form.name" placeholder="Puff Panel 50mm" /></div>
+          <div class="form-group"><label>Code *</label><FormInput v-model="form.code" name="code" required :rules="[{ maxLength: 50 }]" placeholder="PUF50" :async-check="editing ? { table: 'panel_types', column: 'code', ignoreId: editId } : { table: 'panel_types', column: 'code' }" /></div>
+          <div class="form-group full"><label>Name *</label><FormInput v-model="form.name" name="name" required :rules="[{ minLength: 2, maxLength: 100 }]" placeholder="Puff Panel 50mm" /></div>
           <div class="form-group">
             <label>Category *</label>
-            <select v-model="form.category">
-              <option value="roof">Roof</option>
-              <option value="wall">Wall</option>
-              <option value="ceiling">Ceiling</option>
-              <option value="cold_room">Cold Room</option>
-            </select>
+            <FormSelect v-model="form.category" name="category" required :options="[{value:'roof',label:'Roof'},{value:'wall',label:'Wall'},{value:'ceiling',label:'Ceiling'},{value:'cold_room',label:'Cold Room'}]" />
           </div>
-          <div class="form-group"><label>HSN Code</label><input v-model="form.hsn_code" placeholder="39259010" /></div>
-          <div class="form-group"><label>Base Price (₹/SQM) *</label><input v-model.number="form.base_price" type="number" min="0" step="0.01" /></div>
-          <div class="form-group full"><label>Description</label><input v-model="form.description" /></div>
+          <div class="form-group"><label>HSN Code</label><FormInput v-model="form.hsn_code" type="hsn" name="hsn_code" placeholder="39259010" /></div>
+          <div class="form-group"><label>Base Price (₹/SQM) *</label><FormInput v-model.number="form.base_price" type="number" name="base_price" required :rules="[{ min: 0 }]" :step="0.01" /></div>
+          <div class="form-group full"><label>Description</label><FormInput v-model="form.description" name="description" :rules="[{ maxLength: 500 }]" /></div>
           <div class="form-group" v-if="editing">
             <label>Status</label>
             <select v-model="form.is_active"><option :value="true">Active</option><option :value="false">Inactive</option></select>
@@ -105,6 +100,8 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import masterDataService from '../services/masterDataService.js'
+import FormInput from './Form/FormInput.vue'
+import FormSelect from './Form/FormSelect.vue'
 
 const rows = ref([])
 const loading = ref(false)

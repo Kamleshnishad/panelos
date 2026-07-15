@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PurchaseOrder;
+use App\Rules\IndianPhone;
+use App\Rules\IndianGstin;
 use App\Services\ProcurementService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -28,8 +30,8 @@ class ProcurementController extends Controller
         try {
             $data = $r->validate([
                 'name'    => 'required|string|max:150',
-                'phone'   => 'nullable|string|max:30',
-                'gstin'   => 'nullable|string|max:20',
+                'phone'   => ['nullable', 'string', 'max:30', new IndianPhone()],
+                'gstin'   => ['nullable', 'string', 'max:20', new IndianGstin()],
                 'email'   => 'nullable|email|max:120',
                 'address' => 'nullable|string|max:255',
             ]);
@@ -45,8 +47,8 @@ class ProcurementController extends Controller
             $sup = \App\Models\Supplier::where('company_id', $this->cid($r))->findOrFail($id);
             $data = $r->validate([
                 'name'    => 'sometimes|required|string|max:150',
-                'phone'   => 'nullable|string|max:30',
-                'gstin'   => 'nullable|string|max:20',
+                'phone'   => ['nullable', 'string', 'max:30', new IndianPhone()],
+                'gstin'   => ['nullable', 'string', 'max:20', new IndianGstin()],
                 'email'   => 'nullable|email|max:120',
                 'address' => 'nullable|string|max:255',
             ]);

@@ -105,25 +105,25 @@
       <div class="modal-box lg">
         <div class="modal-header"><h3>{{ form.id ? 'Edit Lead' : 'New Lead' }}</h3><button class="btn-close" @click="showForm = false">✕</button></div>
         <div class="form-grid">
-          <div class="form-group"><label>Contact Name *</label><input v-model="form.contact_name" /></div>
-          <div class="form-group"><label>Company</label><input v-model="form.company_name" /></div>
-          <div class="form-group"><label>Phone</label><input v-model="form.phone" /></div>
-          <div class="form-group"><label>Email</label><input v-model="form.email" type="email" /></div>
-          <div class="form-group"><label>City</label><input v-model="form.city" /></div>
+          <div class="form-group"><label>Contact Name *</label><FormInput v-model="form.contact_name" name="contact_name" required :rules="[{ minLength: 2, maxLength: 100 }]" /></div>
+          <div class="form-group"><label>Company</label><FormInput v-model="form.company_name" name="company_name" :rules="[{ maxLength: 150 }]" /></div>
+          <div class="form-group"><label>Phone</label><FormInput v-model="form.phone" type="phone" name="phone" /></div>
+          <div class="form-group"><label>Email</label><FormInput v-model="form.email" type="email" name="email" /></div>
+          <div class="form-group"><label>City</label><FormInput v-model="form.city" name="city" :rules="[{ maxLength: 60 }]" /></div>
           <div class="form-group"><label>Source</label>
-            <select v-model="form.source"><option v-for="s in sources" :key="s" :value="s">{{ s }}</option></select>
+            <FormSelect v-model="form.source" name="source" :options="sources" />
           </div>
           <div class="form-group"><label>Application</label>
-            <select v-model="form.application"><option value="">—</option><option v-for="a in applications" :key="a" :value="a">{{ a }}</option></select>
+            <FormSelect v-model="form.application" name="application" :options="applications" />
           </div>
           <div class="form-group"><label>Assigned To</label>
-            <select v-model="form.assigned_to_user_id"><option :value="null">— Unassigned —</option><option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option></select>
+            <FormSelect v-model="form.assigned_to_user_id" name="assigned_to" :options="users.map(u => ({value:u.id,label:u.name}))" clearable />
           </div>
-          <div class="form-group"><label>Est. Qty (SQM)</label><input v-model.number="form.est_qty_sqm" type="number" min="0" /></div>
-          <div class="form-group"><label>Est. Value (₹)</label><input v-model.number="form.est_value" type="number" min="0" /></div>
-          <div class="form-group"><label>Next Follow-up</label><input v-model="form.next_follow_up_date" type="date" /></div>
-          <div class="form-group full"><label>Requirement / Inquiry</label><textarea v-model="form.requirement" rows="2" placeholder="e.g. 500 sqm 50mm wall panel for cold storage, RAL 9002"></textarea></div>
-          <div class="form-group full"><label>Notes</label><input v-model="form.notes" /></div>
+          <div class="form-group"><label>Est. Qty (SQM)</label><FormInput v-model.number="form.est_qty_sqm" type="number" name="est_qty_sqm" :rules="[{ min: 0 }]" /></div>
+          <div class="form-group"><label>Est. Value (₹)</label><FormInput v-model.number="form.est_value" type="number" name="est_value" :rules="[{ min: 0 }]" /></div>
+          <div class="form-group"><label>Next Follow-up</label><FormInput v-model="form.next_follow_up_date" type="date" name="next_follow_up" /></div>
+          <div class="form-group full"><label>Requirement / Inquiry</label><FormInput v-model="form.requirement" name="requirement" as="textarea" :rows="2" placeholder="e.g. 500 sqm 50mm wall panel for cold storage, RAL 9002" :rules="[{ maxLength: 1000 }]" /></div>
+          <div class="form-group full"><label>Notes</label><FormInput v-model="form.notes" name="notes" :rules="[{ maxLength: 1000 }]" /></div>
         </div>
         <div v-if="formError" class="error-msg">{{ formError }}</div>
         <div class="modal-actions">
@@ -209,6 +209,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import leadService from '../services/leadService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
+import FormInput from './Form/FormInput.vue'
+import FormSelect from './Form/FormSelect.vue'
 
 const emit = defineEmits(['convert'])
 

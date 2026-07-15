@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
+use App\Rules\IndianPhone;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -100,8 +101,8 @@ class UserController extends Controller
 
             $validated = $request->validate([
                 'name'             => 'required|string|max:255',
-                'email'            => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-                'phone'            => 'nullable|string|max:20',
+                'email'            => ['required', 'email', 'max:255', Rule::unique('users', 'email')->where('company_id', $companyId)],
+                'phone'            => ['nullable', 'string', 'max:20', new IndianPhone()],
                 'password'         => ['required', \App\Http\Controllers\Api\AuthController::passwordPolicy()],
                 'role_id'          => ['nullable', Rule::exists('roles', 'id')->where('company_id', $companyId)],
                 'is_company_admin' => 'nullable|boolean',
@@ -138,8 +139,8 @@ class UserController extends Controller
 
             $validated = $request->validate([
                 'name'             => 'sometimes|required|string|max:255',
-                'email'            => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($id)],
-                'phone'            => 'nullable|string|max:20',
+                'email'            => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->where('company_id', $companyId)->ignore($id)],
+                'phone'            => ['nullable', 'string', 'max:20', new IndianPhone()],
                 'role_id'          => ['nullable', Rule::exists('roles', 'id')->where('company_id', $companyId)],
                 'is_company_admin' => 'nullable|boolean',
                 'is_active'        => 'nullable|boolean',

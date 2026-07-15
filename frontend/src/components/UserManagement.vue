@@ -69,19 +69,16 @@
           <button class="btn-close" @click="showModal = false">✕</button>
         </div>
         <div class="form-grid">
-          <div class="form-group"><label>Name *</label><input v-model="form.name" /></div>
-          <div class="form-group"><label>Email *</label><input v-model="form.email" type="email" /></div>
-          <div class="form-group"><label>Phone</label><input v-model="form.phone" /></div>
+          <div class="form-group"><label>Name *</label><FormInput v-model="form.name" name="name" required :rules="[{ maxLength: 255 }]" /></div>
+          <div class="form-group"><label>Email *</label><FormInput v-model="form.email" name="email" type="email" required :async-check="editing ? { table: 'users', column: 'email', ignoreId: editId } : { table: 'users', column: 'email' }" /></div>
+          <div class="form-group"><label>Phone</label><FormInput v-model="form.phone" name="phone" type="phone" /></div>
           <div class="form-group">
             <label>Role</label>
-            <select v-model="form.role_id">
-              <option :value="null">— No role —</option>
-              <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
-            </select>
+            <FormSelect v-model="form.role_id" name="role_id" :options="roleOptions" placeholder="No role" />
           </div>
           <div class="form-group" v-if="!editing">
             <label>Password *</label>
-            <input v-model="form.password" type="password" placeholder="Min 6 characters" />
+            <FormInput v-model="form.password" name="password" type="password" required :rules="[{ minLength: 6 }]" />
           </div>
           <div class="form-group toggles">
             <label class="toggle"><input type="checkbox" v-model="form.is_company_admin" /> Company Admin</label>
@@ -119,7 +116,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import FormInput from './Form/FormInput.vue'
+import FormSelect from './Form/FormSelect.vue'
 import userService from '../services/userService.js'
 
 const users = ref([])
@@ -167,6 +166,8 @@ const resetTarget = ref(null)
 const resetPass = ref('')
 
 const form = reactive({ name: '', email: '', phone: '', role_id: null, password: '', is_company_admin: false, is_active: true })
+
+const roleOptions = computed(() => roles.value.map(r => ({ value: r.id, label: r.name })))
 
 async function load() {
   loading.value = true; error.value = null; forbidden.value = false

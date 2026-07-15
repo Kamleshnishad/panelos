@@ -130,17 +130,17 @@
     <div v-if="showSupplier" class="modal-overlay" @click.self="showSupplier = false">
       <div class="modal-box">
         <div class="modal-header"><h3>{{ newSup.id ? 'Edit Vendor' : 'New Vendor' }}</h3><button class="btn-close" @click="showSupplier = false">✕</button></div>
-        <div class="form-group"><label>Name *</label><input v-model="newSup.name" /></div>
+        <div class="form-group"><label>Name *</label><FormInput v-model="newSup.name" name="sup_name" required :rules="[{ maxLength: 150 }]" /></div>
         <div class="form-row">
-          <div class="form-group flex-1"><label>Phone</label><input v-model="newSup.phone" /></div>
-          <div class="form-group flex-1"><label>GSTIN</label><input v-model="newSup.gstin" /></div>
+          <div class="form-group flex-1"><label>Phone</label><FormInput v-model="newSup.phone" type="phone" name="sup_phone" /></div>
+          <div class="form-group flex-1"><label>GSTIN</label><FormInput v-model="newSup.gstin" type="gstin" name="sup_gstin" /></div>
         </div>
-        <div class="form-group"><label>Email</label><input v-model="newSup.email" type="email" /></div>
-        <div class="form-group"><label>Address</label><input v-model="newSup.address" /></div>
+        <div class="form-group"><label>Email</label><FormInput v-model="newSup.email" type="email" name="sup_email" /></div>
+        <div class="form-group"><label>Address</label><FormInput v-model="newSup.address" name="sup_address" :rules="[{ maxLength: 255 }]" /></div>
         <div v-if="supError" class="error-msg">{{ supError }}</div>
         <div class="modal-actions">
           <button class="btn btn-ghost" @click="showSupplier = false">Cancel</button>
-          <button class="btn btn-primary" :disabled="!newSup.name || supSaving" @click="saveSupplier">{{ supSaving ? 'Saving…' : (newSup.id ? 'Save' : 'Add') }}</button>
+          <button class="btn btn-primary" :disabled="!canSaveSupplier || supSaving" @click="saveSupplier">{{ supSaving ? 'Saving…' : (newSup.id ? 'Save' : 'Add') }}</button>
         </div>
       </div>
     </div>
@@ -182,6 +182,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import procurementService from '../services/procurementService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
+import FormInput from './Form/FormInput.vue'
 
 const pos = ref([])
 const loading = ref(false)
@@ -209,6 +210,7 @@ const recvError = ref(null)
 
 const subtotal = computed(() => form.items.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0), 0))
 const taxAmt = computed(() => subtotal.value * (form.tax_pct || 0) / 100)
+const canSaveSupplier = computed(() => !!newSup.name && newSup.name.length <= 150)
 
 function fmt(n) { return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '—' }

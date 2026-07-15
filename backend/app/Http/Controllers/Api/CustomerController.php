@@ -4,7 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Rules\IndianPhone;
+use App\Rules\IndianGstin;
+use App\Rules\IndianPan;
+use App\Rules\IndianPincode;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
 {
@@ -67,18 +72,20 @@ class CustomerController extends Controller
 
         $validated = $request->validate([
             'name'           => 'required|string|max:255',
-            'code'           => 'nullable|string|max:20',
+            'code'           => ['nullable', 'string', 'max:20', Rule::unique('customers', 'code')->where('company_id', $companyId)],
             'type'           => 'nullable|in:retail,wholesale,distributor,corporate',
             'contact_person' => 'nullable|string|max:100',
-            'email'          => 'nullable|email|max:100',
-            'phone'          => 'nullable|string|max:20',
-            'whatsapp_no'    => 'nullable|string|max:20',
-            'gstin'          => 'nullable|string|max:15',
+            'email'          => ['nullable', 'email', 'max:100', Rule::unique('customers', 'email')->where('company_id', $companyId)->ignore(null)],
+            'phone'          => ['nullable', 'string', 'max:20', new IndianPhone(), Rule::unique('customers', 'phone')->where('company_id', $companyId)],
+            'whatsapp_no'    => ['nullable', 'string', 'max:20', new IndianPhone()],
+            'gstin'          => ['nullable', 'string', 'max:15', new IndianGstin(), Rule::unique('customers', 'gstin')->where('company_id', $companyId)],
+            'pan'            => ['nullable', 'string', 'max:20', new IndianPan()],
             'address_line1'  => 'nullable|string|max:255',
+            'address_line2'  => 'nullable|string|max:255',
             'city'           => 'nullable|string|max:100',
             'state'          => 'nullable|string|max:100',
             'state_code'     => 'nullable|string|max:2',
-            'pincode'        => 'nullable|string|max:10',
+            'pincode'        => ['nullable', 'string', 'max:10', new IndianPincode()],
         ]);
 
         $customer = Customer::create([
@@ -117,15 +124,17 @@ class CustomerController extends Controller
             'name'               => 'sometimes|required|string|max:255',
             'type'               => 'nullable|in:retail,wholesale,distributor,corporate',
             'contact_person'     => 'nullable|string|max:100',
-            'email'              => 'nullable|email|max:100',
-            'phone'              => 'nullable|string|max:20',
-            'whatsapp_no'        => 'nullable|string|max:20',
-            'gstin'              => 'nullable|string|max:15',
+            'email'              => ['nullable', 'email', 'max:100', Rule::unique('customers', 'email')->where('company_id', $companyId)->ignore($id)],
+            'phone'              => ['nullable', 'string', 'max:20', new IndianPhone(), Rule::unique('customers', 'phone')->where('company_id', $companyId)->ignore($id)],
+            'whatsapp_no'        => ['nullable', 'string', 'max:20', new IndianPhone()],
+            'gstin'              => ['nullable', 'string', 'max:15', new IndianGstin(), Rule::unique('customers', 'gstin')->where('company_id', $companyId)->ignore($id)],
+            'pan'                => ['nullable', 'string', 'max:20', new IndianPan()],
             'address_line1'      => 'nullable|string|max:255',
+            'address_line2'      => 'nullable|string|max:255',
             'city'               => 'nullable|string|max:100',
             'state'              => 'nullable|string|max:100',
             'state_code'         => 'nullable|string|max:2',
-            'pincode'            => 'nullable|string|max:10',
+            'pincode'            => ['nullable', 'string', 'max:10', new IndianPincode()],
             'credit_limit'       => 'nullable|numeric|min:0',
             'payment_terms_days' => 'nullable|integer|min:0|max:365',
             'is_active'          => 'nullable|boolean',

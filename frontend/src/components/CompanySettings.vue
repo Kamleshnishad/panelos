@@ -58,10 +58,10 @@
           <div class="form-group full"><label>Address Line</label><input v-model="form.address_line1" :disabled="!canEdit" /></div>
           <div class="form-group"><label>City</label><input v-model="form.city" :disabled="!canEdit" /></div>
           <div class="form-group"><label>State</label><input v-model="form.state" :disabled="!canEdit" /></div>
-          <div class="form-group"><label>State Code (GST)</label><input v-model="form.state_code" :disabled="!canEdit" placeholder="e.g. GJ" /></div>
-          <div class="form-group"><label>Pincode</label><input v-model="form.pincode" :disabled="!canEdit" /></div>
-          <div class="form-group"><label>Phone</label><input v-model="form.phone" :disabled="!canEdit" /></div>
-          <div class="form-group"><label>Email</label><input v-model="form.email" :disabled="!canEdit" /></div>
+          <div class="form-group"><label>State Code (GST)</label><FormInput v-model="form.state_code" :disabled="!canEdit" name="state_code" label="" :max-length="5" /></div>
+          <div class="form-group"><label>Pincode</label><FormInput v-model="form.pincode" type="pincode" :disabled="!canEdit" name="pincode" label="" /></div>
+          <div class="form-group"><label>Phone</label><FormInput v-model="form.phone" type="phone" :disabled="!canEdit" name="phone" label="" /></div>
+          <div class="form-group"><label>Email</label><FormInput v-model="form.email" type="email" :disabled="!canEdit" name="email" label="" /></div>
         </div>
       </section>
 
@@ -69,8 +69,8 @@
       <section class="card">
         <h3>Tax &amp; Compliance</h3>
         <div class="form-grid">
-          <div class="form-group"><label>GSTIN</label><input v-model="form.gstin" :disabled="!canEdit" /></div>
-          <div class="form-group"><label>PAN</label><input v-model="form.pan" :disabled="!canEdit" /></div>
+          <div class="form-group"><label>GSTIN</label><FormInput v-model="form.gstin" type="gstin" :disabled="!canEdit" name="gstin" label="" /></div>
+          <div class="form-group"><label>PAN</label><FormInput v-model="form.pan" type="pan" :disabled="!canEdit" name="pan" label="" /></div>
           <div class="form-group">
             <label>Financial Year Start</label>
             <select v-model.number="form.financial_year_start" :disabled="!canEdit">
@@ -90,10 +90,10 @@
         <div class="form-grid">
           <div class="form-group"><label>Bank Name</label><input v-model="form.bank_name" :disabled="!canEdit" /></div>
           <div class="form-group"><label>Account No</label><input v-model="form.bank_account_no" :disabled="!canEdit" /></div>
-          <div class="form-group"><label>IFSC</label><input v-model="form.bank_ifsc" :disabled="!canEdit" /></div>
+          <div class="form-group"><label>IFSC</label><FormInput v-model="form.bank_ifsc" type="ifsc" :disabled="!canEdit" name="bank_ifsc" label="" /></div>
           <div class="form-group"><label>Branch</label><input v-model="form.bank_branch" :disabled="!canEdit" /></div>
           <div class="form-group"><label>Authorized Signatory</label><input v-model="form.authorized_signatory" :disabled="!canEdit" /></div>
-          <div class="form-group"><label>Signatory Phone</label><input v-model="form.signatory_phone" :disabled="!canEdit" /></div>
+          <div class="form-group"><label>Signatory Phone</label><FormInput v-model="form.signatory_phone" type="phone" :disabled="!canEdit" name="signatory_phone" label="" /></div>
         </div>
       </section>
 
@@ -112,8 +112,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import companyService from '../services/companyService.js'
+import FormInput from './Form/FormInput.vue'
+import FormSelect from './Form/FormSelect.vue'
+import { toastSuccess, toastError } from '../services/ui.js'
 
 const loading       = ref(false)
 const saving        = ref(false)

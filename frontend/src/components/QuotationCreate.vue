@@ -36,12 +36,12 @@
 
           <div class="form-group">
             <label>Project Name</label>
-            <input v-model="form.project_name" placeholder="e.g. Cold Storage Unit, Pune" />
+            <FormInput v-model="form.project_name" name="project_name" :rules="[{ maxLength: 255 }]" placeholder="e.g. Cold Storage Unit, Pune" />
           </div>
 
           <div class="form-group">
             <label>Project Location</label>
-            <input v-model="form.project_location" placeholder="City / Site address" />
+            <FormInput v-model="form.project_location" name="project_location" :rules="[{ maxLength: 255 }]" placeholder="City / Site address" />
           </div>
 
           <div class="form-group">
@@ -60,17 +60,17 @@
 
           <div class="form-group">
             <label>Validity (days)</label>
-            <input v-model.number="form.validity_days" type="number" min="1" max="365" />
+            <FormInput v-model.number="form.validity_days" type="number" name="validity_days" :rules="[{ min: 1, max: 365 }]" />
           </div>
 
           <div class="form-group" v-if="!isBoq">
             <label>Discount %</label>
-            <input v-model.number="form.discount_pct" type="number" min="0" max="100" step="0.5" @input="recalcTotals" />
+            <FormInput v-model.number="form.discount_pct" type="number" name="discount_pct" :rules="[{ min: 0, max: 100 }]" :step="0.5" @input="recalcTotals" />
           </div>
 
           <div class="form-group" v-if="!isBoq">
             <label>Advance %</label>
-            <input v-model.number="form.advance_pct" type="number" min="0" max="100" step="5" @input="recalcTotals" />
+            <FormInput v-model.number="form.advance_pct" type="number" name="advance_pct" :rules="[{ min: 0, max: 100 }]" :step="5" @input="recalcTotals" />
           </div>
 
           <div class="form-group" v-if="!isBoq">
@@ -156,7 +156,7 @@
 
             <div class="form-group">
               <label>Density (kg/m³)</label>
-              <input v-model.number="row.density_kgm3" type="number" step="1" min="10" max="200" />
+              <FormInput v-model.number="row.density_kgm3" type="number" name="density_kgm3" step="1" :rules="[{ min: 10, max: 200 }]" />
             </div>
 
             <div class="form-group">
@@ -498,31 +498,12 @@
     </div>
 
     <!-- New customer modal -->
-    <div v-if="showAddCustomer" class="cust-overlay" @click.self="showAddCustomer = false">
-      <div class="cust-modal" role="dialog" aria-modal="true" aria-label="Add customer">
-        <h3>New Customer</h3>
-        <div class="cust-grid">
-          <div class="form-group"><label>Name *</label><input v-model="newCust.name" ref="newCustNameInput" /></div>
-          <div class="form-group"><label>Type</label>
-            <select v-model="newCust.type">
-              <option value="retail">Retail</option>
-              <option value="wholesale">Wholesale</option>
-              <option value="distributor">Distributor</option>
-              <option value="corporate">Corporate</option>
-            </select>
-          </div>
-          <div class="form-group"><label>City</label><input v-model="newCust.city" /></div>
-          <div class="form-group"><label>State Code</label><input v-model="newCust.state_code" maxlength="2" placeholder="GJ" /></div>
-          <div class="form-group"><label>GSTIN</label><input v-model="newCust.gstin" placeholder="optional" /></div>
-          <div class="form-group"><label>Phone</label><input v-model="newCust.phone" /></div>
-        </div>
-        <div v-if="custError" class="error-banner">{{ custError }}</div>
-        <div class="cust-actions">
-          <button class="btn btn-ghost" @click="showAddCustomer = false">Cancel</button>
-          <button class="btn btn-primary" :disabled="custSaving || !newCust.name" @click="saveNewCustomer">{{ custSaving ? 'Saving…' : 'Add Customer' }}</button>
-        </div>
-      </div>
-    </div>
+    <CustomerEditModal
+      :open="showAddCustomer"
+      :customer="null"
+      @close="showAddCustomer = false"
+      @saved="onNewCustomerSaved"
+    />
 
     <!-- Color datalist -->
     <datalist id="color-list">
@@ -552,6 +533,8 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import quotationService from '../services/quotationService.js'
 import { confirmDialog, toastSuccess, toastError } from '../services/ui.js'
+import CustomerEditModal from './CustomerEditModal.vue'
+import FormInput from './Form/FormInput.vue'
 
 const props = defineProps({
   editId: { type: Number, default: null },
@@ -574,30 +557,22 @@ const customers = ref([])
 const panelTypes = ref([])
 const masterAccessories = ref([])
 const showAddCustomer = ref(false)
-const newCust = reactive({ name: '', type: 'retail', city: '', state_code: '', gstin: '', phone: '' })
-const newCustNameInput = ref(null)
-const custSaving = ref(false)
-const custError = ref(null)
 const submitError = ref(null)
 const saving = ref(false)
 
-watch(showAddCustomer, (v) => { if (v) nextTick(() => newCustNameInput.value?.focus()) })
-
-async function saveNewCustomer() {
-  if (!newCust.name) return
-  custSaving.value = true; custError.value = null
+async function onNewCustomerSaved() {
   try {
-    const res = await quotationService.createCustomer({ ...newCust })
-    const c = res?.data ?? res
-    customers.value.push(c)
-    form.customer_id = c.id
-    onCustomerChange()
-    showAddCustomer.value = false
-    Object.assign(newCust, { name: '', type: 'retail', city: '', state_code: '', gstin: '', phone: '' })
-    toastSuccess('Customer added.')
+    const res = await quotationService.listCustomers({ search: '' })
+    const list = res?.data?.data ?? res?.data ?? res
+    customers.value = Array.isArray(list) ? list : []
+    if (customers.value.length) {
+      const last = customers.value[customers.value.length - 1]
+      form.customer_id = last.id
+      onCustomerChange()
+    }
   } catch (e) {
-    custError.value = e?.response?.data?.message ?? 'Failed to add customer.'
-  } finally { custSaving.value = false }
+    toastError('Failed to refresh customers list.')
+  }
 }
 const companyStateCode = ref(null)   // loaded from /auth/me at mount
 
@@ -905,6 +880,9 @@ async function save(mode) {
         return failValidation(`Row ${rowNum}: enter a rate per SQM before sending. Save as BOQ if rates aren't ready.`, row)
       }
     }
+    if (row.thickness <= 0) return failValidation(`Row ${rowNum}: thickness must be greater than 0mm.`, row)
+    const dKg = Number(row.density_kgm3)
+    if (dKg && (dKg < 10 || dKg > 200)) return failValidation(`Row ${rowNum}: density (kg/m³) must be between 10 and 200.`, row)
   }
 
   saving.value = true

@@ -82,6 +82,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active'])->group(fu
     Route::put('/company', [\App\Http\Controllers\Api\CompanyController::class, 'update'])->name('company.update');
     Route::post('/company/logo', [\App\Http\Controllers\Api\CompanyController::class, 'uploadLogo'])->name('company.logo');
 
+    // Live validation checks (unique-field, format, etc.)
+    Route::post('/validation/check-unique', [\App\Http\Controllers\Api\ValidationController::class, 'checkUnique'])->name('validation.check-unique');
+
     // User Management
     Route::get('/users', [\App\Http\Controllers\Api\UserController::class, 'index'])->name('users.index');
     Route::post('/users', [\App\Http\Controllers\Api\UserController::class, 'store'])->name('users.store');

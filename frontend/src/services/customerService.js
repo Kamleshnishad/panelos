@@ -12,4 +12,6 @@ export default {
   list(params = {}) { return api('get', '/api/customers', null, params) },
   get(id)           { return api('get', `/api/customers/${id}`) },
   profile(id)       { return api('get', `/api/customers/${id}/profile`) },
+  create(payload)   { return api('post', '/api/customers', payload) },
+  update(id, payload) { return api('put', `/api/customers/${id}`, payload) },
 }
