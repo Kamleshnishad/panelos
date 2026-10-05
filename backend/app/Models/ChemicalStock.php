@@ -59,7 +59,7 @@ class ChemicalStock extends BaseModel
 
     public function isExpiring()
     {
-        return $this->expiry_date && $this->expiry_date->diffInDays(now()) <= 30;
+        return $this->expiry_date && !$this->expiry_date->isPast() && $this->expiry_date->lte(now()->addDays(30));
     }
 
     public function isExpired()

@@ -95,19 +95,23 @@ class ForecastingService
                     $this->daysUntilReorder($currentStock, $avgDailySales)
                 );
 
-                $forecast = DemandForecast::create([
-                    'company_id' => $companyId,
-                    'panel_type_id' => $panelType->id,
-                    'forecast_date' => $today,
-                    'forecast_period_days' => $forecastPeriod,
-                    'predicted_demand' => $predictedDemand,
-                    'current_stock' => $currentStock,
-                    'reorder_quantity' => $reorderQuantity,
-                    'recommended_order_date' => $recommendedOrderDate,
-                    'seasonal_factor' => $seasonalFactor,
-                    'trend_strength' => $trendStrength,
-                    'risk_level' => $riskLevel
-                ]);
+                $forecast = DemandForecast::updateOrCreate(
+                    [
+                        'company_id' => $companyId,
+                        'panel_type_id' => $panelType->id,
+                        'forecast_date' => $today,
+                        'forecast_period_days' => $forecastPeriod,
+                    ],
+                    [
+                        'predicted_demand' => $predictedDemand,
+                        'current_stock' => $currentStock,
+                        'reorder_quantity' => $reorderQuantity,
+                        'recommended_order_date' => $recommendedOrderDate,
+                        'seasonal_factor' => $seasonalFactor,
+                        'trend_strength' => $trendStrength,
+                        'risk_level' => $riskLevel
+                    ]
+                );
 
                 $forecasts[] = $forecast;
             }

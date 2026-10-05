@@ -183,6 +183,10 @@ class QuotationService
 
     public function revise(Quotation $original): Quotation
     {
+        if (!in_array($original->status, ['draft', 'sent', 'accepted'], true)) {
+            throw new \Exception("Cannot revise a quotation in '{$original->status}' status.");
+        }
+
         return DB::transaction(function () use ($original) {
             // Lock the original
             $original->update(['status' => 'revised']);
@@ -487,6 +491,8 @@ class QuotationService
             // door/custom/standard — if a real accessory_id (integer) provided, attach to pivot
             $accId = $acc['accessory_id'] ?? null;
             if ($accId && is_numeric($accId)) {
+                // Tenant guard: only the quotation's own company's accessories may be attached.
+                \App\Models\Accessory::where('company_id', $quotation->company_id)->findOrFail((int) $accId);
                 $quotation->accessories()->attach((int) $accId, [
                     'quantity'    => $qty,
                     'unit_price'  => $rate,

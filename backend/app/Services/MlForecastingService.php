@@ -58,19 +58,23 @@ class MlForecastingService
         $reorderQty    = $this->reorderQuantity($avgDaily, $horizonDays);
         $reorderDate   = $this->reorderDate($currentStock, $avgDaily);
 
-        $forecast = DemandForecast::create([
-            'company_id'           => $companyId,
-            'panel_type_id'        => $panelTypeId,
-            'forecast_date'        => now(),
-            'forecast_period_days' => $horizonDays,
-            'predicted_demand'     => $totalDemand,
-            'current_stock'        => $currentStock,
-            'reorder_quantity'     => $reorderQty,
-            'recommended_order_date' => $reorderDate,
-            'seasonal_factor'      => $seasonality['strength'],
-            'trend_strength'       => $trendDir['slope'],
-            'risk_level'           => $riskLevel,
-        ]);
+        $forecast = DemandForecast::updateOrCreate(
+            [
+                'company_id'           => $companyId,
+                'panel_type_id'        => $panelTypeId,
+                'forecast_date'        => now()->toDateString(),
+                'forecast_period_days' => $horizonDays,
+            ],
+            [
+                'predicted_demand'     => $totalDemand,
+                'current_stock'        => $currentStock,
+                'reorder_quantity'     => $reorderQty,
+                'recommended_order_date' => $reorderDate,
+                'seasonal_factor'      => $seasonality['strength'],
+                'trend_strength'       => $trendDir['slope'],
+                'risk_level'           => $riskLevel,
+            ]
+        );
 
         return [
             'success'             => true,

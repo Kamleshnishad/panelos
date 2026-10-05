@@ -27,19 +27,10 @@ class ReportingService
         $from_date = $from_date ?? now()->subYear();
         $to_date = $to_date ?? now();
 
-        $query = Invoice::where('company_id', $companyId)
-            ->whereNotIn('status', ['draft', 'cancelled'])
-            ->whereBetween('invoice_date', [$from_date, $to_date]);
-
-        $invoices = $query->with('items', 'taxCalculation')->get();
-
-        $totalRevenue = $invoices->sum(function ($inv) {
-            return $inv->subtotal;
-        });
-
-        $totalTax = $invoices->sum(function ($inv) {
-            return $inv->taxCalculation->tax_amount ?? 0;
-        });
+        $agg = $this->invoiceAggregates($companyId, fn ($q) => $q->whereBetween('invoice_date', [$from_date, $to_date]));
+        $totalRevenue = $agg['revenue'];
+        $totalTax = $agg['tax'];
+        $invoiceCount = $agg['count'];
 
         $grossRevenue = $totalRevenue + $totalTax;
 
@@ -53,9 +44,28 @@ class ReportingService
                 'tax_collected' => $totalTax,
                 'gross_revenue' => $grossRevenue
             ],
-            'invoice_count' => $invoices->count(),
-            'average_invoice_value' => $invoices->count() > 0 ? round($grossRevenue / $invoices->count(), 2) : 0
+            'invoice_count' => $invoiceCount,
+            'average_invoice_value' => $invoiceCount > 0 ? round($grossRevenue / $invoiceCount, 2) : 0
         ];
+    }
+
+    /**
+     * Invoice count, subtotal sum and tax sum computed in SQL (no model hydration).
+     * $scope adds the caller's date constraints to the base company/status filter.
+     */
+    private function invoiceAggregates(int $companyId, \Closure $scope): array
+    {
+        $base = DB::table('invoices')
+            ->where('company_id', $companyId)
+            ->whereNotIn('status', ['draft', 'cancelled']);
+        $scope($base);
+
+        $row = (clone $base)->selectRaw('COUNT(*) AS n, COALESCE(SUM(subtotal), 0) AS revenue')->first();
+        $tax = DB::table('tax_calculations as t')
+            ->joinSub((clone $base)->select('id'), 'si', 'si.id', '=', 't.invoice_id')
+            ->sum('t.tax_amount');
+
+        return ['count' => (int) $row->n, 'revenue' => (float) $row->revenue, 'tax' => (float) $tax];
     }
 
     public function getBalanceSheet($companyId = null, $asOf = null)
@@ -63,19 +73,9 @@ class ReportingService
         $companyId = $companyId ?? auth()->user()->company_id;
         $asOf = $asOf ?? now();
 
-        $query = Invoice::where('company_id', $companyId)
-            ->whereNotIn('status', ['draft', 'cancelled'])
-            ->where('invoice_date', '<=', $asOf);
-
-        $invoices = $query->with('items', 'taxCalculation')->get();
-
-        $totalRevenue = $invoices->sum(function ($inv) {
-            return $inv->subtotal;
-        });
-
-        $totalTax = $invoices->sum(function ($inv) {
-            return $inv->taxCalculation->tax_amount ?? 0;
-        });
+        $agg = $this->invoiceAggregates($companyId, fn ($q) => $q->where('invoice_date', '<=', $asOf));
+        $totalRevenue = $agg['revenue'];
+        $totalTax = $agg['tax'];
 
         $totalPaid = PaymentTransaction::where('company_id', $companyId)
             ->where('created_at', '<=', $asOf)
@@ -107,15 +107,9 @@ class ReportingService
         $from_date = $from_date ?? now()->subYear();
         $to_date = $to_date ?? now();
 
-        $invoices = Invoice::where('company_id', $companyId)
-            ->whereNotIn('status', ['draft', 'cancelled'])
-            ->whereBetween('invoice_date', [$from_date, $to_date])
-            ->with('items', 'taxCalculation')
-            ->get();
-
-        $invoiceRevenue = $invoices->sum(function ($inv) {
-            return $inv->subtotal + ($inv->taxCalculation->tax_amount ?? 0);
-        });
+        $agg = $this->invoiceAggregates($companyId, fn ($q) => $q->whereBetween('invoice_date', [$from_date, $to_date]));
+        $invoiceRevenue = $agg['revenue'] + $agg['tax'];
+        $invoiceCount = $agg['count'];
 
         $payments = PaymentTransaction::where('company_id', $companyId)
             ->whereBetween('transaction_date', [$from_date, $to_date])
@@ -135,7 +129,7 @@ class ReportingService
                 'write_offs' => $writeOffs,
                 'net_operating_cash_flow' => $cashInflow - $writeOffs
             ],
-            'invoice_count' => $invoices->count(),
+            'invoice_count' => $invoiceCount,
             'payment_transaction_count' => $payments->count()
         ];
     }
@@ -159,11 +153,16 @@ class ReportingService
         $companyId = $companyId ?? auth()->user()->company_id;
         $asOf = $asOf ?? now();
 
+        // 'paid' is deliberately NOT excluded: legacy "Mark Paid" rows can carry a
+        // real balance (audit E-C2), and hiding them would hide receivables.
         $invoices = Invoice::where('company_id', $companyId)
             ->whereNotIn('status', ['draft', 'cancelled'])
             ->where('invoice_date', '<=', $asOf)
-            ->with('dispatch.batch.order.customer', 'items', 'taxCalculation')
-            ->get();
+            ->with([
+                'dispatch.batch.order.customer:id,name',
+                'taxCalculation:id,invoice_id,tax_amount',
+            ])
+            ->get(['id', 'company_id', 'dispatch_id', 'invoice_no', 'status', 'subtotal', 'invoice_date', 'due_date']);
 
         $paidMap = $this->paidByInvoice($invoices->pluck('id'));
 
@@ -191,16 +190,17 @@ class ReportingService
             ];
         });
 
-        $summary = [
-            'total_ar' => $arData->sum('remaining_due'),
-            'current' => $arData->filter(function ($row) { return $row['days_overdue'] === 0; })->sum('remaining_due'),
-            '30_days' => $arData->filter(function ($row) { return $row['days_overdue'] > 0 && $row['days_overdue'] <= 30; })->sum('remaining_due'),
-            '60_days' => $arData->filter(function ($row) { return $row['days_overdue'] > 30 && $row['days_overdue'] <= 60; })->sum('remaining_due'),
-            '90_days' => $arData->filter(function ($row) { return $row['days_overdue'] > 60 && $row['days_overdue'] <= 90; })->sum('remaining_due'),
-            'over_90_days' => $arData->filter(function ($row) { return $row['days_overdue'] > 90; })->sum('remaining_due'),
-            'invoice_count' => $arData->count(),
-            'overdue_count' => $arData->filter(function ($row) { return $row['is_overdue']; })->count()
-        ];
+        // Single pass over the rows instead of one filter()->sum() per bucket.
+        $summary = ['total_ar' => 0, 'current' => 0, '30_days' => 0, '60_days' => 0, '90_days' => 0, 'over_90_days' => 0, 'invoice_count' => 0, 'overdue_count' => 0];
+        foreach ($arData as $row) {
+            $d = $row['days_overdue'];
+            $r = $row['remaining_due'];
+            $summary['total_ar'] += $r;
+            $summary['invoice_count']++;
+            if ($row['is_overdue']) $summary['overdue_count']++;
+            $bucket = $d === 0 ? 'current' : ($d <= 30 ? '30_days' : ($d <= 60 ? '60_days' : ($d <= 90 ? '90_days' : 'over_90_days')));
+            $summary[$bucket] += $r;
+        }
 
         return [
             'summary' => $summary,

@@ -215,15 +215,22 @@ class InvoiceService
     {
         $companyId = $companyId ?? auth()->user()->company_id;
 
-        $invoice = Invoice::where('company_id', $companyId)->findOrFail($invoiceId);
+        return DB::transaction(function () use ($invoiceId, $companyId) {
+            $invoice = Invoice::where('company_id', $companyId)->lockForUpdate()->findOrFail($invoiceId);
 
-        if (!$invoice->canMarkPaid()) {
-            throw new \Exception('Invoice cannot be marked paid in ' . $invoice->status . ' status');
-        }
+            if (!$invoice->canMarkPaid()) {
+                throw new \Exception('Invoice cannot be marked paid in ' . $invoice->status . ' status');
+            }
 
-        $invoice->update(['status' => 'paid', 'paid_date' => now()]);
+            $remaining = app(PaymentService::class)->calculateRemainingDue($invoice->id);
+            if ($remaining > 0.01) {
+                throw new \Exception('Cannot mark paid: ₹' . number_format($remaining, 2) . ' is still outstanding. Record the payment instead.');
+            }
 
-        return $invoice;
+            $invoice->update(['status' => 'paid', 'paid_date' => now()]);
+
+            return $invoice;
+        });
     }
 
     public function cancelInvoice($invoiceId, $companyId = null)

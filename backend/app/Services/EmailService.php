@@ -33,7 +33,7 @@ class EmailService
             // For now, send without attachment (PDF generation requires DomPDF)
             // In production, you would generate and attach the PDF file
             Mail::to($customerEmail)
-                ->send(new InvoiceSentMailable($invoice));
+                ->queue(new InvoiceSentMailable($invoice));
 
             // Log email sent
             $this->logEmailSent($invoice, 'invoice_sent', $customerEmail);
@@ -57,7 +57,7 @@ class EmailService
             $daysOverdue = now()->diffInDays($invoice->due_date);
 
             Mail::to($customerEmail)
-                ->send(new PaymentReminderMailable($invoice, $daysOverdue));
+                ->queue(new PaymentReminderMailable($invoice, $daysOverdue));
 
             // Log email sent
             $this->logEmailSent($invoice, 'payment_reminder', $customerEmail);
@@ -79,7 +79,7 @@ class EmailService
             }
 
             Mail::to($customerEmail)
-                ->send(new PaymentReceivedMailable($invoice, $payment));
+                ->queue(new PaymentReceivedMailable($invoice, $payment));
 
             // Log email sent
             $this->logEmailSent($invoice, 'payment_received', $customerEmail);

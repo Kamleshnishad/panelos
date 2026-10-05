@@ -66,6 +66,10 @@ class QualityControlController extends Controller
             $validated = $request->validate([
                 'status' => 'required|in:pass,fail',
                 'notes' => 'nullable|string|max:1000',
+                'checklist' => 'nullable|array|max:50',
+                'checklist.*.key' => 'required_with:checklist|string|max:50',
+                'checklist.*.label' => 'required_with:checklist|string|max:200',
+                'checklist.*.passed' => 'required_with:checklist|boolean',
             ]);
 
             $qc = $this->qcService->create($batch, $validated, $request->user()->id);

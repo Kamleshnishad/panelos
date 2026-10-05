@@ -124,36 +124,34 @@ class AnalyticsService
         return DB::transaction(function () use ($companyId, $snapshotDate) {
             $snapshotDate = $snapshotDate ?? now()->toDateString();
 
-            $invoices = Invoice::where('company_id', $companyId)
-                ->where('status', '!=', 'draft')
-                ->with('items', 'taxCalculation')
-                ->get();
+            // Aggregate in SQL: the snapshot must not load the company's whole invoice history.
+            $nonDraft = fn () => DB::table('invoices')->where('company_id', $companyId)->where('status', '!=', 'draft');
 
-            $totalInvoices = $invoices->count();
-            $totalRevenue = $invoices->sum('subtotal');
+            $totalInvoices = $nonDraft()->count();
+            $totalRevenue = (float) $nonDraft()->sum('subtotal');
             $avgInvoiceValue = $totalInvoices > 0 ? $totalRevenue / $totalInvoices : 0;
 
-            $totalQuantity = 0;
-            $panelTypesSold = [];
+            $quantities = DB::table('invoice_items as ii')
+                ->join('invoices as i', 'i.id', '=', 'ii.invoice_id')
+                ->where('i.company_id', $companyId)
+                ->where('i.status', '!=', 'draft')
+                ->groupBy('ii.panel_type_id')
+                ->orderByRaw('MIN(ii.id)')
+                ->selectRaw('ii.panel_type_id, SUM(ii.quantity) AS qty')
+                ->get();
 
-            foreach ($invoices as $invoice) {
-                foreach ($invoice->items as $item) {
-                    $totalQuantity += $item->quantity;
-                    $panelTypesSold[$item->panel_type_id] = ($panelTypesSold[$item->panel_type_id] ?? 0) + $item->quantity;
-                }
-            }
+            $totalQuantity = (float) $quantities->sum('qty');
+            $topPanelTypeId = $quantities->first()->panel_type_id ?? null;
 
-            $topPanelTypeId = array_key_exists(0, $panelTypesSold)
-                ? array_key_first($panelTypesSold)
-                : (array_keys($panelTypesSold)[0] ?? null);
-
+            // coil_stocks has quantity_in_stock + unit_cost (the old quantity/average_cost
+            // names don't exist, so this query failed on every database).
             $totalInventoryValue = DB::table('coil_stocks')
                 ->where('company_id', $companyId)
-                ->sum(DB::raw('quantity * average_cost'));
+                ->sum(DB::raw('quantity_in_stock * unit_cost'));
 
             $totalStockUnits = DB::table('coil_stocks')
                 ->where('company_id', $companyId)
-                ->sum('quantity') ?? 0;
+                ->sum('quantity_in_stock') ?? 0;
 
             $accountsReceivable = Invoice::where('company_id', $companyId)
                 ->whereNotIn('status', ['draft', 'cancelled', 'paid'])
@@ -168,11 +166,21 @@ class AnalyticsService
                 ->whereNotIn('status', ['draft', 'cancelled', 'paid'])
                 ->count();
 
-            $taxCollected = $invoices->sum(function ($inv) {
-                return $inv->taxCalculation->tax_amount ?? 0;
-            });
+            $taxCollected = (float) DB::table('tax_calculations as t')
+                ->join('invoices as i', 'i.id', '=', 't.invoice_id')
+                ->where('i.company_id', $companyId)
+                ->where('i.status', '!=', 'draft')
+                ->sum('t.tax_amount');
 
-            $activeCustomers = $invoices->pluck('dispatch.batch.order.customer_id')->unique()->count();
+            $activeCustomers = DB::table('invoices as i')
+                ->join('dispatches as d', 'd.id', '=', 'i.dispatch_id')
+                ->join('production_batches as b', 'b.id', '=', 'd.batch_id')
+                ->join('orders as o', 'o.id', '=', 'b.order_id')
+                ->where('i.company_id', $companyId)
+                ->where('i.status', '!=', 'draft')
+                ->whereNotNull('o.customer_id')
+                ->distinct()
+                ->count('o.customer_id');
 
             $performanceStatus = $this->assessPerformanceStatus(
                 $totalRevenue,

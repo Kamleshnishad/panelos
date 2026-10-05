@@ -11,11 +11,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE low_stock_alerts MODIFY COLUMN item_type ENUM('coil','chemical','consumable')");
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE low_stock_alerts MODIFY COLUMN item_type ENUM('coil','chemical','consumable')");
+        }
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE low_stock_alerts MODIFY COLUMN item_type ENUM('coil','chemical')");
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE low_stock_alerts MODIFY COLUMN item_type ENUM('coil','chemical')");
+        }
     }
 };

@@ -10,6 +10,7 @@ return [
         'leads.view'        => 'View leads',
         'leads.manage'      => 'Add / edit leads',
         'customers.view'    => 'View customers & 360 profile',
+        'customers.manage'  => 'Add / edit customers',
     ],
     'Sales' => [
         'quotations.view'   => 'View quotations / BOQ',
@@ -24,6 +25,8 @@ return [
     'Inventory' => [
         'inventory.view'    => 'View stock',
         'inventory.manage'  => 'Adjust stock / consumables',
+        'stock.view'        => 'View stock (used by default roles)',
+        'stock.manage'      => 'Adjust stock (used by default roles)',
         'procurement.view'  => 'View procurement (POs)',
         'procurement.manage'=> 'Create POs / receive goods',
     ],

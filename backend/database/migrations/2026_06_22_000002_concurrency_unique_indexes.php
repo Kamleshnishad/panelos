@@ -59,6 +59,9 @@ return new class extends Migration {
 
     private function hasIndex(string $table, string $index): bool
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return DB::table('sqlite_master')->where('type', 'index')->where('tbl_name', $table)->where('name', $index)->exists();
+        }
         return DB::table('information_schema.statistics')
             ->where('table_schema', DB::getDatabaseName())
             ->where('table_name', $table)
@@ -69,6 +72,7 @@ return new class extends Migration {
     /** Name of a UNIQUE index covering exactly [$col] (excluding PRIMARY), or null. */
     private function singleColumnUnique(string $table, string $col): ?string
     {
+        if (DB::connection()->getDriverName() !== 'mysql') return null;
         $rows = DB::select(
             'SELECT index_name, GROUP_CONCAT(column_name ORDER BY seq_in_index) AS cols
              FROM information_schema.statistics

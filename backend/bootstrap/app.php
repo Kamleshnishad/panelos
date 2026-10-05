@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'tenant.active' => \App\Http\Middleware\EnsureActiveTenant::class,
+            'perm.module'   => \App\Http\Middleware\EnforceModulePermissions::class,
             'super.admin'   => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
     })

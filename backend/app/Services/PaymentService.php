@@ -14,7 +14,9 @@ class PaymentService
         return DB::transaction(function () use ($invoiceId, $amount, $paymentMethod, $referenceNo, $companyId) {
             $companyId = $companyId ?? auth()->user()->company_id;
 
-            $invoice = Invoice::where('company_id', $companyId)->findOrFail($invoiceId);
+            // Row lock serializes concurrent manual payments on the same invoice,
+            // so the remaining-due check below sees earlier committed payments.
+            $invoice = Invoice::where('company_id', $companyId)->lockForUpdate()->findOrFail($invoiceId);
 
             if ($invoice->status === 'cancelled') {
                 throw new \Exception('Cannot record payment for cancelled invoice');

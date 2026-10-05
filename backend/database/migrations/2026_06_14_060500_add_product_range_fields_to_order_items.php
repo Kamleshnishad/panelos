@@ -14,7 +14,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE order_items MODIFY COLUMN density_type ENUM('PUF','PIR','Rockwool','EPS','Glasswool') NOT NULL DEFAULT 'PUF'");
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE order_items MODIFY COLUMN density_type ENUM('PUF','PIR','Rockwool','EPS','Glasswool') NOT NULL DEFAULT 'PUF'");
+        }
 
         Schema::table('order_items', function (Blueprint $table) {
             $table->string('application', 40)->nullable()->after('panel_type_id');
@@ -31,6 +33,8 @@ return new class extends Migration
         Schema::table('order_items', function (Blueprint $table) {
             $table->dropColumn(['application', 'fixing_system', 'top_color_ral', 'bottom_color_ral', 'bottom_surface']);
         });
-        DB::statement("ALTER TABLE order_items MODIFY COLUMN density_type ENUM('PUF','PIR') NOT NULL DEFAULT 'PUF'");
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE order_items MODIFY COLUMN density_type ENUM('PUF','PIR') NOT NULL DEFAULT 'PUF'");
+        }
     }
 };

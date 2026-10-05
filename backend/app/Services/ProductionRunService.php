@@ -68,10 +68,13 @@ class ProductionRunService
      */
     public function start(ProductionRun $run, bool $force = false): ProductionRun
     {
-        if ($run->status !== 'draft') {
-            throw new \Exception('Only a draft run can be started.');
-        }
         return DB::transaction(function () use ($run, $force) {
+            // Lock + recheck: two concurrent starts must not both issue material.
+            $run = ProductionRun::where('id', $run->id)->lockForUpdate()->firstOrFail();
+            if ($run->status !== 'draft') {
+                throw new \Exception('Only a draft run can be started.');
+            }
+
             // 1. Consume raw material first (throws on shortage unless forced).
             $this->materialService->issueForRun($run, $force);
 
@@ -92,10 +95,11 @@ class ProductionRunService
      */
     public function complete(ProductionRun $run, array $actuals = []): ProductionRun
     {
-        if ($run->status !== 'in_progress') {
-            throw new \Exception('Only a run in progress can be completed.');
-        }
         return DB::transaction(function () use ($run, $actuals) {
+            $run = ProductionRun::where('id', $run->id)->lockForUpdate()->firstOrFail();
+            if ($run->status !== 'in_progress') {
+                throw new \Exception('Only a run in progress can be completed.');
+            }
             $this->materialService->recordActuals($run, $actuals);
 
             foreach ($run->batches as $batch) {

@@ -289,13 +289,14 @@ class StockService
             ->get();
 
         foreach ($expiringChemicals as $chemical) {
-            if ($chemical->isExpiring()) {
+            $alertType = $chemical->isExpired() ? 'expired' : ($chemical->isExpiring() ? 'expiring_soon' : null);
+            if ($alertType !== null && ($alertType === 'expired' ? $chemical->quantity_in_stock > 0 : true)) {
                 LowStockAlert::updateOrCreate(
                     [
                         'company_id' => $companyId,
                         'item_type' => 'chemical',
                         'item_id' => $chemical->id,
-                        'alert_type' => 'expiring_soon',
+                        'alert_type' => $alertType,
                         'status' => 'active'
                     ],
                     [

@@ -25,6 +25,7 @@ class QualityControlService
                 'inspected_by_user_id' => $userId,
                 'inspected_at' => now(),
                 'notes' => $data['notes'] ?? null,
+                'checklist' => $data['checklist'] ?? null,
             ]);
 
             // Update batch status based on QC result

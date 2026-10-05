@@ -174,6 +174,7 @@ class ProcurementService
         }
 
         return DB::transaction(function () use ($po, $receipts) {
+            $po = PurchaseOrder::lockForUpdate()->findOrFail($po->id);
             $companyId = $po->company_id;
             $note = 'GRN — PO ' . $po->po_no;
 
@@ -182,8 +183,13 @@ class ProcurementService
                 if ($qty <= 0) continue;
 
                 $item = PurchaseOrderItem::where('id', $r['po_item_id'] ?? 0)
-                    ->where('purchase_order_id', $po->id)->first();
+                    ->where('purchase_order_id', $po->id)->lockForUpdate()->first();
                 if (!$item) continue;
+
+                $outstanding = (float) $item->quantity - (float) $item->received_qty;
+                if ($qty > $outstanding + 0.0001) {
+                    throw new \Exception("Cannot receive {$qty} — only {$outstanding} outstanding on this PO line.");
+                }
 
                 $cost = isset($r['cost']) && $r['cost'] !== null ? (float) $r['cost'] : (float) $item->rate;
 

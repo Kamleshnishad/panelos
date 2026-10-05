@@ -324,7 +324,7 @@ class QuotationController extends Controller
             // Accessories
             'accessories'                           => 'nullable|array',
             'accessories.*.type'                    => 'nullable|in:standard,door,installation,custom',
-            'accessories.*.accessory_id'            => 'nullable',
+            'accessories.*.accessory_id'            => ['nullable', Rule::exists('accessories', 'id')->where('company_id', $companyId)],
             'accessories.*.qty'                     => 'nullable|numeric|min:0',
             'accessories.*.rate'                    => 'nullable|numeric|min:0',
         ];

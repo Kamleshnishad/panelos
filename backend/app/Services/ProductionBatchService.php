@@ -88,6 +88,12 @@ class ProductionBatchService
             throw new \Exception('Cannot start production for batch not in draft status');
         }
 
+        // Raw material is only issued by a production run. A standalone batch
+        // started directly would consume stock physically but never record it.
+        if ($batch->run_id === null) {
+            throw new \Exception('Start this batch through a production run so raw material is issued.');
+        }
+
         $batch->update([
             'status' => 'in_progress',
             'started_at' => now(),

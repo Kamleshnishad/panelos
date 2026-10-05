@@ -14,10 +14,12 @@ class BatchStageLogService
      */
     public function startStage(ProductionBatch $batch, ProductionStage $stage, int $userId, ?string $notes = null): BatchStageLog
     {
-        // Validate stage can be started
-        $this->validateStageStartable($batch, $stage);
-
         return DB::transaction(function () use ($batch, $stage, $userId, $notes) {
+            // Lock the batch so concurrent "Start" clicks serialize; the
+            // already-started check must run after the lock is held.
+            ProductionBatch::where('id', $batch->id)->lockForUpdate()->firstOrFail();
+            $this->validateStageStartable($batch, $stage);
+
             $log = BatchStageLog::create([
                 'batch_id' => $batch->id,
                 'stage_id' => $stage->id,
@@ -60,7 +62,7 @@ class BatchStageLogService
     public function getBatchTimeline(ProductionBatch $batch)
     {
         return BatchStageLog::where('batch_id', $batch->id)
-            ->with('stage', 'loggedByUser')
+            ->with('stage', 'user')
             ->orderBy('stage_id', 'asc')
             ->get();
     }

@@ -11,13 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("ALTER TABLE quotations MODIFY status ENUM('boq','draft','sent','accepted','rejected','revised','expired') NOT NULL DEFAULT 'draft'");
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE quotations MODIFY status ENUM('boq','draft','sent','accepted','rejected','revised','expired') NOT NULL DEFAULT 'draft'");
+        }
     }
 
     public function down(): void
     {
         // Re-home any remaining BOQs to draft before shrinking the enum
         DB::table('quotations')->where('status', 'boq')->update(['status' => 'draft']);
-        DB::statement("ALTER TABLE quotations MODIFY status ENUM('draft','sent','accepted','rejected','revised','expired') NOT NULL DEFAULT 'draft'");
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE quotations MODIFY status ENUM('draft','sent','accepted','rejected','revised','expired') NOT NULL DEFAULT 'draft'");
+        }
     }
 };

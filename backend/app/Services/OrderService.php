@@ -15,11 +15,14 @@ class OrderService
             throw new \Exception('Quotation must be accepted to create an order.');
         }
 
-        if ($quotation->orders()->exists()) {
-            throw new \Exception('An order already exists for this quotation.');
-        }
-
         return \App\Support\DocNumber::retry(fn () => DB::transaction(function () use ($quotation, $overrideCredit) {
+            // Lock the quotation before the existence check so two concurrent
+            // requests can't both see "no order yet" and both create one.
+            Quotation::where('id', $quotation->id)->lockForUpdate()->firstOrFail();
+            if ($quotation->orders()->exists()) {
+                throw new \Exception('An order already exists for this quotation.');
+            }
+
             $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer');
 
             // Authoritative credit check under a customer-row lock so two concurrent
@@ -123,6 +126,14 @@ class OrderService
     public function update(Order $order, array $data): Order
     {
         $allowed = ['expected_delivery_date', 'notes', 'status'];
+
+        if (($data['status'] ?? null) === 'completed') {
+            $batches = $order->batches()->get();
+            if ($batches->isEmpty() || $batches->contains(fn ($b) => $b->status !== 'dispatched')) {
+                throw new \Exception('An order can only be marked completed once all its production batches are dispatched.');
+            }
+        }
+
         $order->update(array_intersect_key($data, array_flip($allowed)));
         return $order->fresh();
     }

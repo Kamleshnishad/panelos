@@ -41,7 +41,9 @@ return new class extends Migration
         });
 
         // Add REVISED to status enum
-        DB::statement("ALTER TABLE quotations MODIFY COLUMN status ENUM('draft','sent','accepted','rejected','revised','expired') DEFAULT 'draft'");
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE quotations MODIFY COLUMN status ENUM('draft','sent','accepted','rejected','revised','expired') DEFAULT 'draft'");
+        }
 
         // Full rebuild of quotation_items with all 21 BOQ fields
         Schema::drop('quotation_items');
