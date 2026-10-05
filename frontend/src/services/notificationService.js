@@ -1,16 +1,8 @@
-import axios from 'axios'
-
-function authHeaders() {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-function api(method, url, data = null) {
-  return axios({ method, url, data, headers: authHeaders() }).then(r => r.data)
-}
+import { api } from './api.js'
 
 export default {
-  get()           { return api('get',  '/api/settings/notifications') },
-  save(data)      { return api('put',  '/api/settings/notifications', data) },
-  test(channel, phone) { return api('post', '/api/settings/notifications/test', { channel, phone }) },
-  logs()          { return api('get',  '/api/settings/notifications/logs') },
+  get()           { return api.get('/settings/notifications').then(r => r.data) },
+  save(data)      { return api.put('/settings/notifications', data).then(r => r.data) },
+  test(channel, phone) { return api.post('/settings/notifications/test', { channel, phone }).then(r => r.data) },
+  logs()          { return api.get('/settings/notifications/logs').then(r => r.data) },
 }

@@ -53,7 +53,7 @@ export default {
 
   // Accounts Receivable / aging
   accountsReceivable(params = {}) { return api('get', '/api/reports/accounts-receivable', null, params) },
-  sendReminder(id)              { return api('post', `/api/invoices/${id}/payment-reminder`) },
+  sendReminder(id)              { return api('post', `/api/invoices/${id}/send-payment-reminder`) },
 
   // e-Invoice (IRN / QR) + e-Way Bill
   einvoiceStatus(id)               { return api('get',  `/api/invoices/${id}/einvoice/status`) },

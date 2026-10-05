@@ -1,25 +1,16 @@
-import axios from 'axios'
-
-function authHeaders() {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-function api(method, url, data = null, params = null) {
-  return axios({ method, url, data, params, headers: authHeaders() }).then(r => r.data)
-}
+import { api } from './api.js'
 
 export default {
-  list()           { return api('get', '/api/document-templates') },
-  apply(data)      { return api('put', '/api/document-templates', data) },
+  list()           { return api.get('/document-templates').then(r => r.data) },
+  apply(data)      { return api.put('/document-templates', data).then(r => r.data) },
 
   // Returns an object URL for the preview PDF (fetched as blob so the Bearer
   // token is sent). On error, throws with a readable message.
   async preview(docType, key) {
     try {
-      const res = await axios({
-        method: 'get', url: '/api/document-templates/preview',
+      const res = await api.get('/document-templates/preview', {
         params: { doc_type: docType, template: key },
-        responseType: 'blob', headers: authHeaders(),
+        responseType: 'blob',
       })
       return window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
     } catch (e) {

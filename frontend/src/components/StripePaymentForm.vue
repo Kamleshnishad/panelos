@@ -143,7 +143,7 @@ const processCardPayment = async () => {
   try {
     const { clientSecret, intentId, amount } = await paymentService.createPaymentIntent(props.invoiceId)
 
-    const { setupIntent, error: confirmError } = await stripe.value.confirmCardPayment(clientSecret, {
+    const { paymentIntent, error: confirmError } = await stripe.value.confirmCardPayment(clientSecret, {
       payment_method: {
         card: cardElement.value,
         billing_details: { email: email.value }
@@ -156,7 +156,7 @@ const processCardPayment = async () => {
       return
     }
 
-    if (setupIntent.status === 'succeeded') {
+    if (paymentIntent?.status === 'succeeded') {
       success.value = true
       emit('payment-success', { intentId, amount })
       setTimeout(() => {

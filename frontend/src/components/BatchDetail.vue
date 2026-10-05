@@ -243,9 +243,9 @@
         </div>
 
         <!-- Checklist results -->
-        <div class="qc-checklist-results" v-if="qcChecklist.length">
+        <div class="qc-checklist-results" v-if="qc.checklist && qc.checklist.length">
           <div class="qc-checklist-label">Inspection Checklist</div>
-          <div class="qc-check-row" v-for="item in qcChecklist" :key="item.key">
+          <div class="qc-check-row" v-for="item in qc.checklist" :key="item.key">
             <span class="check-icon" :class="item.passed ? 'pass' : 'fail'">{{ item.passed ? '✓' : '✗' }}</span>
             <span class="check-label">{{ item.label }}</span>
           </div>
@@ -487,8 +487,9 @@ async function submitQc() {
   qcSubmitError.value = null
   try {
     const res = await batchService.createQc(props.batchId, {
-      status: qcForm.status,
-      notes:  qcForm.notes || null,
+      status:    qcForm.status,
+      notes:     qcForm.notes || null,
+      checklist: qcChecklist.map(c => ({ key: c.key, label: c.label, passed: !!c.passed })),
     })
     qc.value = res?.data ?? res
     // Reload full batch to update status badge
