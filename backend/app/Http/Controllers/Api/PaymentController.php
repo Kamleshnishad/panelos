@@ -9,6 +9,7 @@ use App\Services\PaymentGatewayService;
 use App\Services\PaymentReminderService;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
@@ -342,10 +343,20 @@ class PaymentController extends Controller
         }
 
         try {
-            $event = json_decode($payload, true);
+            // Decode WITHOUT assoc=true so nested structures (event->data->object)
+            // stay stdClass all the way down. json_decode($payload, true) followed
+            // by a shallow (object) cast only converts the top level — $event->data
+            // stayed a plain array, so handlePaymentSucceeded()'s
+            // `$event->data->object` silently evaluated to null (property access
+            // on an array), and a successful card payment was never recorded (C5).
+            $event = json_decode($payload);
 
-            if ($event['type'] === 'payment_intent.succeeded') {
-                $result = $gatewayService->handlePaymentSucceeded((object)$event);
+            if ($event->type === 'payment_intent.succeeded') {
+                $result = $gatewayService->handlePaymentSucceeded($event);
+                if (!($result['success'] ?? false)) {
+                    Log::warning('Stripe payment_intent.succeeded webhook did not record a payment', $result);
+                    return response()->json($result, 422);
+                }
                 return response()->json(['success' => true]);
             }
 

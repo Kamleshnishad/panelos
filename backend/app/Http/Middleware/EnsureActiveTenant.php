@@ -39,10 +39,17 @@ class EnsureActiveTenant
             return $next($request);   // nothing to enforce
         }
 
-        // Lazy trial-expiry flip
+        // Lazy trial-expiry flip. subscription_status is deliberately excluded
+        // from Company::$fillable (only SubscriptionService/SuperAdminController
+        // may set it) — update() is mass-assignment too, so this silently
+        // dropped the write AND never even set it in-memory (fill() filters
+        // non-fillable keys out before touching the attribute at all). The
+        // blocked check below read the SAME unmodified $company object, so an
+        // expired trial was never actually enforced, on this request or any
+        // future one — the entire lazy-expiry mechanism was a no-op.
         if ($company->subscription_status === 'trial'
             && $company->trial_ends_at && $company->trial_ends_at->isPast()) {
-            $company->update(['subscription_status' => 'expired']);
+            $company->forceFill(['subscription_status' => 'expired'])->save();
         }
 
         $blocked = !$company->is_active || $company->subscription_status === 'expired';

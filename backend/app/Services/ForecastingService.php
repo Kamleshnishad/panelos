@@ -72,7 +72,14 @@ class ForecastingService
                 : PanelType::where('company_id', $companyId)->get();
 
             $forecasts = [];
-            $today = now();
+            // C4: pre-formatted to EXACTLY the string Eloquent's fromDateTime()
+            // writes to the 'forecast_date' column on create (HasAttributes::
+            // fromDateTime() uses getDateFormat(), not the cast's format
+            // suffix) — updateOrCreate()'s match query uses this raw value
+            // directly, bypassing the model's date cast entirely, so a bare
+            // now() (carrying the current time-of-day) never matched what was
+            // actually stored, creating a new duplicate row on every call.
+            $forecastDate = now()->startOfDay()->format('Y-m-d H:i:s');
 
             foreach ($panelTypes as $panelType) {
                 $historicalData = $this->getHistoricalSalesData($companyId, $panelType->id, 180);
@@ -91,7 +98,11 @@ class ForecastingService
                 $reorderQuantity = $this->calculateReorderQuantity($avgDailySales, $forecastPeriod);
                 $riskLevel = $this->assessRiskLevel($currentStock, $predictedDemand);
 
-                $recommendedOrderDate = $today->addDays(
+                // A fresh now() each iteration — addDays() mutates the Carbon
+                // instance it's called on, so reusing one shared instance across
+                // loop iterations would silently drift "today" forward by each
+                // prior panel type's reorder lead time.
+                $recommendedOrderDate = now()->addDays(
                     $this->daysUntilReorder($currentStock, $avgDailySales)
                 );
 
@@ -99,7 +110,7 @@ class ForecastingService
                     [
                         'company_id' => $companyId,
                         'panel_type_id' => $panelType->id,
-                        'forecast_date' => $today,
+                        'forecast_date' => $forecastDate,
                         'forecast_period_days' => $forecastPeriod,
                     ],
                     [
@@ -254,8 +265,12 @@ class ForecastingService
 
     public function getDemandForecast($companyId, $panelTypeId = null)
     {
+        // Same format generateDemandForecast()/generateMlForecast() now write
+        // (see the C4 fix there) — a bare toDateString() here would compare a
+        // plain 'Y-m-d' string against the stored full-datetime-formatted
+        // value and silently find nothing on drivers that store it literally.
         $query = DemandForecast::where('company_id', $companyId)
-            ->where('forecast_date', now()->toDateString());
+            ->where('forecast_date', now()->startOfDay()->format('Y-m-d H:i:s'));
 
         if ($panelTypeId) {
             $query->where('panel_type_id', $panelTypeId);

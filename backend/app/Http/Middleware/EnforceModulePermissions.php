@@ -13,6 +13,27 @@ use Symfony\Component\HttpFoundation\Response;
 // need invoices.manage).
 class EnforceModulePermissions
 {
+    // Billing self-service recovery must stay reachable by ANY authenticated
+    // user of the tenant (not just settings.manage holders) — EnsureActiveTenant
+    // allow-lists these same route names for exactly this reason: a lapsed
+    // tenant's non-admin staff must still be able to pay and reactivate.
+    private const ROUTE_ALLOW = ['billing.status', 'billing.checkout', 'billing.verify'];
+
+    // Routes whose URL segment doesn't match their actual permission domain —
+    // checked by route name BEFORE the segment-based MODULES lookup below.
+    // C1: batch creation lives under /orders/{orderId}/batches (segment
+    // "orders"), so it was gated on orders.manage instead of the production
+    // key it actually needs. C2: dispatch creation/listing-by-batch live
+    // under /batches/... (segment "batches"), so they were gated on
+    // production.* instead of dispatch.* — letting Production create/see
+    // dispatches without dispatch.manage/view, and blocking anyone who held
+    // dispatch.* but not production.*.
+    private const ROUTE_OVERRIDE = [
+        'batches.create'      => 'production.manage',
+        'dispatches.create'   => 'dispatch.manage',
+        'dispatches.by_batch' => 'dispatch.view',
+    ];
+
     private const MODULES = [
         'quotations'        => ['quotations.view', 'quotations.manage'],
         'orders'            => ['orders.view', 'orders.manage'],
@@ -32,8 +53,15 @@ class EnforceModulePermissions
         'users'             => ['users.manage', 'users.manage'],
         'roles'             => [null, 'settings.manage'],
         'audit-logs'        => ['audit.view', null],
-        'forecasts'         => ['reports.view', 'reports.view'],
-        'analytics'         => ['reports.view', 'reports.view'],
+        // MD6: write (forecast generation / analytics snapshots) needs its own
+        // key — reports.view is meant to be read-only (e.g. Viewer role has it).
+        'forecasts'         => ['reports.view', 'reports.manage'],
+        'analytics'         => ['reports.view', 'reports.manage'],
+        // C3: was entirely unmapped, so every report route (P&L, balance
+        // sheet, cash flow, AR aging, tax, MIS...) passed through with no
+        // permission check at all — the single most sensitive data category
+        // in the system, left wide open to any authenticated user.
+        'reports'           => ['reports.view', 'reports.view'],
         // Master data and company configuration: reads open (forms need them),
         // writes need settings.manage.
         'settings'          => [null, 'settings.manage'],
@@ -45,20 +73,31 @@ class EnforceModulePermissions
         'gst'               => [null, 'settings.manage'],
         'sms'               => [null, 'settings.manage'],
         'billing'           => [null, 'settings.manage'],
+        // Bulk CSV export of customer/quotation/order/invoice data — same
+        // sensitivity class as reports, read-only, no write variant.
+        'export'            => ['reports.view', null],
     ];
 
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        $segment = $request->segment(2);
+        $routeName = $request->route()?->getName();
 
-        if (!$user || !isset(self::MODULES[$segment])) {
+        if (!$user || in_array($routeName, self::ROUTE_ALLOW, true)) {
             return $next($request);
         }
 
-        [$readKey, $writeKey] = self::MODULES[$segment];
-        $isRead = in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true);
-        $required = $isRead ? $readKey : $writeKey;
+        if ($routeName !== null && array_key_exists($routeName, self::ROUTE_OVERRIDE)) {
+            $required = self::ROUTE_OVERRIDE[$routeName];
+        } else {
+            $segment = $request->segment(2);
+            if (!isset(self::MODULES[$segment])) {
+                return $next($request);
+            }
+            [$readKey, $writeKey] = self::MODULES[$segment];
+            $isRead = in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true);
+            $required = $isRead ? $readKey : $writeKey;
+        }
 
         if ($required === null || $user->hasPermission($required)) {
             return $next($request);

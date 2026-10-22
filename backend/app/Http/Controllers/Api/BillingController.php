@@ -154,12 +154,11 @@ class BillingController extends Controller
         }
 
         $amountPaid = (float) ((($order['amount_paid'] ?? $order['amount'] ?? 0)) / 100); // paise → rupees
-        if (!empty($notes['coupon'])) {
-            $coupon = \App\Models\Coupon::usable($notes['coupon']);
-            if ($coupon) $coupon->increment('used_count');
-        }
 
-        $company = $this->subs->activate($company, $plan, $months, 'razorpay', $data['razorpay_payment_id'], true, $r->user()->id, $amountPaid);
+        // Coupon increment now happens inside activate(), gated by the same
+        // idempotency check as the credit itself (MD1 fix) — not here, where it
+        // would run even on the losing side of a verify()/webhook() race.
+        $company = $this->subs->activate($company, $plan, $months, 'razorpay', $data['razorpay_payment_id'], true, $r->user()->id, $amountPaid, $notes['coupon'] ?? null);
         Log::info('Subscription activated via Razorpay', ['company_id' => $company->id, 'plan' => $plan, 'months' => $months, 'payment_id' => $data['razorpay_payment_id']]);
 
         return $this->successResponse([
@@ -190,8 +189,21 @@ class BillingController extends Controller
                 // Same reference key as verify() (raw payment id) so activate()'s
                 // idempotency guard dedupes the two paths (CONC-H2).
                 $paymentId = $r->input('payload.payment.entity.id') ?? '';
-                if ($company && $company->subscription_status !== 'active') {
-                    $this->subs->activate($company, $plan, $months, 'razorpay', $paymentId);
+                // MD7: an empty reference would bypass activate()'s own idempotency
+                // check (it short-circuits on a falsy $reference), so a redelivered
+                // webhook with no payment id could double-credit. Skip crediting
+                // entirely rather than pass a reference that can't dedupe.
+                //
+                // C9: do NOT also gate on subscription_status !== 'active' — a
+                // company renewing before its current plan expires is, by
+                // definition, still 'active' (status only flips lazily on the
+                // next request past subscription_ends_at). That made this exact
+                // backstop skip the one scenario it exists for: the client's
+                // own verify() call never completing after a successful
+                // payment. activate()'s own reference-based idempotency check
+                // (identical to verify()'s) is the only guard needed here.
+                if ($company && $paymentId !== '') {
+                    $this->subs->activate($company, $plan, $months, 'razorpay', $paymentId, true, null, null, $notes['coupon'] ?? null);
                     Log::info('Subscription activated via webhook', ['company_id' => $cid, 'plan' => $plan]);
                 }
             }

@@ -26,20 +26,33 @@ class TenantProvisioningService
     public function provision(array $data): array
     {
         return DB::transaction(function () use ($data) {
+            // subscription_plan/status, trial_ends_at and is_active are
+            // deliberately excluded from Company::$fillable (see
+            // SubscriptionService::activate()'s note) — Company::create() is
+            // mass-assignment too, so those four keys were silently dropped
+            // here and every new signup landed on the DB column defaults
+            // instead: subscription_plan='growth' (not 'starter'),
+            // trial_ends_at=NULL (no default at all) — meaning the trial
+            // never naturally expires, since EnsureActiveTenant's lazy-expiry
+            // flip requires a non-null trial_ends_at in the past. Every
+            // self-signup silently got unlimited free access on the growth
+            // plan. Fixed by forceFill()-ing the guarded fields after create().
             $company = Company::create([
                 'name'                => $data['company_name'],
                 'subdomain'           => $this->uniqueSubdomain($data['company_name']),
                 'email'               => $data['email'],
                 'phone'               => $data['phone'] ?? null,
-                'subscription_plan'   => 'starter',
-                'subscription_status' => 'trial',
-                'trial_ends_at'       => now()->addDays(self::TRIAL_DAYS),
-                'is_active'           => true,
                 'utm_source'          => $data['utm_source'] ?? null,
                 'utm_medium'          => $data['utm_medium'] ?? null,
                 'utm_campaign'        => $data['utm_campaign'] ?? null,
                 'signup_referrer'     => $data['signup_referrer'] ?? null,
             ]);
+            $company->forceFill([
+                'subscription_plan'   => 'starter',
+                'subscription_status' => 'trial',
+                'trial_ends_at'       => now()->addDays(self::TRIAL_DAYS),
+                'is_active'           => true,
+            ])->save();
 
             $roles = $this->createDefaultRoles($company->id);
 
@@ -64,13 +77,14 @@ class TenantProvisioningService
         $defs = [
             ['name' => 'Company Admin',      'description' => 'Full access to this company', 'permissions' => ['*'], 'system' => true],
             ['name' => 'Sales',              'description' => 'Leads, quotations, orders, customers', 'permissions' => [
-                'leads.view', 'leads.manage', 'quotations.view', 'quotations.manage', 'orders.view', 'customers.view', 'customers.manage',
+                'leads.view', 'leads.manage', 'quotations.view', 'quotations.manage', 'orders.view', 'orders.manage', 'customers.view', 'customers.manage',
             ], 'system' => false],
-            ['name' => 'Production',          'description' => 'Production, runs, QC, stock', 'permissions' => [
-                'production.view', 'production.manage', 'stock.view',
+            ['name' => 'Production',          'description' => 'Production, runs, QC, stock, dispatch, procurement', 'permissions' => [
+                'production.view', 'production.manage', 'stock.view', 'stock.manage',
+                'dispatch.view', 'dispatch.manage', 'procurement.view', 'procurement.manage',
             ], 'system' => false],
             ['name' => 'Accounts',            'description' => 'Invoices, payments, reports', 'permissions' => [
-                'invoices.view', 'invoices.manage', 'payments.view', 'payments.manage', 'reports.view', 'costing.view',
+                'invoices.view', 'invoices.manage', 'payments.view', 'payments.manage', 'reports.view', 'reports.manage', 'costing.view',
             ], 'system' => false],
             ['name' => 'Viewer',              'description' => 'Read-only', 'permissions' => [
                 'leads.view', 'quotations.view', 'orders.view', 'customers.view', 'production.view', 'stock.view', 'invoices.view', 'reports.view',

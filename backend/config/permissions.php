@@ -38,6 +38,7 @@ return [
         'payments.view'     => 'View receivables / payments',
         'payments.manage'   => 'Record payments / reminders',
         'reports.view'      => 'View reports & analytics',
+        'reports.manage'    => 'Generate forecasts / analytics snapshots',
         'costing.view'      => 'See cost / margin / valuation (sensitive)',
     ],
     'Administration' => [

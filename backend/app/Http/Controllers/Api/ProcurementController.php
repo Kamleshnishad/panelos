@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ChemicalStock;
+use App\Models\CoilStock;
+use App\Models\ConsumableStock;
 use App\Models\PurchaseOrder;
 use App\Rules\IndianPhone;
 use App\Rules\IndianGstin;
 use App\Services\ProcurementService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class ProcurementController extends Controller
@@ -104,7 +108,27 @@ class ProcurementController extends Controller
                 'items.*.quantity'     => 'required|numeric|min:0.01',
                 'items.*.rate'         => 'nullable|numeric|min:0',
             ]);
-            return $this->createdResponse($this->proc->createPurchaseOrder($this->cid($r), $data), 'PO created', 201);
+
+            // material_kind picks which stock table stock_id must belong to, so a
+            // plain exists: rule (one fixed table) can't scope it — MD5: without this,
+            // any integer stock_id passed the required|integer rule even when it
+            // belonged to a different company or didn't exist in that kind's table.
+            $companyId = $this->cid($r);
+            $validator = Validator::make($data, []);
+            $validator->after(function ($validator) use ($data, $companyId) {
+                $tables = ['coil' => CoilStock::class, 'chemical' => ChemicalStock::class, 'consumable' => ConsumableStock::class];
+                foreach ($data['items'] as $i => $item) {
+                    $model = $tables[$item['material_kind']] ?? null;
+                    if ($model && !$model::where('company_id', $companyId)->where('id', $item['stock_id'])->exists()) {
+                        $validator->errors()->add("items.$i.stock_id", 'The selected stock item does not exist.');
+                    }
+                }
+            });
+            if ($validator->fails()) {
+                return $this->errorResponse($validator->errors()->toArray(), 'Validation failed', 'VALIDATION_ERROR', 422);
+            }
+
+            return $this->createdResponse($this->proc->createPurchaseOrder($companyId, $data), 'PO created', 201);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
         } catch (\Exception $e) {

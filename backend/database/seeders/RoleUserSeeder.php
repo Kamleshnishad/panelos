@@ -12,18 +12,20 @@ class RoleUserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create demo company
+        // Create demo company. is_active/subscription_plan/subscription_status
+        // are guarded on Company — firstOrCreate()'s second array is
+        // mass-assignment too, so those three were silently dropped and this
+        // landed on the DB defaults ('growth'/'trial') instead of the pro/
+        // active plan the seeder intends. forceFill() to actually set them.
         $company = Company::firstOrCreate(
             ['subdomain' => 'demo'],
             [
                 'name' => 'PanelOS Demo Co.',
                 'email' => 'demo@panelos.local',
                 'phone' => '9876543210',
-                'is_active' => true,
-                'subscription_plan' => 'pro',
-                'subscription_status' => 'active',
             ]
         );
+        $company->forceFill(['is_active' => true, 'subscription_plan' => 'pro', 'subscription_status' => 'active'])->save();
 
         // Roles
         $roles = [

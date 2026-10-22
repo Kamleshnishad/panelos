@@ -23,7 +23,10 @@ class DemandForecast extends Model
     ];
 
     protected $casts = [
-        'forecast_date' => 'date',
+        // C4: an explicit Y-m-d format (not the bare 'date' cast, which still
+        // carries a time-of-day internally) so a stored value and a freshly
+        // computed match value in updateOrCreate() can never disagree.
+        'forecast_date' => 'date:Y-m-d',
         'recommended_order_date' => 'date',
         'predicted_demand' => 'integer',
         'current_stock' => 'integer',

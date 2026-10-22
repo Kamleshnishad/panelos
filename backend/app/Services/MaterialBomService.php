@@ -20,7 +20,17 @@ class MaterialBomService
 {
     public function settings(int $companyId): MaterialSetting
     {
-        return MaterialSetting::firstOrCreate(['company_id' => $companyId]);
+        // firstOrCreate(['company_id' => $x]) only sets the attribute it was
+        // given — on a fresh INSERT the returned instance doesn't reflect the
+        // table's column defaults (steel_density, iso_polyol_ratio, wastage
+        // %, etc.), so every numeric field reads as null/0 until the row is
+        // refetched. That silently zeroed every BOM calculation (coil lines
+        // were skipped outright via `if ($v['kg'] <= 0) continue`, and
+        // wastage/overpack factors became 1.0) for a brand-new company's very
+        // first material computation. Discovered while adding C1's standalone
+        // batch material-issuance test, not previously logged.
+        $settings = MaterialSetting::firstOrCreate(['company_id' => $companyId]);
+        return $settings->wasRecentlyCreated ? $settings->fresh() : $settings;
     }
 
     public function requirementForRun(ProductionRun $run): array

@@ -193,7 +193,7 @@ class ProductionBatchController extends Controller
             $batch = ProductionBatch::where('company_id', $request->user()->company_id)
                 ->findOrFail($id);
 
-            $batch = $this->batchService->startProduction($batch);
+            $batch = $this->batchService->startProduction($batch, $request->boolean('force'));
 
             return $this->successResponse(
                 $batch,

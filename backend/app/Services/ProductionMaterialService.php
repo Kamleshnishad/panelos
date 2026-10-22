@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ChemicalStock;
 use App\Models\CoilStock;
 use App\Models\ConsumableStock;
+use App\Models\ProductionBatch;
 use App\Models\ProductionMaterialUsage;
 use App\Models\ProductionRun;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,71 @@ class ProductionMaterialService
                     'company_id'         => $companyId,
                     'run_id'             => $run->id,
                     'batch_id'           => null,
+                    'material_kind'      => $l['material_kind'],
+                    'stock_id'           => $stockId,
+                    'material_name'      => $l['label'],
+                    'unit'               => $l['unit'],
+                    'standard_qty'       => $l['standard'],
+                    'issued_qty'         => $l['required'],
+                    'actual_qty'         => null,
+                    'wastage_pct'        => $l['wastage_pct'] ?? 0,
+                    'notes'              => $note,
+                    'created_by_user_id' => $userId,
+                ]);
+
+                $issued[] = ['material' => $l['label'], 'qty' => $l['required'], 'unit' => $l['unit']];
+            }
+
+            return ['skipped' => false, 'issued' => $issued, 'all_ok' => $req['all_ok']];
+        });
+    }
+
+    /** Already issued for this standalone batch? (avoid double-deduction on re-start) */
+    public function alreadyIssuedForBatch(ProductionBatch $batch): bool
+    {
+        return ProductionMaterialUsage::where('batch_id', $batch->id)->exists();
+    }
+
+    /**
+     * Deduct material for a standalone batch (no production run) — C1 fix.
+     * Mirrors issueForRun, but keys usage rows on batch_id instead of run_id
+     * and computes the requirement from the batch's own order rather than a
+     * run's grouped batches.
+     * @throws \Exception when stock is short and $force is false.
+     */
+    public function issueForBatch(ProductionBatch $batch, bool $force = false): array
+    {
+        if ($this->alreadyIssuedForBatch($batch)) {
+            return ['skipped' => true, 'reason' => 'Material already issued for this batch.'];
+        }
+
+        $batch->loadMissing('order');
+        if (!$batch->order) {
+            return ['skipped' => true, 'reason' => 'Batch has no linked order — nothing to compute material for.'];
+        }
+
+        $req = $this->bom->requirementForOrder($batch->order);
+
+        if (!$req['all_ok'] && !$force) {
+            $short = collect($req['lines'])->where('ok', false)
+                ->map(fn ($l) => "{$l['label']} (short {$l['short_by']} {$l['unit']})")->implode(', ');
+            throw new \Exception('Insufficient stock: ' . $short . '. Add stock or start with override.');
+        }
+
+        return DB::transaction(function () use ($batch, $req) {
+            $companyId = $batch->company_id;
+            $note = 'Production batch ' . $batch->batch_no;
+            $userId = auth()?->user()?->id;
+            $issued = [];
+
+            foreach ($req['lines'] as $l) {
+                $rows = $this->resolveRows($l['material_kind'], $l['ref'], $companyId);
+                $stockId = $this->deductFifo($l['material_kind'], $rows, (float) $l['required'], $note, $companyId);
+
+                ProductionMaterialUsage::create([
+                    'company_id'         => $companyId,
+                    'run_id'             => null,
+                    'batch_id'           => $batch->id,
                     'material_kind'      => $l['material_kind'],
                     'stock_id'           => $stockId,
                     'material_name'      => $l['label'],

@@ -155,11 +155,15 @@ class SuperAdminController extends Controller
         $c = Company::withoutGlobalScope('tenant')->findOrFail($id);
 
         $base = ($c->trial_ends_at && $c->trial_ends_at->isFuture()) ? $c->trial_ends_at : now();
-        $c->update([
+        // Company deliberately excludes subscription_status/is_active/trial_ends_at
+        // from $fillable — update() is mass-assignment too, so it silently
+        // dropped all three with no error, meaning this endpoint never
+        // actually extended a trial despite returning a success response.
+        $c->forceFill([
             'subscription_status' => 'trial',
             'is_active'           => true,
             'trial_ends_at'       => $base->copy()->addDays($data['days']),
-        ]);
+        ])->save();
 
         $this->audit($r, $c->id, 'trial_extended', "Trial extended by {$data['days']} day(s)", ['days' => $data['days']]);
         return $this->successResponse($c->fresh(), "Trial extended by {$data['days']} day(s)");
@@ -171,7 +175,10 @@ class SuperAdminController extends Controller
         $this->requireSuperAdmin($r);
         $data = $r->validate(['is_active' => 'required|boolean']);
         $c = Company::withoutGlobalScope('tenant')->findOrFail($id);
-        $c->update(['is_active' => $data['is_active']]);
+        // is_active is guarded on Company (see SubscriptionService::activate()'s
+        // note) — update() silently dropped it, so suspending/restoring a
+        // tenant from here had no actual effect.
+        $c->forceFill(['is_active' => $data['is_active']])->save();
 
         $this->audit($r, $c->id, $data['is_active'] ? 'tenant_restored' : 'tenant_suspended', $data['is_active'] ? 'Tenant re-activated' : 'Tenant suspended');
         return $this->successResponse($c->fresh(), $data['is_active'] ? 'Tenant re-activated' : 'Tenant suspended');

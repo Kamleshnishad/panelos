@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 class ProductionBatchService
 {
+    public function __construct(private ProductionMaterialService $materialService) {}
+
     /**
      * Create production batch from order items
      */
@@ -82,24 +84,31 @@ class ProductionBatchService
     /**
      * Start production for batch
      */
-    public function startProduction(ProductionBatch $batch): ProductionBatch
+    public function startProduction(ProductionBatch $batch, bool $force = false): ProductionBatch
     {
-        if ($batch->status !== 'draft') {
-            throw new \Exception('Cannot start production for batch not in draft status');
-        }
+        return DB::transaction(function () use ($batch, $force) {
+            // Lock + recheck: two concurrent starts must not both issue material.
+            $batch = ProductionBatch::where('id', $batch->id)->lockForUpdate()->firstOrFail();
+            if ($batch->status !== 'draft') {
+                throw new \Exception('Cannot start production for batch not in draft status');
+            }
 
-        // Raw material is only issued by a production run. A standalone batch
-        // started directly would consume stock physically but never record it.
-        if ($batch->run_id === null) {
-            throw new \Exception('Start this batch through a production run so raw material is issued.');
-        }
+            // A production run issues material for its child batches up front
+            // (ProductionRunService::start). A standalone batch (no run_id) has
+            // no run to do that, so it issues its own material here instead —
+            // previously this unconditionally threw, so no standalone batch
+            // could ever be started (C1 fix).
+            if ($batch->run_id === null) {
+                $this->materialService->issueForBatch($batch, $force);
+            }
 
-        $batch->update([
-            'status' => 'in_progress',
-            'started_at' => now(),
-        ]);
+            $batch->update([
+                'status' => 'in_progress',
+                'started_at' => now(),
+            ]);
 
-        return $batch->fresh();
+            return $batch->fresh();
+        });
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Company;
+use App\Models\Coupon;
 use App\Models\SubscriptionPayment;
 
 /**
@@ -16,14 +17,24 @@ class SubscriptionService
      * Activate (or extend) a paid plan for N months. Stacks on remaining time.
      * Records a SubscriptionPayment unless $record is false.
      */
-    public function activate(Company $company, string $plan, int $months = 1, string $method = 'manual', ?string $reference = null, bool $record = true, ?int $byUserId = null, ?float $totalOverride = null): Company
+    public function activate(Company $company, string $plan, int $months = 1, string $method = 'manual', ?string $reference = null, bool $record = true, ?int $byUserId = null, ?float $totalOverride = null, ?string $couponCode = null): Company
     {
         // Atomic: company state + payment record must both land, or neither (CONC-M3).
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($company, $plan, $months, $method, $reference, $record, $byUserId, $totalOverride) {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($company, $plan, $months, $method, $reference, $record, $byUserId, $totalOverride, $couponCode) {
         // Idempotency: a payment already recorded under this reference must never be
         // credited twice (verify() + webhook() can both fire for one payment) — CONC-H2.
         if ($record && $reference && SubscriptionPayment::where('reference', $reference)->exists()) {
             return $company->fresh();
+        }
+
+        // Coupon increment lives here (not in the caller) so it only ever runs on
+        // whichever path actually wins the idempotency check above — verify() and
+        // webhook() can both fire for one payment, and MD1's bug was incrementing
+        // in the caller, before this guard, so the loser of the race skipped it
+        // (used_count silently never counted the redemption).
+        if ($record && $couponCode) {
+            $coupon = Coupon::usable($couponCode);
+            if ($coupon) $coupon->increment('used_count');
         }
 
         $base = ($company->subscription_ends_at && $company->subscription_ends_at->isFuture())
@@ -31,12 +42,22 @@ class SubscriptionService
         $periodStart = $base->copy();
         $periodEnd   = $base->copy()->addMonths($months);
 
-        $company->update([
+        // Company deliberately excludes these from $fillable (so a tenant admin
+        // can never self-upgrade via a stray mass-assignment elsewhere) — its
+        // own comment says only this service may set them, via forceFill().
+        // update() is mass-assignment too, so it was silently dropping all
+        // four fields with no error: every activation (manual, verify(),
+        // webhook()) created a correct SubscriptionPayment row while the
+        // company's actual subscription_status/plan/ends_at/is_active never
+        // changed. A paying customer would stay on their old/expired plan
+        // forever with no error anywhere. Found while writing a C9 regression
+        // test, not previously logged.
+        $company->forceFill([
             'subscription_plan'    => $plan,
             'subscription_status'  => 'active',
             'is_active'            => true,
             'subscription_ends_at' => $periodEnd,
-        ]);
+        ])->save();
 
         if ($record) {
             $total   = $totalOverride ?? ($this->monthlyPrice($plan) * $months);   // GST-inclusive
@@ -83,11 +104,12 @@ class SubscriptionService
         $base = ($company->trial_ends_at && $company->trial_ends_at->isFuture())
             ? $company->trial_ends_at : now();
 
-        $company->update([
+        // See the forceFill() note in activate() above — same guarded-field bug.
+        $company->forceFill([
             'subscription_status' => 'trial',
             'is_active'           => true,
             'trial_ends_at'       => $base->copy()->addDays($days),
-        ]);
+        ])->save();
 
         return $company->fresh();
     }

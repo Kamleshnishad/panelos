@@ -327,6 +327,14 @@ class QuotationController extends Controller
             'accessories.*.accessory_id'            => ['nullable', Rule::exists('accessories', 'id')->where('company_id', $companyId)],
             'accessories.*.qty'                     => 'nullable|numeric|min:0',
             'accessories.*.rate'                    => 'nullable|numeric|min:0',
+            // Previously undeclared — Laravel's validate() strips any nested key with
+            // no rule, so these were silently discarded before saveAccessories() ever
+            // saw them (QB2): description/unit always lost, door dimensions always null.
+            'accessories.*.description'             => 'nullable|string|max:255',
+            'accessories.*.unit'                    => 'nullable|string|max:20',
+            'accessories.*.door_type'                => 'nullable|string|max:50',
+            'accessories.*.door_width'               => 'nullable|numeric|min:0',
+            'accessories.*.door_height'              => 'nullable|numeric|min:0',
         ];
     }
 }

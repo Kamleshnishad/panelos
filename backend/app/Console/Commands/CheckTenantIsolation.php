@@ -35,10 +35,15 @@ class CheckTenantIsolation extends Command
 
         try {
             // --- Create tenant A ---
-            $cA = Company::create(['name' => 'ISO_TEST_A', 'subdomain' => 'iso-a-' . uniqid(), 'subscription_status' => 'trial', 'is_active' => true]);
+            // subscription_status/is_active are guarded on Company — create()'s
+            // mass-assignment silently dropped them (harmless here only
+            // because the DB defaults happen to be 'trial'/true already).
+            $cA = Company::create(['name' => 'ISO_TEST_A', 'subdomain' => 'iso-a-' . uniqid()]);
+            $cA->forceFill(['subscription_status' => 'trial', 'is_active' => true])->save();
             $uA = User::create(['company_id' => $cA->id, 'name' => 'ISO A', 'email' => 'iso-a-' . uniqid() . '@test.local', 'password' => bcrypt('panel2026x'), 'is_company_admin' => true, 'is_active' => true]);
             // --- Create tenant B ---
-            $cB = Company::create(['name' => 'ISO_TEST_B', 'subdomain' => 'iso-b-' . uniqid(), 'subscription_status' => 'trial', 'is_active' => true]);
+            $cB = Company::create(['name' => 'ISO_TEST_B', 'subdomain' => 'iso-b-' . uniqid()]);
+            $cB->forceFill(['subscription_status' => 'trial', 'is_active' => true])->save();
             $uB = User::create(['company_id' => $cB->id, 'name' => 'ISO B', 'email' => 'iso-b-' . uniqid() . '@test.local', 'password' => bcrypt('panel2026x'), 'is_company_admin' => true, 'is_active' => true]);
             $cleanup = [$uA, $uB, $cA, $cB];
 

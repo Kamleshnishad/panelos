@@ -58,11 +58,21 @@ class MlForecastingService
         $reorderQty    = $this->reorderQuantity($avgDaily, $horizonDays);
         $reorderDate   = $this->reorderDate($currentStock, $avgDaily);
 
+        // C4: pre-formatted to EXACTLY the string Eloquent's fromDateTime()
+        // writes to the 'forecast_date' column on create (HasAttributes::
+        // fromDateTime() uses getDateFormat(), not the cast's format suffix)
+        // — updateOrCreate()'s match query uses this raw value directly,
+        // bypassing the model's date cast entirely. A plain now()->toDateString()
+        // ('2026-10-12') never matched the full-datetime string actually
+        // stored, so the match always missed and the retry hit this table's
+        // unique index, throwing an unhandled duplicate-key error.
+        $forecastDate = now()->startOfDay()->format('Y-m-d H:i:s');
+
         $forecast = DemandForecast::updateOrCreate(
             [
                 'company_id'           => $companyId,
                 'panel_type_id'        => $panelTypeId,
-                'forecast_date'        => now()->toDateString(),
+                'forecast_date'        => $forecastDate,
                 'forecast_period_days' => $horizonDays,
             ],
             [
