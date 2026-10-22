@@ -217,13 +217,19 @@ const adjustDiff    = computed(() => {
   return adjustForm.new_quantity - Number(activeRow.value.quantity_in_stock)
 })
 
+// Guards against out-of-order responses: toggling the low-stock filter or
+// paging quickly can let an earlier request resolve after a later one and
+// overwrite the grid with stale data (MD8).
+let reqSeq = 0
 async function load(page = 1) {
+  const seq = ++reqSeq
   loading.value = true
   error.value   = null
   try {
     const params = { page, per_page: 24 }
     if (showLowOnly.value) params.low_stock = 1
     const res  = await stockService.getCoils(params)
+    if (seq !== reqSeq) return
     // apiResponse wraps a paginator: { success, data: { data:[], current_page, last_page, total }, message }
     const body = res?.data ?? {}
     rows.value = body.data ?? (Array.isArray(body) ? body : [])
@@ -233,12 +239,14 @@ async function load(page = 1) {
     // Accurate low-stock total (independent of the current page) for the summary card
     try {
       const lr = await stockService.getCoils({ low_stock: 1, per_page: 1 })
+      if (seq !== reqSeq) return
       lowTotal.value = lr?.data?.total ?? 0
     } catch { /* non-fatal */ }
   } catch (e) {
+    if (seq !== reqSeq) return
     error.value = e?.response?.data?.message ?? 'Failed to load coil inventory.'
   } finally {
-    loading.value = false
+    if (seq === reqSeq) loading.value = false
   }
 }
 

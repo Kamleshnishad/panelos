@@ -194,12 +194,18 @@ const createForm = reactive({ name: '', category: '', unit: 'litre', reorder_lev
 const pagination = reactive({ current_page: 1, last_page: 1, total: 0 })
 const lowTotal   = ref(0)
 
+// Guards against out-of-order responses: toggling the low-stock filter or
+// paging quickly can let an earlier request resolve after a later one and
+// overwrite the grid with stale data (MD8).
+let reqSeq = 0
 async function load(page = 1) {
+  const seq = ++reqSeq
   loading.value = true; error.value = null
   try {
     const params = { page, per_page: 24 }
     if (showLowOnly.value) params.low_stock = 1
     const res = await stockService.getConsumables(params)
+    if (seq !== reqSeq) return
     const body = res?.data ?? {}
     rows.value = body.data ?? (Array.isArray(body) ? body : [])
     pagination.current_page = body.current_page ?? 1
@@ -207,11 +213,13 @@ async function load(page = 1) {
     pagination.total        = body.total ?? rows.value.length
     try {
       const lr = await stockService.getConsumables({ low_stock: 1, per_page: 1 })
+      if (seq !== reqSeq) return
       lowTotal.value = lr?.data?.total ?? 0
     } catch { /* non-fatal */ }
   } catch (e) {
+    if (seq !== reqSeq) return
     error.value = e?.response?.data?.message ?? 'Failed to load consumables.'
-  } finally { loading.value = false }
+  } finally { if (seq === reqSeq) loading.value = false }
 }
 
 function goPage(p) { if (p < 1 || p > pagination.last_page) return; load(p) }

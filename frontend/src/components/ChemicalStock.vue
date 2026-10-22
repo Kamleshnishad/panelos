@@ -275,7 +275,12 @@ const adjustDiff    = computed(() => {
   return adjustForm.new_quantity - Number(activeRow.value.quantity_in_stock)
 })
 
+// Guards against out-of-order responses: toggling a filter or paging quickly
+// can let an earlier request resolve after a later one and overwrite the
+// grid with stale data (MD8).
+let reqSeq = 0
 async function load(page = 1) {
+  const seq = ++reqSeq
   loading.value = true
   error.value   = null
   try {
@@ -283,6 +288,7 @@ async function load(page = 1) {
     if (showLowOnly.value)  params.low_stock = 1
     if (showExpiring.value) params.expiring  = 1
     const res  = await stockService.getChemicals(params)
+    if (seq !== reqSeq) return
     const body = res?.data ?? {}
     rows.value = body.data ?? (Array.isArray(body) ? body : [])
     pagination.current_page = body.current_page ?? 1
@@ -291,14 +297,17 @@ async function load(page = 1) {
     // Accurate totals for summary cards (independent of current page)
     try {
       const lr = await stockService.getChemicals({ low_stock: 1, per_page: 1 })
+      if (seq !== reqSeq) return
       lowTotal.value = lr?.data?.total ?? 0
       const er = await stockService.getChemicals({ expiring: 1, per_page: 1 })
+      if (seq !== reqSeq) return
       expiringTotal.value = er?.data?.total ?? 0
     } catch { /* non-fatal */ }
   } catch (e) {
+    if (seq !== reqSeq) return
     error.value = e?.response?.data?.message ?? 'Failed to load chemical inventory.'
   } finally {
-    loading.value = false
+    if (seq === reqSeq) loading.value = false
   }
 }
 

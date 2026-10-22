@@ -919,7 +919,12 @@ async function save(mode) {
       })),
       accessories: accessories_rows.value.map(acc => ({
         type:         acc.type || 'standard',
-        accessory_id: acc.accessory_id || null,
+        // door/installation rows are identified by `type`, not a real
+        // master-accessory reference — addAccessoryRow() seeds accessory_id
+        // with the literal string 'door'/'installation' as a row-type marker,
+        // which the backend's Rule::exists('accessories','id') check then
+        // rejected outright, failing the entire quotation save (QB1).
+        accessory_id: acc.type === 'standard' ? (acc.accessory_id || null) : null,
         qty:          acc.qty,
         rate:         acc.rate,
         description:  acc.description || null,

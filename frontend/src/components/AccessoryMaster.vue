@@ -117,10 +117,16 @@ const form = reactive({ code: '', name: '', unit: 'NOS', hsn_code: '73089090', r
 
 const pagination = reactive({ current_page: 1, last_page: 1, total: 0 })
 
+// Guards against out-of-order responses: paging quickly can let an earlier
+// request resolve after a later one and overwrite the table with stale
+// data (MD8).
+let reqSeq = 0
 async function load(page = 1) {
+  const seq = ++reqSeq
   loading.value = true; error.value = null
   try {
     const res  = await masterDataService.accessories({ page, per_page: 50 })
+    if (seq !== reqSeq) return
     const body = res?.data ?? {}
     rows.value = body.data ?? (Array.isArray(body) ? body : [])
     // Handle both paginatedResponse (meta.pagination) and raw-paginator shapes
@@ -129,8 +135,8 @@ async function load(page = 1) {
     pagination.current_page = pg.current_page ?? 1
     pagination.total        = pg.total ?? rows.value.length
     pagination.last_page    = pg.last_page ?? (per ? Math.max(1, Math.ceil((pg.total ?? 0) / per)) : 1)
-  } catch (e) { error.value = e?.response?.data?.message ?? 'Failed to load.' }
-  finally { loading.value = false }
+  } catch (e) { if (seq === reqSeq) error.value = e?.response?.data?.message ?? 'Failed to load.' }
+  finally { if (seq === reqSeq) loading.value = false }
 }
 
 function goPage(p) { if (p < 1 || p > pagination.last_page) return; load(p) }

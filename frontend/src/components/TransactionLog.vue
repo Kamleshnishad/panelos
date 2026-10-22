@@ -109,7 +109,12 @@ const pagination = reactive({ current_page: 1, last_page: 1, total: 0 })
 
 const filters = reactive({ kind: '', type: '', from_date: '', to_date: '' })
 
+// Guards against out-of-order responses: quick filter toggles or page clicks
+// can let an earlier request resolve after a later one and overwrite the
+// table with stale data (MD8).
+let reqSeq = 0
 async function load(page = 1) {
+  const seq = ++reqSeq
   loading.value = true
   error.value   = null
   try {
@@ -120,15 +125,17 @@ async function load(page = 1) {
     if (filters.to_date)   params.to_date   = filters.to_date
 
     const res  = await stockService.getTransactions(params)
+    if (seq !== reqSeq) return
     rows.value = res?.data?.data ?? res?.data ?? []
     const meta = res?.data?.meta ?? res?.meta ?? {}
     pagination.current_page = meta.current_page ?? 1
     pagination.last_page    = meta.last_page    ?? 1
     pagination.total        = meta.total        ?? rows.value.length
   } catch (e) {
+    if (seq !== reqSeq) return
     error.value = e?.response?.data?.message ?? 'Failed to load transactions.'
   } finally {
-    loading.value = false
+    if (seq === reqSeq) loading.value = false
   }
 }
 

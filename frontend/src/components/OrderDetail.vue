@@ -18,7 +18,8 @@
         <button
           v-if="order.status === 'in_production'"
           class="btn btn-complete"
-          :disabled="actionLoading"
+          :disabled="actionLoading || !canMarkCompleted"
+          :title="canMarkCompleted ? '' : 'All production batches must be dispatched first'"
           @click="updateStatus('completed')"
         >Mark Completed</button>
         <button
@@ -38,6 +39,9 @@
 
     <div v-if="actionError"   class="error-banner">{{ actionError }}</div>
     <div v-if="actionSuccess" class="success-banner">{{ actionSuccess }}</div>
+    <div v-if="order.status === 'in_production' && !canMarkCompleted" class="hint-banner">
+      This order can be marked completed once every production batch below has been dispatched.
+    </div>
 
     <!-- Info grid -->
     <div class="info-grid card">
@@ -233,13 +237,21 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import orderService from '../services/orderService.js'
 
 const props = defineProps({ orderId: { type: Number, required: true } })
 const emit  = defineEmits(['back', 'view-quotation', 'view-batch'])
 
 const order   = ref(null)
+// Mirrors OrderService::update()'s own rule server-side — an order can only
+// be marked completed once every batch is dispatched (C6: the button used to
+// stay enabled unconditionally and only fail after the click, with no
+// explanation of why).
+const canMarkCompleted = computed(() => {
+  const batches = order.value?.batches ?? []
+  return batches.length > 0 && batches.every((b) => b.status === 'dispatched')
+})
 const loading = ref(false)
 const loadError = ref(null)
 const saving  = ref(false)
@@ -322,6 +334,7 @@ onMounted(load)
 
 .error-banner   { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 10px 16px; border-radius: 6px; font-size: 13px; }
 .success-banner { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; padding: 10px 16px; border-radius: 6px; font-size: 13px; }
+.hint-banner    { background: #fff8e1; border: 1px solid #ffe082; color: #8a6d00; padding: 10px 16px; border-radius: 6px; font-size: 13px; }
 
 .card { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px 24px; }
 .card h3 { margin: 0 0 14px; font-size: 15px; color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary-tint); padding-bottom: 8px; }

@@ -272,13 +272,19 @@ function moveTo(status) {
   return flow[status] || []
 }
 
+// Guards against out-of-order responses: switching status tabs or searching
+// quickly can let an earlier request resolve after a later one and overwrite
+// the table with stale data (MD8).
+let reqSeq = 0
 async function load(page = 1) {
+  const seq = ++reqSeq
   loading.value = true
   try {
     const params = { page, per_page: 50 }
     if (statusFilter.value) params.status = statusFilter.value
     if (search.value) params.search = search.value
     const res  = await leadService.list(params)
+    if (seq !== reqSeq) return
     const body = res?.data ?? {}
     leads.value = Array.isArray(body) ? body : (body.data ?? [])
     if (body.counts) allCount.value = body.counts          // server-side status counts for tabs
@@ -286,8 +292,8 @@ async function load(page = 1) {
     pagination.current_page = pg.current_page ?? 1
     pagination.last_page    = pg.last_page ?? 1
     pagination.total        = pg.total ?? leads.value.length
-  } catch (e) { toastError(e?.response?.data?.message ?? 'Could not load leads.') }
-  finally { loading.value = false }
+  } catch (e) { if (seq === reqSeq) toastError(e?.response?.data?.message ?? 'Could not load leads.') }
+  finally { if (seq === reqSeq) loading.value = false }
 }
 
 function goPage(p) { if (p < 1 || p > pagination.last_page) return; load(p) }

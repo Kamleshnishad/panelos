@@ -179,10 +179,16 @@ function statusLabel(s) { return { draft: 'Draft', in_progress: 'In Progress', c
 
 const pagination = reactive({ current_page: 1, last_page: 1, total: 0 })
 
+// Guards against out-of-order responses: paging quickly can let an earlier
+// request resolve after a later one and overwrite the list with stale
+// data (MD8).
+let reqSeq = 0
 async function load(page = 1) {
+  const seq = ++reqSeq
   loading.value = true
   try {
     const res  = await productionService.listRuns({ page, per_page: 30 })
+    if (seq !== reqSeq) return
     const body = res?.data ?? {}
     // Server now orders by status priority (active first), so no client re-sort needed.
     runs.value = Array.isArray(body) ? body : (body.data ?? [])
@@ -191,9 +197,9 @@ async function load(page = 1) {
     pagination.last_page    = pg.last_page ?? 1
     pagination.total        = pg.total ?? runs.value.length
   } catch (e) {
-    toastError(e?.response?.data?.message ?? 'Could not load runs.')
+    if (seq === reqSeq) toastError(e?.response?.data?.message ?? 'Could not load runs.')
   } finally {
-    loading.value = false
+    if (seq === reqSeq) loading.value = false
   }
 }
 
