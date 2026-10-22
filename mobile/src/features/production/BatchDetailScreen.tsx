@@ -6,11 +6,23 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Button } from '../../design-system/Button';
 import { colors, font, spacing } from '../../design-system/tokens';
 import { IconBack } from '../../design-system/icons';
-import { useBatch, useBatchTimeline, useCompleteBatch, useCompleteStage, useProductionStages, useStartBatch, useStartStage } from './hooks';
+import {
+  useBatch,
+  useBatchTimeline,
+  useCompleteBatch,
+  useCompleteStage,
+  useProductionStages,
+  useStageAttachments,
+  useStartBatch,
+  useStartStage,
+  useUploadStagePhoto,
+} from './hooks';
 import { useElapsed } from './useElapsed';
 import { batchStatusMeta } from './statusMeta';
 import { ProductionStackParamList } from './navigation';
 import { BatchStageLog, ProductionStage } from '../../api/production';
+import { IconCamera } from '../../design-system/icons';
+import { pickPhoto } from '../../shared/pickPhoto';
 
 type Nav = NativeStackNavigationProp<ProductionStackParamList, 'BatchDetail'>;
 type Rt = RouteProp<ProductionStackParamList, 'BatchDetail'>;
@@ -116,6 +128,7 @@ export function BatchDetailScreen() {
             {merged.map((m, idx) => (
               <StageRow
                 key={m.stage.id}
+                batchId={batchId}
                 merged={m}
                 isLast={idx === merged.length - 1}
                 onStart={() => handleStart(m.stage.id, idx === 0)}
@@ -132,6 +145,7 @@ export function BatchDetailScreen() {
 }
 
 function StageRow({
+  batchId,
   merged,
   isLast,
   onStart,
@@ -139,6 +153,7 @@ function StageRow({
   starting,
   completing,
 }: {
+  batchId: number;
   merged: MergedStage;
   isLast: boolean;
   onStart: () => void;
@@ -148,6 +163,10 @@ function StageRow({
 }) {
   const { stage, log, state } = merged;
   const elapsed = useElapsed(state === 'active' ? log?.started_at ?? null : null);
+  const hasLog = state === 'active' || state === 'done';
+  const attachmentsQuery = useStageAttachments(batchId, hasLog ? stage.id : null);
+  const uploadPhoto = useUploadStagePhoto(batchId, stage.id);
+  const photoCount = attachmentsQuery.data?.length ?? 0;
 
   const dotStyle =
     state === 'done' ? styles.dotDone : state === 'active' ? styles.dotActive : styles.dotLocked;
@@ -167,6 +186,18 @@ function StageRow({
           {state === 'active' && <Text style={styles.stageMetaActive}>{elapsed}</Text>}
         </View>
         {state === 'locked' && <Text style={styles.stageHint}>Complete previous stage first</Text>}
+        {hasLog && (
+          <TouchableOpacity
+            style={styles.photoBtn}
+            onPress={() => pickPhoto((uri) => uploadPhoto.mutate(uri))}
+            disabled={uploadPhoto.isPending}
+          >
+            <IconCamera color={colors.primary} />
+            <Text style={styles.photoBtnText}>
+              {uploadPhoto.isPending ? 'Uploading…' : photoCount > 0 ? `${photoCount} photo${photoCount > 1 ? 's' : ''}` : 'Add photo'}
+            </Text>
+          </TouchableOpacity>
+        )}
         {state === 'available' && (
           <Button title="Start Stage" variant="outline" onPress={onStart} loading={starting} style={styles.stageBtn} />
         )}
@@ -205,6 +236,8 @@ const styles = StyleSheet.create({
   stageMetaActive: { fontSize: 12, color: colors.primary, fontWeight: font.weight.heavy },
   stageHint: { fontSize: 11.5, color: '#9aa0ac', fontWeight: font.weight.semibold },
   stageBtn: { alignSelf: 'flex-start', paddingHorizontal: spacing.lg },
+  photoBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  photoBtnText: { color: colors.primary, fontWeight: font.weight.bold, fontSize: 12.5 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   emptyText: { color: colors.textSecondary, fontWeight: font.weight.semibold, textAlign: 'center' },
 });

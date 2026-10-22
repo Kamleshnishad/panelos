@@ -4,10 +4,13 @@ Everything here is **new work on the Laravel backend**, confirmed necessary by d
 
 ---
 
-## §1. Photo / Attachment Upload (blocks Phase 1.5, Phase 2.3)
+## §1. Photo / Attachment Upload — ✅ shipped 2026-10-22 (unblocked Phase 1.5, Phase 2.3)
 
-### Current state
+### Current state (as of original write-up — now resolved, see below)
 No route in `backend/routes/api.php` handles photo upload for batch stages or dispatch delivery confirmation. The design docs mention `upload-photo` and `upload-delivery-photos` but these were never implemented — confirmed by grepping the live route file for `photo|signature|upload`, which returned no matches.
+
+### What was actually built
+Matches the spec below closely, with two small deviations: the table/migration is named `attachments` (`backend/database/migrations/2026_10_22_000001_create_attachments_table.php`) and lives on `App\Models\Attachment`; routes are `POST/GET /batches/{batchId}/stages/{stageId}/attachments` and `POST/GET /dispatches/{id}/attachments` (plural `attachments`, matching the table name, rather than the singular originally sketched). Both already covered by the right permission keys (`production.manage`/`dispatch.manage`) with no middleware changes needed — the URL segments (`batches`, `dispatches`) already map correctly. Storage uses the existing `public` disk (same one `AccessoryController::uploadImage` already uses), validated `image|mimes:jpeg,jpg,png,webp|max:5120` server-side regardless of client compression. Tests: `backend/tests/Feature/AttachmentUploadTest.php` (5 tests — upload+list for both stage and dispatch attachments, non-image rejection, cross-tenant rejection, and a Production-vs-Viewer permission check).
 
 ### What to build
 

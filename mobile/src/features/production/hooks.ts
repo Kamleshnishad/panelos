@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as productionApi from '../../api/production';
 import * as qcApi from '../../api/qc';
+import * as attachmentsApi from '../../api/attachments';
 
 export function useBatches(status?: productionApi.BatchStatus) {
   return useInfiniteQuery({
@@ -83,6 +84,24 @@ export function useCreateQc(batchId: number) {
       queryClient.invalidateQueries({ queryKey: ['batch', batchId, 'qc'] });
       queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
       queryClient.invalidateQueries({ queryKey: ['batches'] });
+    },
+  });
+}
+
+export function useStageAttachments(batchId: number, stageId: number | null) {
+  return useQuery({
+    queryKey: ['batch', batchId, 'stage', stageId, 'attachments'],
+    queryFn: () => attachmentsApi.listStageAttachments(batchId, stageId!),
+    enabled: stageId != null,
+  });
+}
+
+export function useUploadStagePhoto(batchId: number, stageId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (uri: string) => attachmentsApi.uploadStagePhoto(batchId, stageId, 'stage_photo', uri),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batch', batchId, 'stage', stageId, 'attachments'] });
     },
   });
 }

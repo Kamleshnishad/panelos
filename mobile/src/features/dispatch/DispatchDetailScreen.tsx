@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -7,13 +7,14 @@ import { Button } from '../../design-system/Button';
 import { StatusPill } from '../../design-system/StatusPill';
 import { IconBack, IconCamera } from '../../design-system/icons';
 import { colors, font, radius, spacing } from '../../design-system/tokens';
-import { useCompleteDispatch, useDispatch } from './hooks';
+import { useCompleteDispatch, useDispatch, useDispatchAttachments, useUploadDispatchPhoto } from './hooks';
 import { dispatchStatusMeta } from './statusMeta';
 import { computeDispatchQty, computeDispatchTotal } from '../../api/dispatch';
 import { DispatchStackParamList } from './navigation';
 import { openChallan } from './challan';
 import { useSessionStore } from '../../auth/session';
 import { hasPermission } from '../../auth/permissions';
+import { pickPhoto } from '../../shared/pickPhoto';
 
 type Nav = NativeStackNavigationProp<DispatchStackParamList, 'DispatchDetail'>;
 type Rt = RouteProp<DispatchStackParamList, 'DispatchDetail'>;
@@ -25,6 +26,8 @@ export function DispatchDetailScreen() {
 
   const { data: dispatch, isLoading } = useDispatch(dispatchId);
   const completeDispatch = useCompleteDispatch(dispatchId);
+  const attachmentsQuery = useDispatchAttachments(dispatchId);
+  const uploadPhoto = useUploadDispatchPhoto(dispatchId);
   const [challanLoading, setChallanLoading] = useState(false);
   const user = useSessionStore((s) => s.user);
   const canManage = hasPermission(user, 'dispatch.manage');
@@ -108,6 +111,27 @@ export function DispatchDetailScreen() {
             </TouchableOpacity>
           </View>
 
+          {canManage && (
+            <>
+              <Text style={styles.sectionTitle}>Delivery Proof</Text>
+              <View style={styles.card}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>
+                  {(attachmentsQuery.data ?? []).map((a) => (
+                    <Image key={a.id} source={{ uri: a.url }} style={styles.photoThumb} />
+                  ))}
+                  <TouchableOpacity
+                    style={styles.addPhotoBtn}
+                    onPress={() => pickPhoto((uri) => uploadPhoto.mutate(uri))}
+                    disabled={uploadPhoto.isPending}
+                  >
+                    <IconCamera color={colors.primary} />
+                    <Text style={styles.addPhotoText}>{uploadPhoto.isPending ? 'Uploading…' : 'Add'}</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
+            </>
+          )}
+
           {dispatch.status === 'pending' && canManage && (
             <Button title="Mark Delivered" variant="primary" block onPress={handleMarkDelivered} loading={completeDispatch.isPending} />
           )}
@@ -139,5 +163,9 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row' },
   challanBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderColor: colors.primary, borderRadius: radius.sm, paddingHorizontal: 16, paddingVertical: 11 },
   challanBtnText: { color: colors.primary, fontWeight: font.weight.bold, fontSize: font.size.sm },
+  photoRow: { gap: 10 },
+  photoThumb: { width: 72, height: 72, borderRadius: radius.sm, backgroundColor: colors.border },
+  addPhotoBtn: { width: 72, height: 72, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.primary, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  addPhotoText: { color: colors.primary, fontWeight: font.weight.bold, fontSize: 11 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
 });

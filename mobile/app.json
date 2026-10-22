@@ -23,7 +23,15 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "PanelOS uses the camera to attach stage and delivery photos.",
+          "photosPermission": "PanelOS uses your photo library to attach stage and delivery photos.",
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }

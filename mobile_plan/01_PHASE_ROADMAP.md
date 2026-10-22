@@ -62,10 +62,10 @@ Full screen spec: [04_PRODUCTION_MODULE.md](04_PRODUCTION_MODULE.md).
 - Exit criteria: a QC record created on mobile appears correctly on the web QC dashboard.
 - Effort: 1 week.
 
-### 1.5 QC/stage photo attachment ⚠ backend dependency
-- Deliverables: camera capture + upload UI, wired to the **new** photo endpoints from [09_BACKEND_CHANGES_REQUIRED.md](09_BACKEND_CHANGES_REQUIRED.md) §1.
-- Exit criteria: a photo taken on-device is visible on the corresponding web batch/QC detail screen.
-- Effort: 1 week (app side) — **blocked until backend §1 ships**.
+### 1.5 Stage photo attachment — ✅ built
+- Deliverables: camera capture + upload UI, wired to the photo endpoints from [09_BACKEND_CHANGES_REQUIRED.md](09_BACKEND_CHANGES_REQUIRED.md) §1 (now shipped).
+- Exit criteria: a photo taken on-device is visible on the corresponding web batch detail screen (served from the `public` disk, same as existing accessory/company-logo images).
+- **Shipped** (2026-10-22): `Attachment` model/migration + `AttachmentController` (backend), `mobile/src/api/attachments.ts` + `pickPhoto()` helper (app). Wired into `BatchDetailScreen.tsx` — a camera button appears on any active/completed stage row, uploads a `stage_photo`, and shows a running count. `qc_photo` is a supported type on the same endpoint but has no dedicated UI yet — `QcScreen.tsx` is batch-level (post-stages), not stage-scoped, so it doesn't have a natural `stageId` to attach through; revisit if QC needs its own photo flow.
 
 ### 1.6 Module QA & floor UAT
 - Deliverables: a real floor worker uses the module for a live batch under supervision; issues logged and triaged.
@@ -89,10 +89,10 @@ Full screen spec: [05_DISPATCH_MODULE.md](05_DISPATCH_MODULE.md).
 - Deliverables: detail screen, `POST /dispatches/{id}/allocate`.
 - Effort: 1 week.
 
-### 2.3 Mark delivered + proof capture ⚠ backend dependency
-- Deliverables: `POST /dispatches/{id}/complete`, photo + optional signature capture wired to the new delivery-proof endpoint ([09_BACKEND_CHANGES_REQUIRED.md](09_BACKEND_CHANGES_REQUIRED.md) §1).
-- Exit criteria: proof visible on the web dispatch detail and on the challan record.
-- Effort: 1.5 weeks — **blocked until backend §1 ships**.
+### 2.3 Mark delivered + proof capture — ✅ built
+- Deliverables: `POST /dispatches/{id}/complete`, photo capture wired to the delivery-proof endpoint ([09_BACKEND_CHANGES_REQUIRED.md](09_BACKEND_CHANGES_REQUIRED.md) §1, now shipped).
+- Exit criteria: proof visible on the web dispatch detail.
+- **Shipped** (2026-10-22): `DispatchDetailScreen.tsx` now has a "Delivery Proof" card — thumbnail row + an always-available camera/library button, independent of the Mark Delivered action (so proof can be captured before or after confirming). `signature` is a supported attachment type on the same endpoint but has no dedicated capture UI yet (no signature-pad library added) — revisit if a drawn signature (not just a photo) is actually required.
 
 ### 2.4 Challan viewer
 - Deliverables: `GET /dispatches/{id}/challan` rendered read-only (reuse existing PDF via in-app viewer or `GET /dispatches/{id}/challan/pdf`).
