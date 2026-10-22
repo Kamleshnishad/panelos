@@ -6,7 +6,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Button } from '../../design-system/Button';
 import { colors, font, spacing } from '../../design-system/tokens';
 import { IconBack } from '../../design-system/icons';
-import { useBatch, useBatchTimeline, useCompleteStage, useProductionStages, useStartStage } from './hooks';
+import { useBatch, useBatchTimeline, useCompleteBatch, useCompleteStage, useProductionStages, useStartBatch, useStartStage } from './hooks';
 import { useElapsed } from './useElapsed';
 import { batchStatusMeta } from './statusMeta';
 import { ProductionStackParamList } from './navigation';
@@ -31,6 +31,8 @@ export function BatchDetailScreen() {
   const timelineQuery = useBatchTimeline(batchId);
   const startStage = useStartStage(batchId);
   const completeStage = useCompleteStage(batchId);
+  const startBatch = useStartBatch(batchId);
+  const completeBatch = useCompleteBatch(batchId);
 
   const merged: MergedStage[] = useMemo(() => {
     const stages = stagesQuery.data ?? [];
@@ -52,17 +54,27 @@ export function BatchDetailScreen() {
   const batch = batchQuery.data;
   const isLoading = batchQuery.isLoading || stagesQuery.isLoading || timelineQuery.isLoading;
 
-  async function handleStart(stageId: number) {
+  // A batch worked entirely through this app must also transition at the
+  // batch level (draft -> in_progress -> qc_pending), not just at the stage
+  // level — ProductionBatchService::completeBatch requires 'in_progress',
+  // which only startProduction() sets (M2 fix).
+  async function handleStart(stageId: number, isFirstStage: boolean) {
     try {
+      if (isFirstStage && batch?.status === 'draft') {
+        await startBatch.mutateAsync();
+      }
       await startStage.mutateAsync(stageId);
     } catch (e: any) {
       Alert.alert('Could not start stage', e?.response?.data?.message ?? 'Please try again.');
     }
   }
 
-  async function handleComplete(stageId: number) {
+  async function handleComplete(stageId: number, isLastStage: boolean) {
     try {
       await completeStage.mutateAsync({ stageId });
+      if (isLastStage) {
+        await completeBatch.mutateAsync();
+      }
     } catch (e: any) {
       Alert.alert('Could not complete stage', e?.response?.data?.message ?? 'Please try again.');
     }
@@ -106,10 +118,10 @@ export function BatchDetailScreen() {
                 key={m.stage.id}
                 merged={m}
                 isLast={idx === merged.length - 1}
-                onStart={() => handleStart(m.stage.id)}
-                onComplete={() => handleComplete(m.stage.id)}
-                starting={startStage.isPending}
-                completing={completeStage.isPending}
+                onStart={() => handleStart(m.stage.id, idx === 0)}
+                onComplete={() => handleComplete(m.stage.id, idx === merged.length - 1)}
+                starting={startStage.isPending || startBatch.isPending}
+                completing={completeStage.isPending || completeBatch.isPending}
               />
             ))}
           </View>

@@ -12,6 +12,8 @@ import { dispatchStatusMeta } from './statusMeta';
 import { computeDispatchQty, computeDispatchTotal } from '../../api/dispatch';
 import { DispatchStackParamList } from './navigation';
 import { openChallan } from './challan';
+import { useSessionStore } from '../../auth/session';
+import { hasPermission } from '../../auth/permissions';
 
 type Nav = NativeStackNavigationProp<DispatchStackParamList, 'DispatchDetail'>;
 type Rt = RouteProp<DispatchStackParamList, 'DispatchDetail'>;
@@ -24,6 +26,8 @@ export function DispatchDetailScreen() {
   const { data: dispatch, isLoading } = useDispatch(dispatchId);
   const completeDispatch = useCompleteDispatch(dispatchId);
   const [challanLoading, setChallanLoading] = useState(false);
+  const user = useSessionStore((s) => s.user);
+  const canManage = hasPermission(user, 'dispatch.manage');
 
   async function handleMarkDelivered() {
     Alert.alert('Confirm delivery', 'Mark this dispatch as delivered now?', [
@@ -104,7 +108,7 @@ export function DispatchDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {dispatch.status === 'pending' && (
+          {dispatch.status === 'pending' && canManage && (
             <Button title="Mark Delivered" variant="primary" block onPress={handleMarkDelivered} loading={completeDispatch.isPending} />
           )}
         </ScrollView>

@@ -1,10 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as dispatchApi from '../../api/dispatch';
 
 export function useDispatches(status?: dispatchApi.DispatchStatus) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['dispatches', status ?? 'all'],
-    queryFn: () => dispatchApi.listDispatches(status ? { status } : {}),
+    queryFn: ({ pageParam }) => dispatchApi.listDispatches(status ? { status, page: pageParam } : { page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.current_page * lastPage.per_page < lastPage.total ? lastPage.current_page + 1 : undefined),
   });
 }
 

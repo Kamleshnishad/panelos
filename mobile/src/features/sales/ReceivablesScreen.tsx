@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -26,8 +26,8 @@ export function ReceivablesScreen() {
     try {
       await sendPaymentReminder(invoiceId);
       setReminded((r) => ({ ...r, [invoiceId]: true }));
-    } catch {
-      // best-effort — leave the button re-tappable on failure
+    } catch (e: any) {
+      Alert.alert('Could not send reminder', e?.response?.data?.message ?? 'Please try again.');
     } finally {
       setSending((s) => ({ ...s, [invoiceId]: false }));
     }

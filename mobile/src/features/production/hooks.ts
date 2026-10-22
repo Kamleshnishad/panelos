@@ -1,11 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as productionApi from '../../api/production';
 import * as qcApi from '../../api/qc';
 
 export function useBatches(status?: productionApi.BatchStatus) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['batches', status ?? 'all'],
-    queryFn: () => productionApi.listBatches(status ? { status } : {}),
+    queryFn: ({ pageParam }) => productionApi.listBatches(status ? { status, page: pageParam } : { page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const { current_page, per_page, total } = lastPage.meta.pagination;
+      return current_page * per_page < total ? current_page + 1 : undefined;
+    },
   });
 }
 
@@ -28,6 +33,28 @@ export function useStartStage(batchId: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch', batchId, 'timeline'] });
       queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
+    },
+  });
+}
+
+export function useStartBatch(batchId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => productionApi.startBatch(batchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+    },
+  });
+}
+
+export function useCompleteBatch(batchId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => productionApi.completeBatch(batchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
     },
   });
 }

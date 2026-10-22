@@ -7,7 +7,9 @@ import { apiClient } from './client';
 // qc_passed/qc_failed come from QualityControlService::create; 'completed'/'cancelled'
 // are not confirmed reachable within this module's scope but are included defensively
 // since ProductionBatchController hints at a 'draft' status flow that predates dispatch.
-export type BatchStatus = 'draft' | 'in_progress' | 'qc_pending' | 'qc_passed' | 'qc_failed' | 'completed' | 'cancelled';
+// 'dispatched' is set by Dispatch::markAsCompleted() the moment a dispatch finishes —
+// triggered directly by this app's own "Mark Delivered" action (M1 fix).
+export type BatchStatus = 'draft' | 'in_progress' | 'qc_pending' | 'qc_passed' | 'qc_failed' | 'completed' | 'cancelled' | 'dispatched';
 
 export type ProductionStage = {
   id: number;
@@ -99,5 +101,21 @@ export async function startStage(batchId: number, stageId: number, notes?: strin
 
 export async function completeStage(batchId: number, stageId: number, notes?: string) {
   const res = await apiClient.post<ApiEnvelope<BatchStageLog>>(`/batches/${batchId}/stages/${stageId}/complete`, { notes });
+  return res.data.data;
+}
+
+// Batch-level start/complete — distinct from stage-level start/complete above.
+// ProductionBatchService::completeBatch requires status === 'in_progress', which
+// only startProduction() sets; without calling these, a batch worked entirely
+// through this app could never reach qc_pending (M2 fix).
+export async function startBatch(batchId: number) {
+  const res = await apiClient.post<ApiEnvelope<Batch>>(`/batches/${batchId}/start`);
+  return res.data.data;
+}
+
+export async function completeBatch(batchId: number, completedQuantity?: number) {
+  const res = await apiClient.post<ApiEnvelope<Batch>>(`/batches/${batchId}/complete`, {
+    completed_quantity: completedQuantity,
+  });
   return res.data.data;
 }

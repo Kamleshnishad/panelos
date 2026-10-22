@@ -16,7 +16,10 @@ type Nav = NativeStackNavigationProp<ProductionStackParamList, 'BatchList'>;
 export function BatchListScreen() {
   const navigation = useNavigation<Nav>();
   const [filter, setFilter] = useState<BatchStatus | 'all'>('all');
-  const { data, isLoading, isError, refetch, isRefetching } = useBatches(filter === 'all' ? undefined : filter);
+  const { data, isLoading, isError, refetch, isRefetching, fetchNextPage, hasNextPage, isFetchingNextPage } = useBatches(
+    filter === 'all' ? undefined : filter,
+  );
+  const batches = data?.pages.flatMap((p) => p.data) ?? [];
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -44,10 +47,13 @@ export function BatchListScreen() {
         </View>
       ) : (
         <FlatList
-          data={data?.data ?? []}
+          data={batches}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
+          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.md }} /> : null}
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={styles.emptyText}>No batches match this filter.</Text>

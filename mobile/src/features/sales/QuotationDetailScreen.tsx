@@ -9,6 +9,8 @@ import { colors, font, spacing } from '../../design-system/tokens';
 import { useAcceptQuotation, useQuotation, useRejectQuotation, useSendQuotation } from './hooks';
 import { quotationStatusMeta } from './statusMeta';
 import { SalesStackParamList } from './navigation';
+import { useSessionStore } from '../../auth/session';
+import { hasPermission } from '../../auth/permissions';
 
 type Nav = NativeStackNavigationProp<SalesStackParamList, 'QuotationDetail'>;
 type Rt = RouteProp<SalesStackParamList, 'QuotationDetail'>;
@@ -24,6 +26,8 @@ export function QuotationDetailScreen() {
   const sendQ = useSendQuotation(quotationId);
   const acceptQ = useAcceptQuotation(quotationId);
   const rejectQ = useRejectQuotation(quotationId);
+  const user = useSessionStore((s) => s.user);
+  const canManage = hasPermission(user, 'quotations.manage');
 
   async function runAction(label: string, mutateAsync: () => Promise<unknown>) {
     try {
@@ -64,32 +68,34 @@ export function QuotationDetailScreen() {
             <SummaryRow label="Balance" value={money(q.balance_amount)} />
           </View>
 
-          <View style={styles.actionsRow}>
-            {q.status === 'draft' && (
-              <Button title="Send" variant="primary" block onPress={() => runAction('Send', () => sendQ.mutateAsync())} loading={sendQ.isPending} />
-            )}
-            {q.status === 'sent' && (
-              <>
-                <Button
-                  title="Accept"
-                  variant="primary"
-                  block
-                  onPress={() => runAction('Accept', () => acceptQ.mutateAsync())}
-                  loading={acceptQ.isPending}
-                />
-                <Button
-                  title="Reject"
-                  variant="danger"
-                  block
-                  onPress={() => runAction('Reject', () => rejectQ.mutateAsync())}
-                  loading={rejectQ.isPending}
-                />
-              </>
-            )}
-            {q.status === 'draft' && (
-              <Button title="Reject" variant="outline" block onPress={() => runAction('Reject', () => rejectQ.mutateAsync())} loading={rejectQ.isPending} />
-            )}
-          </View>
+          {canManage && (
+            <View style={styles.actionsRow}>
+              {q.status === 'draft' && (
+                <Button title="Send" variant="primary" block onPress={() => runAction('Send', () => sendQ.mutateAsync())} loading={sendQ.isPending} />
+              )}
+              {q.status === 'sent' && (
+                <>
+                  <Button
+                    title="Accept"
+                    variant="primary"
+                    block
+                    onPress={() => runAction('Accept', () => acceptQ.mutateAsync())}
+                    loading={acceptQ.isPending}
+                  />
+                  <Button
+                    title="Reject"
+                    variant="danger"
+                    block
+                    onPress={() => runAction('Reject', () => rejectQ.mutateAsync())}
+                    loading={rejectQ.isPending}
+                  />
+                </>
+              )}
+              {q.status === 'draft' && (
+                <Button title="Reject" variant="outline" block onPress={() => runAction('Reject', () => rejectQ.mutateAsync())} loading={rejectQ.isPending} />
+              )}
+            </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>

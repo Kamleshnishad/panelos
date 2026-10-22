@@ -48,7 +48,10 @@ export function SalesHomeScreen() {
 
 function QuotationsTab({ onOpen }: { onOpen: (id: number) => void }) {
   const [filter, setFilter] = useState<QuotationStatus | 'all'>('all');
-  const { data, isLoading, isError, refetch, isRefetching } = useQuotations(filter === 'all' ? undefined : filter);
+  const { data, isLoading, isError, refetch, isRefetching, fetchNextPage, hasNextPage, isFetchingNextPage } = useQuotations(
+    filter === 'all' ? undefined : filter,
+  );
+  const quotations = data?.pages.flatMap((p) => p.data) ?? [];
 
   return (
     <>
@@ -61,10 +64,13 @@ function QuotationsTab({ onOpen }: { onOpen: (id: number) => void }) {
         </View>
       ) : (
         <FlatList
-          data={data?.data ?? []}
+          data={quotations}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
+          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.md }} /> : null}
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={styles.emptyText}>No quotations match this filter.</Text>
@@ -79,7 +85,10 @@ function QuotationsTab({ onOpen }: { onOpen: (id: number) => void }) {
 
 function OrdersTab({ onOpen }: { onOpen: (id: number) => void }) {
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all');
-  const { data, isLoading, isError, refetch, isRefetching } = useOrders(filter === 'all' ? undefined : filter);
+  const { data, isLoading, isError, refetch, isRefetching, fetchNextPage, hasNextPage, isFetchingNextPage } = useOrders(
+    filter === 'all' ? undefined : filter,
+  );
+  const orders = data?.pages.flatMap((p) => p.data) ?? [];
 
   return (
     <>
@@ -92,10 +101,13 @@ function OrdersTab({ onOpen }: { onOpen: (id: number) => void }) {
         </View>
       ) : (
         <FlatList
-          data={data?.data ?? []}
+          data={orders}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
+          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.md }} /> : null}
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={styles.emptyText}>No orders match this filter.</Text>

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as quotationsApi from '../../api/quotations';
 import * as ordersApi from '../../api/orders';
 import * as reportsApi from '../../api/reports';
@@ -6,9 +6,14 @@ import * as invoicesApi from '../../api/invoices';
 import * as paymentsApi from '../../api/payments';
 
 export function useQuotations(status?: quotationsApi.QuotationStatus) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['quotations', status ?? 'all'],
-    queryFn: () => quotationsApi.listQuotations(status ? { status } : {}),
+    queryFn: ({ pageParam }) => quotationsApi.listQuotations(status ? { status, page: pageParam } : { page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const { current_page, per_page, total } = lastPage.meta.pagination;
+      return current_page * per_page < total ? current_page + 1 : undefined;
+    },
   });
 }
 
@@ -32,9 +37,14 @@ export const useAcceptQuotation = (id: number) => useQuotationAction(id, quotati
 export const useRejectQuotation = (id: number) => useQuotationAction(id, quotationsApi.rejectQuotation);
 
 export function useOrders(status?: ordersApi.OrderStatus) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['orders', status ?? 'all'],
-    queryFn: () => ordersApi.listOrders(status ? { status } : {}),
+    queryFn: ({ pageParam }) => ordersApi.listOrders(status ? { status, page: pageParam } : { page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const { current_page, per_page, total } = lastPage.meta.pagination;
+      return current_page * per_page < total ? current_page + 1 : undefined;
+    },
   });
 }
 

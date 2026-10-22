@@ -9,6 +9,7 @@ export const batchStatusMeta: Record<BatchStatus, { label: string; variant: Pill
   qc_failed: { label: 'QC Failed', variant: 'danger' },
   completed: { label: 'Completed', variant: 'success' },
   cancelled: { label: 'Cancelled', variant: 'neutral' },
+  dispatched: { label: 'Dispatched', variant: 'success' },
 };
 
 export const statusFilters: { key: BatchStatus | 'all'; label: string }[] = [
@@ -17,4 +18,5 @@ export const statusFilters: { key: BatchStatus | 'all'; label: string }[] = [
   { key: 'qc_pending', label: 'QC Pending' },
   { key: 'qc_passed', label: 'Passed' },
   { key: 'qc_failed', label: 'Failed' },
+  { key: 'dispatched', label: 'Dispatched' },
 ];

@@ -16,7 +16,10 @@ type Nav = NativeStackNavigationProp<DispatchStackParamList, 'DispatchList'>;
 export function DispatchListScreen() {
   const navigation = useNavigation<Nav>();
   const [filter, setFilter] = useState<DispatchStatus | 'all'>('all');
-  const { data, isLoading, isError, refetch, isRefetching } = useDispatches(filter === 'all' ? undefined : filter);
+  const { data, isLoading, isError, refetch, isRefetching, fetchNextPage, hasNextPage, isFetchingNextPage } = useDispatches(
+    filter === 'all' ? undefined : filter,
+  );
+  const dispatches = data?.pages.flatMap((p) => p.data) ?? [];
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -44,10 +47,13 @@ export function DispatchListScreen() {
         </View>
       ) : (
         <FlatList
-          data={data?.data ?? []}
+          data={dispatches}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
+          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.md }} /> : null}
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={styles.emptyText}>No dispatches match this filter.</Text>

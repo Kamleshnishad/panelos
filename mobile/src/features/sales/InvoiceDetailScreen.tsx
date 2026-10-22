@@ -10,6 +10,8 @@ import { useInvoice, usePaymentStatus, useRecordPayment } from './hooks';
 import { sendPaymentReminder } from '../../api/payments';
 import { PaymentMethod } from '../../api/payments';
 import { SalesStackParamList } from './navigation';
+import { useSessionStore } from '../../auth/session';
+import { hasPermission } from '../../auth/permissions';
 
 type Nav = NativeStackNavigationProp<SalesStackParamList, 'InvoiceDetail'>;
 type Rt = RouteProp<SalesStackParamList, 'InvoiceDetail'>;
@@ -31,6 +33,8 @@ export function InvoiceDetailScreen() {
   const { data: invoice, isLoading: invoiceLoading } = useInvoice(invoiceId);
   const { data: paymentStatus, isLoading: statusLoading } = usePaymentStatus(invoiceId);
   const recordPayment = useRecordPayment(invoiceId);
+  const user = useSessionStore((s) => s.user);
+  const canManage = hasPermission(user, 'invoices.manage');
 
   const [showForm, setShowForm] = useState(false);
   const [amount, setAmount] = useState('');
@@ -111,7 +115,7 @@ export function InvoiceDetailScreen() {
             </>
           )}
 
-          {showForm && (
+          {showForm && canManage && (
             <View style={styles.card}>
               <Text style={styles.formTitle}>Record Payment</Text>
               <View style={styles.field}>
@@ -138,19 +142,21 @@ export function InvoiceDetailScreen() {
             </View>
           )}
 
-          <View style={styles.actionsRow}>
-            <Button
-              title={reminderSent ? 'Reminder Sent ✓' : 'Send Reminder'}
-              variant="outline"
-              block
-              onPress={handleReminder}
-              disabled={reminderSent}
-              loading={reminderSending}
-            />
-            {!showForm && paymentStatus.remaining_due > 0 && (
-              <Button title="Record Payment" variant="primary" block onPress={() => setShowForm(true)} />
-            )}
-          </View>
+          {canManage && (
+            <View style={styles.actionsRow}>
+              <Button
+                title={reminderSent ? 'Reminder Sent ✓' : 'Send Reminder'}
+                variant="outline"
+                block
+                onPress={handleReminder}
+                disabled={reminderSent}
+                loading={reminderSending}
+              />
+              {!showForm && paymentStatus.remaining_due > 0 && (
+                <Button title="Record Payment" variant="primary" block onPress={() => setShowForm(true)} />
+              )}
+            </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
