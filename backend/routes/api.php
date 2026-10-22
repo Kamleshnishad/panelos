@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\QuotationController;
 use App\Http\Controllers\Api\ProductionBatchController;
 use App\Http\Controllers\Api\ProductionStageController;
+use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\BatchStageLogController;
 use App\Http\Controllers\Api\QualityControlController;
 use App\Http\Controllers\Api\CuttingScheduleController;
@@ -222,6 +223,8 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::get('/batches/{batchId}/progress', [BatchStageLogController::class, 'getProgress'])->name('batches.progress');
     Route::post('/batches/{batchId}/stages/{stageId}/start', [BatchStageLogController::class, 'startStage'])->name('batches.stages.start');
     Route::post('/batches/{batchId}/stages/{stageId}/complete', [BatchStageLogController::class, 'completeStage'])->name('batches.stages.complete');
+    Route::get('/batches/{batchId}/stages/{stageId}/attachments', [AttachmentController::class, 'indexForStage'])->name('batches.stages.attachments.index');
+    Route::post('/batches/{batchId}/stages/{stageId}/attachments', [AttachmentController::class, 'storeForStage'])->name('batches.stages.attachments.store');
 
     // Quality Control
     Route::get('/quality-control', [QualityControlController::class, 'index'])->name('qc.index');
@@ -283,6 +286,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
 
     Route::get('/dispatches/{id}/challan', [DispatchController::class, 'getChallan'])->name('dispatches.challan');
     Route::get('/dispatches/{id}/challan/pdf', [DispatchController::class, 'getChallanPdf'])->name('dispatches.challan.pdf');
+
+    Route::get('/dispatches/{id}/attachments', [AttachmentController::class, 'indexForDispatch'])->name('dispatches.attachments.index');
+    Route::post('/dispatches/{id}/attachments', [AttachmentController::class, 'storeForDispatch'])->name('dispatches.attachments.store');
 
     Route::get('/batches/{batchId}/dispatches', [DispatchController::class, 'getDispatchesByBatch'])->name('dispatches.by_batch');
 

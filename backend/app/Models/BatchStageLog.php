@@ -43,4 +43,9 @@ class BatchStageLog extends Model
     {
         return $this->belongsTo(User::class, 'logged_by_user_id');
     }
+
+    public function attachments()
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
 }

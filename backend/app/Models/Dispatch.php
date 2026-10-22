@@ -83,6 +83,11 @@ class Dispatch extends BaseModel
         return $this->hasMany(StockAllocation::class);
     }
 
+    public function attachments()
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
+
     public function getTotalAmountAttribute()
     {
         return $this->items->sum('amount') ?? 0;
