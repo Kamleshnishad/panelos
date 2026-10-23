@@ -20,6 +20,19 @@ class AccessoryService
      */
     public function update(Accessory $accessory, array $data): Accessory
     {
+        // A cleared form field arrives as null (Laravel converts "" to null), but
+        // rate, unit_price and unit are NOT NULL — so blanking a price made the
+        // whole save fail with a 500 that also leaked the raw SQL error. Blank
+        // means the column's default, as it does on create.
+        foreach (['rate', 'unit_price'] as $price) {
+            if (array_key_exists($price, $data) && $data[$price] === null) {
+                $data[$price] = 0;
+            }
+        }
+        if (array_key_exists('unit', $data) && $data['unit'] === null) {
+            $data['unit'] = 'NOS';
+        }
+
         $accessory->update($data);
         return $accessory->fresh();
     }

@@ -1,0 +1,57 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — read the application log on production (manual only, read-only).
+#  Answers "what actually went wrong?" when the browser only shows a generic
+#  failure. Prints who the app runs as, whether it can write its logs, and the
+#  most recent errors with their reference ids.
+#
+#  Optional input `grep` narrows the output (e.g. "SQLSTATE" or a reference id).
+# ═══════════════════════════════════════════════════════════════
+
+name: Check Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: 'Only show log lines containing this text (blank = last errors)'
+        required: false
+        default: ''
+      lines:
+        description: 'How many matching lines to show'
+        required: false
+        default: '25'
+
+jobs:
+  check:
+    name: Tail the application log
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment:
+      name: production
+    steps:
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          name: panelos_deploy
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Inspect logs
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          PATTERN: ${{ inputs.grep }}
+          LINES: ${{ inputs.lines }}
+        run: |
+          PAT="${PATTERN:-ERROR}"
+          ssh -i ~/.ssh/panelos_deploy \
+              -o StrictHostKeyChecking=accept-new \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "docker exec panelos_backend sh -c 'echo ---runs-as---; id; echo; echo ---log-dir---; ls -la storage/logs | head -8; echo; echo ---can-write---; touch storage/logs/.w && echo yes && rm storage/logs/.w || echo NO; echo; echo ---last-matches---; grep -h \"$PAT\" storage/logs/*.log 2>/dev/null | cut -c1-400 | tail -n $LINES'"

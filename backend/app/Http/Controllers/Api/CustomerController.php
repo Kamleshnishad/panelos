@@ -148,6 +148,26 @@ class CustomerController extends Controller
             'notes'              => 'nullable|string|max:2000',
         ]);
 
+        // The edit form sends EVERY field, with "" for each one left blank, and
+        // Laravel's ConvertEmptyStringsToNull turns those into null. Several
+        // customer columns are NOT NULL, so writing that straight through failed
+        // the whole save with "Column 'address_line1' cannot be null" — a 500 for
+        // any customer with, say, no address on file. store() already coalesced
+        // these to ''; update() never did, and it went unnoticed only because the
+        // edit form had no way to open until recently.
+        foreach (['phone', 'address_line1', 'city', 'state', 'state_code', 'pincode'] as $column) {
+            if (array_key_exists($column, $validated) && $validated[$column] === null) {
+                $validated[$column] = '';
+            }
+        }
+        // Clearing a number means "back to the default", not "invalid".
+        if (array_key_exists('credit_limit', $validated) && $validated['credit_limit'] === null) {
+            $validated['credit_limit'] = 0;                    // 0 = no limit
+        }
+        if (array_key_exists('payment_terms_days', $validated) && $validated['payment_terms_days'] === null) {
+            $validated['payment_terms_days'] = 30;
+        }
+
         $customer->update($validated);
 
         return response()->json(['success' => true, 'data' => $customer]);

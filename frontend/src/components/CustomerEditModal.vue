@@ -167,6 +167,7 @@ import FormSelect from './Form/FormSelect.vue'
 import FormTextarea from './Form/FormTextarea.vue'
 import customerService from '../services/customerService.js'
 import { toastError, toastSuccess } from '../services/ui.js'
+import { errorText } from '../services/errorText.js'
 import { useFieldValidation } from '../composables/useFieldValidation.js'
 
 const props = defineProps({
@@ -280,12 +281,7 @@ async function save() {
     emit('saved')
     close()
   } catch (e) {
-    const errs = e?.response?.data?.errors || e?.response?.data
-    if (errs && typeof errs === 'object') {
-      error.value = Object.values(errs).flat().join(' • ')
-    } else {
-      error.value = e?.response?.data?.message || 'Save failed.'
-    }
+    error.value = errorText(e)
     toastError(error.value)
   } finally {
     saving.value = false
