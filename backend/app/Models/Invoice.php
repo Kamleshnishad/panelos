@@ -70,7 +70,8 @@ class Invoice extends BaseModel
         $fyYear = $now->month >= 4 ? $now->year : $now->year - 1;
         $prefix = "INV-{$fyYear}";
 
-        $lastInvoice = static::where('company_id', $companyId)
+        // withTrashed: a deleted invoice keeps its number in the unique key, so it must still count here.
+        $lastInvoice = static::withTrashed()->where('company_id', $companyId)
             ->where('invoice_no', 'like', "{$prefix}%")
             ->latest('id')
             ->first();

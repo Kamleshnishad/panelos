@@ -186,7 +186,8 @@ class OrderService
         $fyEnd   = \Carbon\Carbon::create($fyYear + 1, 3, 31, 23, 59, 59);
 
         // Shape checked in PHP — REGEXP is MySQL-only (see QuotationService).
-        $candidates = Order::where('company_id', $companyId)
+        // withTrashed: a deleted order keeps its number in the unique key, so it must still count here.
+        $candidates = Order::withTrashed()->where('company_id', $companyId)
             ->whereBetween('created_at', [$fyStart, $fyEnd])
             ->where('order_no', 'like', $prefix . '-%')
             ->orderByDesc('id')

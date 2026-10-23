@@ -632,7 +632,8 @@ class QuotationService
         // Only root quotations count, not revision suffixes like SCP-2026-001-v2.
         // The shape is checked in PHP rather than with REGEXP, which only MySQL
         // has — it made this whole code path unrunnable on any other driver.
-        $candidates = Quotation::where('company_id', $companyId)
+        // withTrashed: a deleted quotation keeps its number in the unique key, so it must still count here.
+        $candidates = Quotation::withTrashed()->where('company_id', $companyId)
             ->whereBetween('created_at', [$fyStart, $fyEnd])
             ->where('quotation_no', 'like', $prefix . '-%')
             ->orderByDesc('id')
