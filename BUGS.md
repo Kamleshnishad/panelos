@@ -74,14 +74,14 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
-| **PB-031** | `High` | Fixed – not deployed | Production | **Stage tracking is decorative.** `BatchStageLogService::areAllStagesCompleted()` and `getNextStage()` are defined but **never called** — `completeBatch()` only checks `status === 'in_progress'`. A batch can be completed, QC'd and dispatched with **zero stage logs**. Sequence is enforced *if* you use stages; using them at all is optional. |
-| **PB-032** | `Medium` | Fixed – not deployed | Production | **No sign-off on any production step.** `batch_stage_logs` records only `logged_by_user_id` — the same operator starts and completes a stage. QC is the only approved artefact in the whole system (`approved_by_user_id` + `approved_at`). No rejection/rework path on a stage. |
+| **PB-031** | `High` | Deployed | Production | **Stage tracking is decorative.** `BatchStageLogService::areAllStagesCompleted()` and `getNextStage()` are defined but **never called** — `completeBatch()` only checks `status === 'in_progress'`. A batch can be completed, QC'd and dispatched with **zero stage logs**. Sequence is enforced *if* you use stages; using them at all is optional. |
+| **PB-032** | `Medium` | Deployed | Production | **No sign-off on any production step.** `batch_stage_logs` records only `logged_by_user_id` — the same operator starts and completes a stage. QC is the only approved artefact in the whole system (`approved_by_user_id` + `approved_at`). No rejection/rework path on a stage. |
 
 ### Feature requests
 
 | ID | Priority | Status | Area | Title |
 |---|---|---|---|---|
-| **FR-001** | `High` | Fixed – not deployed | Production | **Per-stage approval gate.** Client wants every production step signed off before the next begins. Depends on PB-031 (enforcement) and PB-032 (approver fields). Design in §5. |
+| **FR-001** | `High` | Deployed | Production | **Per-stage approval gate.** Client wants every production step signed off before the next begins. Depends on PB-031 (enforcement) and PB-032 (approver fields). Design in §5. |
 
 ### Production data — not code
 
@@ -118,6 +118,7 @@ Baseline on MySQL: 418 tests, 152 passing, 266 failing/erroring.
 
 | When | Commit | Carried | Outcome |
 |---|---|---|---|
+| 2026-10-23 12:48 UTC | [`628942a`](https://github.com/Kamleshnishad/panelos/commit/628942a) | PB-031, PB-032, FR-001 | ✅ Deployed. Migration applied, `schema:check` clean, health OK. Verified live: enforcement and four-eyes both **off**, `requires_approval` exposed on all 6 of the tenant's stages, approve endpoint responding. Dormant until the tenant opts in at Settings → Company → Production Control. |
 | 2026-10-23 12:35 UTC | — (verification only) | **Phase 1** | ✅ Full cycle walked on production as the live tenant: BOQ → quotation → order → run → QC → dispatch → invoice → payment → order closed. 36 checks, all passed. `GET /reports/reconciliation` for the new order: **ordered 69,974 = invoiced 69,974 = paid 69,974, gap 0** — the report that showed `revenue_leak: 128,725.88` before the fixes. Found PB-033 and PB-034 on the way. |
 | 2026-10-23 12:16 UTC | [`c6a05c5`](https://github.com/Kamleshnishad/panelos/commit/c6a05c5) | PB-030 (+ PB-026 migration) | ✅ Deployed. Verified on the live container: `schedule:list` shows all four tasks with next-due times, and the supervisord `schedule:run` loop is running. **Restore rehearsed**: the deploy's own backup artifact was loaded into a scratch database — 773 statements, 0 failures, 65 tables, data intact. |
 | 2026-10-23 11:42 UTC | [`7409193`](https://github.com/Kamleshnishad/panelos/commit/7409193) | PB-001 → PB-020 | ✅ Deployed. Pre-migration backup taken (221.9 KB, archived as GH artifact `db-backup-7409193`). Migration `2026_10_23_000001_fix_invoice_dispatch_item_precision_and_non_panel_lines` applied. `schema:check` → *Schema matches baseline*. `/api/health` → `{"status":"OK","database":"OK"}`. |
