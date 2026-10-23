@@ -11,6 +11,7 @@
 
         <div class="form-grid">
           <FormInput
+            class="span-2"
             v-model="form.name"
             name="name"
             label="Customer Name"
@@ -40,6 +41,7 @@
             name="phone"
             type="phone"
             label="Phone"
+            required
             placeholder="10-digit mobile"
             :rules="[{ required: true }]"
             :async-check="customer ? { table: 'customers', column: 'phone', ignoreId: customer.id } : { table: 'customers', column: 'phone' }"
@@ -80,6 +82,7 @@
           />
 
           <FormInput
+            class="span-2"
             v-model="form.address_line1"
             name="address_line1"
             label="Address Line 1"
@@ -91,14 +94,6 @@
             v-model="form.city"
             name="city"
             label="City"
-            placeholder="Optional"
-            :rules="[{ maxLength: 100 }]"
-          />
-
-          <FormInput
-            v-model="form.state"
-            name="state"
-            label="State"
             placeholder="Optional"
             :rules="[{ maxLength: 100 }]"
           />
@@ -143,6 +138,7 @@
           />
 
           <FormTextarea
+            class="full"
             v-model="form.notes"
             name="notes"
             label="Notes"
@@ -304,7 +300,7 @@ async function save() {
   backdrop-filter: blur(2px);
 }
 .modal-box {
-  background: var(--surface); border-radius: 12px; width: 90%; max-width: 800px;
+  background: var(--surface); border-radius: 12px; width: 92%; max-width: 940px;
   max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 16px 40px rgba(0,0,0,0.2);
 }
 .modal-head {
@@ -323,18 +319,27 @@ async function save() {
   display: flex; justify-content: flex-end; gap: 8px;
   padding: 12px 20px; border-top: 1px solid var(--border); background: var(--surface-2);
 }
+/* Three columns on a desktop, two on a tablet, one on a phone. The old rules
+   pinned every field to a fixed column by nth-child, which broke the moment a
+   field was added or removed. Width is driven by the field, not its position. */
 .form-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0 18px;
 }
-.form-grid > :nth-child(odd) { grid-column: 1; }
-.form-grid > :nth-child(even) { grid-column: 2; }
-.form-grid > :nth-last-child(2):nth-child(odd),
-.form-grid > :last-child { grid-column: 1 / -1; }
+.form-grid .span-2 { grid-column: span 2; }
+.form-grid .full   { grid-column: 1 / -1; }
+
+@media (max-width: 900px) {
+  .form-grid { grid-template-columns: 1fr 1fr; }
+  .form-grid .span-2 { grid-column: span 2; }
+}
 .error-banner {
   background: var(--danger-bg); color: var(--danger); padding: 8px 12px;
   border-radius: 8px; font-size: 12.5px; margin-bottom: 12px; border: 1px solid var(--danger-bd);
 }
 @media (max-width: 640px) {
   .form-grid { grid-template-columns: 1fr; }
+  .form-grid .span-2, .form-grid .full { grid-column: 1 / -1; }
 }
 </style>

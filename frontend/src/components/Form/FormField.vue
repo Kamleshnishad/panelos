@@ -24,10 +24,10 @@ defineProps({
 
 <style scoped>
 .form-field {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 .form-field__label {
   font-size: 12.5px;
@@ -39,11 +39,16 @@ defineProps({
   color: var(--danger);
   font-weight: 700;
 }
+/* Only takes up room when it has something to say. This used to reserve 18px
+   under EVERY field whether or not there was an error, which on a 16-field form
+   added ~250px of blank space and pushed half the form below the fold. */
 .form-field__messages {
-  min-height: 18px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+.form-field__messages:empty {
+  display: none;
 }
 .form-field__error {
   color: var(--danger);
