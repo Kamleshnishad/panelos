@@ -91,6 +91,12 @@ class SeedSignatureDemoData extends Command
         $roofPanel = $panelTypes['Signature TopRoof™'];
         $this->seedStock($company->id, $roofPanel->id);
 
+        // Safe to re-run: if a previous run got partway through the
+        // transaction chain (e.g. failed on a later step), wipe everything
+        // for this one demo customer and rebuild from scratch rather than
+        // erroring on "quotation already exists" / "order already exists".
+        $this->resetExistingDemoCustomer($company->id);
+
         // ── 2. Customer (from the real Proforma Invoice's buyer block) ─────
         $customer = Customer::withoutGlobalScope('tenant')->firstOrCreate(
             ['company_id' => $company->id, 'email' => 'accounts@kwalitybusinessassociate.in'],
@@ -323,6 +329,51 @@ class SeedSignatureDemoData extends Command
                 ['sequence' => $s['sequence'], 'is_active' => true]
             );
         }
+    }
+
+    /**
+     * Deletes this one demo customer and everything downstream of it (lead,
+     * quotation, order, batch, QC, dispatch, invoice, payment) so the whole
+     * command can be safely re-run after a partial failure, without touching
+     * the product catalog, stock, or any other customer.
+     */
+    private function resetExistingDemoCustomer(int $companyId): void
+    {
+        $customer = Customer::withoutGlobalScope('tenant')
+            ->where('company_id', $companyId)->where('name', 'Kwality Business Associate LLP')->first();
+        if (!$customer) return;
+
+        $quotationIds = \App\Models\Quotation::withoutGlobalScope('tenant')->where('company_id', $companyId)->where('customer_id', $customer->id)->pluck('id');
+        $orderIds = \App\Models\Order::withoutGlobalScope('tenant')->where('company_id', $companyId)->where('customer_id', $customer->id)->pluck('id');
+        $batchIds = \App\Models\ProductionBatch::withoutGlobalScope('tenant')->where('company_id', $companyId)->whereIn('order_id', $orderIds)->pluck('id');
+        $dispatchIds = \App\Models\Dispatch::withoutGlobalScope('tenant')->where('company_id', $companyId)->whereIn('batch_id', $batchIds)->pluck('id');
+        $invoiceIds = \App\Models\Invoice::withoutGlobalScope('tenant')->where('company_id', $companyId)->whereIn('dispatch_id', $dispatchIds)->pluck('id');
+
+        // These are plain Model classes (no SoftDeletes trait), so forceDelete()
+        // isn't available on their builder — delete() is already a hard delete.
+        \App\Models\PaymentTransaction::whereIn('invoice_id', $invoiceIds)->delete();
+        \App\Models\TaxCalculation::whereIn('invoice_id', $invoiceIds)->delete();
+        \App\Models\InvoiceItem::whereIn('invoice_id', $invoiceIds)->delete();
+        \App\Models\Invoice::withoutGlobalScope('tenant')->whereIn('id', $invoiceIds)->forceDelete();
+        \App\Models\StockAllocation::whereIn('dispatch_id', $dispatchIds)->delete();
+        \App\Models\DispatchItem::whereIn('dispatch_id', $dispatchIds)->delete();
+        \App\Models\Dispatch::withoutGlobalScope('tenant')->whereIn('id', $dispatchIds)->forceDelete();
+        \App\Models\QualityControl::whereIn('batch_id', $batchIds)->delete();
+        \App\Models\BatchStageLog::whereIn('batch_id', $batchIds)->delete();
+        \App\Models\ProductionMaterialUsage::where('company_id', $companyId)->whereIn('batch_id', $batchIds)->forceDelete();
+        \App\Models\ProductionBatch::withoutGlobalScope('tenant')->whereIn('id', $batchIds)->forceDelete();
+        \App\Models\OrderItemSize::whereIn('order_item_id', \App\Models\OrderItem::whereIn('order_id', $orderIds)->pluck('id'))->delete();
+        \App\Models\OrderItem::whereIn('order_id', $orderIds)->delete();
+        \App\Models\Order::withoutGlobalScope('tenant')->whereIn('id', $orderIds)->forceDelete();
+        \App\Models\QuotationItemSize::whereIn('quotation_item_id', \App\Models\QuotationItem::whereIn('quotation_id', $quotationIds)->pluck('id'))->delete();
+        \App\Models\QuotationItem::whereIn('quotation_id', $quotationIds)->delete();
+        \Illuminate\Support\Facades\DB::table('quotation_accessories')->whereIn('quotation_id', $quotationIds)->delete();
+        \App\Models\Quotation::withoutGlobalScope('tenant')->whereIn('id', $quotationIds)->forceDelete();
+        \App\Models\LeadActivity::whereIn('lead_id', \App\Models\Lead::withoutGlobalScope('tenant')->where('company_id', $companyId)->where('customer_id', $customer->id)->pluck('id'))->forceDelete();
+        \App\Models\Lead::withoutGlobalScope('tenant')->where('company_id', $companyId)->where('customer_id', $customer->id)->forceDelete();
+        $customer->forceDelete();
+
+        $this->info('Removed a previous partial/complete run for this demo customer — rebuilding from scratch.');
     }
 
     /** Enough stock for the batch to self-issue material without needing --force. */
