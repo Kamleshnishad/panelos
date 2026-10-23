@@ -377,8 +377,8 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
   <div class="tc-section">
     <div class="tc-title">1. Bank Details</div>
     <div class="tc-item">Bank Name: {{ $company->bank_name ?? 'As provided separately' }}</div>
-    <div class="tc-item">Account No: {{ $company->bank_account ?? '—' }}</div>
-    <div class="tc-item">IFSC Code: {{ $company->ifsc_code ?? '—' }}</div>
+    <div class="tc-item">Account No: {{ $company->bank_account_no ?: '—' }}</div>
+    <div class="tc-item">IFSC Code: {{ $company->bank_ifsc ?: '—' }}</div>
   </div>
 
   <div class="tc-section">

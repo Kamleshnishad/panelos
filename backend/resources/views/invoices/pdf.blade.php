@@ -252,7 +252,7 @@ table { width: 100%; border-collapse: collapse; }
     <h4>Payment Information</h4>
     <div>Please remit payment by <strong>{{ $invoice->due_date?->format('d M Y') }}</strong>.</div>
     @if($company && ($company->bank_name ?? false))
-      <div style="margin-top:3px">Bank: {{ $company->bank_name }} @if($company->bank_account) | A/c: {{ $company->bank_account }}@endif @if($company->bank_ifsc) | IFSC: {{ $company->bank_ifsc }}@endif</div>
+      <div style="margin-top:3px">Bank: {{ $company->bank_name }} @if($company->bank_account_no) | A/c: {{ $company->bank_account_no }}@endif @if($company->bank_ifsc) | IFSC: {{ $company->bank_ifsc }}@endif</div>
     @endif
   </div>
   @endif
