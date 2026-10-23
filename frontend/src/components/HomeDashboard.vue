@@ -9,6 +9,32 @@
     <div v-if="loading" class="loading-state">Loading dashboard…</div>
 
     <template v-else-if="data">
+      <!-- Setup checklist — only while something is still outstanding -->
+      <div v-if="data.setup && !data.setup.done" class="setup-card">
+        <div class="setup-head">
+          <div>
+            <h3>Finish setting up</h3>
+            <p class="setup-sub">
+              These block real work rather than showing an error when you get there.
+            </p>
+          </div>
+          <div class="setup-count mono">{{ data.setup.complete }} / {{ data.setup.total }}</div>
+        </div>
+        <div class="setup-bar"><div class="setup-fill" :style="{ width: setupPct + '%' }"></div></div>
+        <ul class="setup-list">
+          <li v-for="item in data.setup.outstanding" :key="item.key">
+            <button class="setup-item" @click="$emit('navigate', item.go)">
+              <span class="setup-box">○</span>
+              <span class="setup-text">
+                <span class="setup-label">{{ item.label }}</span>
+                <span class="setup-hint">{{ item.hint }}</span>
+              </span>
+              <span class="setup-go">→</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+
       <!-- KPI cards -->
       <div class="kpi-grid">
         <div v-for="k in kpiCards" :key="k.key" class="kpi-card" @click="k.nav && $emit('navigate', k.nav)">
@@ -160,6 +186,12 @@ import dashboardService from '../services/dashboardService.js'
 import BiChart from './BiChart.vue'
 
 defineEmits(['navigate'])
+
+const setupPct = computed(() => {
+  const s = data.value?.setup
+  if (!s || !s.total) return 0
+  return Math.round((s.complete / s.total) * 100)
+})
 
 const data    = ref(null)
 const loading = ref(false)
@@ -355,4 +387,22 @@ onMounted(load)
   .bi-grid { grid-template-columns: 1fr; }
   .bi-grid .span-2 { grid-column: auto; }
 }
+
+/* Setup checklist (Phase 5) */
+.setup-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent, #3D5AF1); border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+.setup-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.setup-head h3 { margin: 0; font-size: 16px; color: var(--text, #1a1a1a); }
+.setup-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--text-3, #888); }
+.setup-count { font-size: 13px; font-weight: 700; color: var(--accent, #3D5AF1); white-space: nowrap; }
+.setup-bar { height: 5px; background: #eef1f6; border-radius: 3px; margin: 12px 0 6px; overflow: hidden; }
+.setup-fill { height: 100%; background: var(--accent, #3D5AF1); transition: width .3s; }
+.setup-list { list-style: none; margin: 0; padding: 0; }
+.setup-item { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: none; border: none; padding: 9px 4px; cursor: pointer; border-bottom: 1px solid var(--row, #f0f0f0); }
+.setup-item:hover { background: var(--surface-3, #f7f8fa); }
+.setup-list li:last-child .setup-item { border-bottom: none; }
+.setup-box { color: #c8ced9; font-size: 15px; line-height: 1.2; }
+.setup-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.setup-label { font-size: 13.5px; font-weight: 600; color: var(--text, #1a1a1a); }
+.setup-hint { font-size: 11.5px; color: var(--text-3, #888); line-height: 1.45; }
+.setup-go { color: var(--accent, #3D5AF1); font-weight: 700; }
 </style>

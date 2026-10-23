@@ -223,6 +223,7 @@ class StockController extends Controller
                 'reorder_level' => 'nullable|numeric|min:0',
                 'batch_number'  => 'nullable|string|max:100',
                 'expiry_date'   => 'nullable|date',
+                'quantity_in_stock' => 'nullable|numeric|min:0',   // PB-033
             ]);
 
             $companyId = auth()->user()->company_id;
@@ -239,7 +240,15 @@ class StockController extends Controller
                 'expiry_date'       => $validated['expiry_date'] ?? null,
             ]);
 
-            return $this->apiResponse(true, $stock, 'Chemical created successfully', 201);
+            $this->bookOpeningBalance(
+                fn ($qty) => $this->stockService->addChemicalStock(
+                    $stock->id, $qty, null, $validated['batch_number'] ?? null,
+                    $validated['expiry_date'] ?? null, 'Opening balance', $companyId
+                ),
+                $validated['quantity_in_stock'] ?? 0
+            );
+
+            return $this->apiResponse(true, $stock->fresh(), 'Chemical created successfully', 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->apiResponse(false, $e->errors(), 'Validation failed', 422);
         } catch (\Exception $e) {
@@ -322,6 +331,20 @@ class StockController extends Controller
         }
     }
 
+    /**
+     * Book an opening balance through StockService rather than writing the
+     * column directly, so the movement still lands in stock_transactions.
+     * That ledger is why these endpoints created rows at zero in the first
+     * place; PB-033 was that they accepted a quantity and discarded it.
+     */
+    private function bookOpeningBalance(callable $add, $quantity): void
+    {
+        $qty = (float) $quantity;
+        if ($qty > 0) {
+            $add($qty);
+        }
+    }
+
     public function createCoil(Request $request)
     {
         try {
@@ -331,6 +354,10 @@ class StockController extends Controller
                 'panel_type_id' => 'required|integer|exists:panel_types,id',
                 'reorder_level' => 'nullable|numeric|min:0',
                 'unit_cost'     => 'nullable|numeric|min:0',
+                // PB-033: an opening balance used to be accepted silently and
+                // thrown away — the row was created at 0 behind a 201, and the
+                // first production run then failed with "Insufficient stock".
+                'quantity_in_stock' => 'nullable|numeric|min:0',
             ]);
 
             // One coil-stock row per panel type
@@ -348,7 +375,12 @@ class StockController extends Controller
                 'unit_cost'         => $validated['unit_cost'] ?? 0,
             ]);
 
-            return $this->apiResponse(true, $stock->load('panelType'), 'Coil stock created successfully', 201);
+            $this->bookOpeningBalance(
+                fn ($qty) => $this->stockService->addCoilStock($stock->id, $qty, 'Opening balance', $companyId),
+                $validated['quantity_in_stock'] ?? 0
+            );
+
+            return $this->apiResponse(true, $stock->fresh()->load('panelType'), 'Coil stock created successfully', 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->apiResponse(false, $e->errors(), 'Validation failed', 422);
         } catch (\Exception $e) {
@@ -404,6 +436,7 @@ class StockController extends Controller
                 'unit'          => 'required|string|max:20',
                 'reorder_level' => 'nullable|numeric|min:0',
                 'unit_cost'     => 'nullable|numeric|min:0',
+                'quantity_in_stock' => 'nullable|numeric|min:0',   // PB-033
             ]);
 
             $stock = \App\Models\ConsumableStock::create([
@@ -416,7 +449,14 @@ class StockController extends Controller
                 'unit_cost'         => $validated['unit_cost'] ?? 0,
             ]);
 
-            return $this->apiResponse(true, $stock, 'Consumable created successfully', 201);
+            $this->bookOpeningBalance(
+                fn ($qty) => $this->stockService->addConsumableStock(
+                    $stock->id, $qty, 'Opening balance', auth()->user()->company_id
+                ),
+                $validated['quantity_in_stock'] ?? 0
+            );
+
+            return $this->apiResponse(true, $stock->fresh(), 'Consumable created successfully', 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->apiResponse(false, $e->errors(), 'Validation failed', 422);
         } catch (\Exception $e) {

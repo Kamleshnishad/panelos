@@ -55,6 +55,7 @@ class TenantProvisioningService
             ])->save();
 
             $roles = $this->createDefaultRoles($company->id);
+            $this->seedOperatingDefaults($company->id);
 
             $user = User::create([
                 'company_id'       => $company->id,
@@ -69,6 +70,61 @@ class TenantProvisioningService
 
             return ['company' => $company, 'user' => $user];
         });
+    }
+
+    /**
+     * The master data a tenant cannot run production without.
+     *
+     * The BOM engine resolves materials by EXACT strings — chemicals by category
+     * 'Polyol' and 'Isocyanate', consumables by 'film' and 'tape', coil by
+     * panel_type_id. A new tenant who named them anything else, or simply had no
+     * rows yet, hit "Insufficient stock" on their first run with nothing to
+     * explain why. Seeding the rows at zero removes that dead end: they only
+     * have to book quantities in.
+     *
+     * Panel types are deliberately NOT seeded — those are the tenant's own
+     * product range and prices, and a wrong default is worse than none.
+     */
+    private function seedOperatingDefaults(int $companyId): void
+    {
+        $stages = ['Raw Material Inspection', 'Sheet Cutting', 'Foam Injection', 'Curing', 'Quality Check', 'Packaging'];
+        foreach ($stages as $i => $name) {
+            \App\Models\ProductionStage::create([
+                'company_id' => $companyId,
+                'name'       => $name,
+                'sequence'   => $i + 1,
+                'is_active'  => true,
+                'requires_approval' => false,   // the tenant opts in per stage
+            ]);
+        }
+
+        foreach ([['Polyol', 'Polyol', 'kg'], ['Isocyanate (MDI)', 'Isocyanate', 'kg']] as [$name, $category, $unit]) {
+            \App\Models\ChemicalStock::create([
+                'company_id' => $companyId, 'chemical_id' => null,
+                'name' => $name, 'category' => $category, 'unit' => $unit,
+                'quantity_in_stock' => 0, 'reorder_level' => 0,
+            ]);
+        }
+
+        foreach ([['Protective Film', 'film', 'sqm'], ['Sealant Tape', 'tape', 'm']] as [$name, $category, $unit]) {
+            \App\Models\ConsumableStock::create([
+                'company_id' => $companyId,
+                'name' => $name, 'category' => $category, 'unit' => $unit,
+                'quantity_in_stock' => 0, 'reorder_level' => 0, 'unit_cost' => 0,
+            ]);
+        }
+
+        // Standard 18% exclusive GST, the same rate the quotation engine uses.
+        // TaxService would auto-provision this on the first invoice anyway; doing
+        // it here means the tenant can see and change it before invoicing.
+        \App\Models\TaxConfiguration::create([
+            'company_id' => $companyId,
+            'tax_type' => 'exclusive',
+            'default_tax_rate' => \App\Services\TaxService::DEFAULT_GST_RATE,
+            'is_active' => true,
+        ]);
+
+        \App\Models\MaterialSetting::create(['company_id' => $companyId]);
     }
 
     /** Default roles for a new tenant. Admin gets all; others are starting points. */

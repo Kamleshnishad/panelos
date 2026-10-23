@@ -170,7 +170,13 @@ sum equals the order value exactly.
 
 ---
 
-## Phase 5 — Onboarding a new tenant without a dead end
+## Phase 5 — Onboarding a new tenant without a dead end ✅ *(done 2026-10-23)*
+
+> Signup now seeds the six production stages, the four material rows the BOM looks up by exact string
+> (Polyol, Isocyanate, film, tape) at zero quantity, a tax configuration and material settings. PB-033 is
+> fixed: stock creation accepts an opening balance and books it through `StockService`, so it lands in the
+> ledger. The dashboard carries a setup checklist that names what is still missing, why it matters and
+> where to go. Panel types are deliberately not seeded — those are the tenant's own product range.
 
 A new tenant today gets roles and nothing else. Before they can run production they must create stock rows
 whose categories match **exact magic strings**, or every production start fails with

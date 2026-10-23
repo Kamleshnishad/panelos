@@ -28,6 +28,7 @@ class DashboardService
             'alerts'         => $this->alerts($companyId),
             'recent_activity'=> $this->recentActivity($companyId),
             'analytics'      => $this->analytics($companyId),
+            'setup'          => $this->setupChecklist($companyId),
         ]);
     }
 
@@ -149,6 +150,74 @@ class DashboardService
     {
         $today = now();
         return \Carbon\Carbon::create($today->month >= 4 ? $today->year : $today->year - 1, 4, 1)->startOfDay();
+    }
+
+    /**
+     * What a new tenant still has to do before the system will work for them.
+     *
+     * Every item here silently blocks a real flow rather than erroring
+     * helpfully: no panel type means nothing can be quoted; a zero base price
+     * makes rate suggestions meaningless; a missing coil row makes the BOM read
+     * zero available and the first production run dies with "Insufficient
+     * stock"; no company state code sends every invoice to intra-state GST.
+     */
+    private function setupChecklist(int $companyId): array
+    {
+        $company = \App\Models\Company::find($companyId);
+
+        $panelTypes  = \App\Models\PanelType::where('company_id', $companyId)->where('is_active', true)->count();
+        $pricedTypes = \App\Models\PanelType::where('company_id', $companyId)->where('is_active', true)
+            ->where('base_price', '>', 0)->count();
+        $customers   = \App\Models\Customer::where('company_id', $companyId)->where('is_active', true)->count();
+        $stages      = \App\Models\ProductionStage::where('company_id', $companyId)->where('is_active', true)->count();
+
+        // Coil is resolved per panel type, so a type with no coil row can never be produced.
+        $typesWithoutCoil = $panelTypes === 0 ? 0 : \App\Models\PanelType::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->whereNotExists(function ($q) use ($companyId) {
+                $q->selectRaw(1)->from('coil_stocks')
+                  ->whereColumn('coil_stocks.panel_type_id', 'panel_types.id')
+                  ->where('coil_stocks.company_id', $companyId)
+                  ->whereNull('coil_stocks.deleted_at');
+            })->count();
+
+        $chemicals = \App\Models\ChemicalStock::where('company_id', $companyId)
+            ->whereIn('category', ['Polyol', 'Isocyanate'])->count();
+
+        $items = [
+            ['key' => 'company_gst', 'label' => 'Add your GSTIN and state', 'go' => 'company',
+             'done' => !empty($company?->gstin) && !empty($company?->state_code),
+             'hint' => 'Decides whether invoices carry CGST+SGST or IGST.'],
+            ['key' => 'panel_types', 'label' => 'Create your panel types', 'go' => 'master',
+             'done' => $panelTypes > 0,
+             'hint' => 'Nothing can be quoted until at least one exists.'],
+            ['key' => 'panel_prices', 'label' => 'Set a base price on each panel type', 'go' => 'master',
+             'done' => $panelTypes > 0 && $pricedTypes === $panelTypes,
+             'hint' => 'A zero base price makes suggested rates meaningless.'],
+            ['key' => 'customers', 'label' => 'Add your first customer', 'go' => 'customers',
+             'done' => $customers > 0,
+             'hint' => 'Quotations are raised against a customer.'],
+            ['key' => 'stages', 'label' => 'Set up production stages', 'go' => 'master',
+             'done' => $stages > 0,
+             'hint' => 'The shop floor tracks and signs off work stage by stage.'],
+            ['key' => 'coil_stock', 'label' => 'Add coil stock for every panel type', 'go' => 'stock',
+             'done' => $panelTypes > 0 && $typesWithoutCoil === 0,
+             'hint' => $typesWithoutCoil > 0
+                ? "{$typesWithoutCoil} panel type(s) have no coil row — production will fail with Insufficient stock."
+                : 'Coil is tracked per panel type.'],
+            ['key' => 'chemicals', 'label' => 'Add Polyol and Isocyanate stock', 'go' => 'stock',
+             'done' => $chemicals >= 2,
+             'hint' => 'The foam calculation looks these up by category — both must exist.'],
+        ];
+
+        $outstanding = array_values(array_filter($items, fn ($i) => !$i['done']));
+
+        return [
+            'done'        => count($outstanding) === 0,
+            'complete'    => count($items) - count($outstanding),
+            'total'       => count($items),
+            'outstanding' => $outstanding,
+        ];
     }
 
     private function kpis(int $companyId): array
