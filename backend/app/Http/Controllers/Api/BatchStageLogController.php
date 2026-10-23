@@ -189,4 +189,46 @@ class BatchStageLogController extends Controller
             );
         }
     }
+
+    /** Sign off a stage that is awaiting approval (FR-001). */
+    public function approveStage(Request $request, int $batchId, int $stageId)
+    {
+        return $this->decide($request, $batchId, $stageId, true);
+    }
+
+    /** Send a stage back to the floor with a reason (FR-001). */
+    public function rejectStage(Request $request, int $batchId, int $stageId)
+    {
+        return $this->decide($request, $batchId, $stageId, false);
+    }
+
+    private function decide(Request $request, int $batchId, int $stageId, bool $approve)
+    {
+        try {
+            ProductionBatch::where('company_id', $request->user()->company_id)->findOrFail($batchId);
+
+            $log = BatchStageLog::where('batch_id', $batchId)
+                ->where('stage_id', $stageId)
+                ->firstOrFail();
+
+            $validated = $request->validate($approve
+                ? ['notes' => 'nullable|string|max:1000']
+                : ['reason' => 'required|string|max:500']);
+
+            $log = $approve
+                ? $this->stageLogService->approveStage($log, $request->user()->id)
+                : $this->stageLogService->rejectStage($log, $request->user()->id, $validated['reason']);
+
+            return $this->successResponse(
+                $log->load('stage', 'user', 'approvedByUser'),
+                $approve ? 'Stage approved' : 'Stage rejected'
+            );
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Batch or stage log not found', 'NOT_FOUND', 404);
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'STAGE_DECISION_ERROR', 400);
+        }
+    }
 }

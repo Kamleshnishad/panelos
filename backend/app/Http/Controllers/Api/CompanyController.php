@@ -76,6 +76,10 @@ class CompanyController extends Controller
                 'order_prefix'         => 'nullable|string|max:10',
                 'challan_prefix'       => 'nullable|string|max:10',
                 'financial_year_start' => 'nullable|integer|min:1|max:12',
+                // Production stage gating (PB-031 / FR-001). Off by default; a tenant
+                // turns it on once their stages exist and open batches are clear.
+                'enforce_production_stages' => 'nullable|boolean',
+                'stage_approval_four_eyes'  => 'nullable|boolean',
                 'e_invoice_applicable' => 'nullable|boolean',
                 'tcs_applicable'       => 'nullable|boolean',
             ]);

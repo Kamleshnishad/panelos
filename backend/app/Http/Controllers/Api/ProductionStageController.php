@@ -60,6 +60,7 @@ class ProductionStageController extends Controller
                 'description' => 'nullable|string|max:500',
                 'sequence' => 'nullable|integer|min:1',
                 'is_active' => 'nullable|boolean',
+                'requires_approval' => 'nullable|boolean',
             ]);
 
             $validated['company_id'] = $request->user()->company_id;
@@ -130,6 +131,7 @@ class ProductionStageController extends Controller
                 'description' => 'nullable|string|max:500',
                 'sequence' => 'nullable|integer|min:1',
                 'is_active' => 'nullable|boolean',
+                'requires_approval' => 'nullable|boolean',
             ]);
 
             $stage = $this->stageService->update($stage, $validated);

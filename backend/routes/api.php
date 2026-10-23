@@ -230,6 +230,10 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::get('/batches/{batchId}/progress', [BatchStageLogController::class, 'getProgress'])->name('batches.progress');
     Route::post('/batches/{batchId}/stages/{stageId}/start', [BatchStageLogController::class, 'startStage'])->name('batches.stages.start');
     Route::post('/batches/{batchId}/stages/{stageId}/complete', [BatchStageLogController::class, 'completeStage'])->name('batches.stages.complete');
+    // Stage sign-off (FR-001) — gated on production.approve, not production.manage,
+    // so the person who runs the line need not be the one who signs it off.
+    Route::post('/batches/{batchId}/stages/{stageId}/approve', [BatchStageLogController::class, 'approveStage'])->name('batches.stages.approve');
+    Route::post('/batches/{batchId}/stages/{stageId}/reject', [BatchStageLogController::class, 'rejectStage'])->name('batches.stages.reject');
     Route::get('/batches/{batchId}/stages/{stageId}/attachments', [AttachmentController::class, 'indexForStage'])->name('batches.stages.attachments.index');
     Route::post('/batches/{batchId}/stages/{stageId}/attachments', [AttachmentController::class, 'storeForStage'])->name('batches.stages.attachments.store');
 

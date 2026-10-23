@@ -36,6 +36,8 @@ class Company extends Model
         'bank_branch',
         'authorized_signatory',
         'signatory_phone',
+        'enforce_production_stages',
+        'stage_approval_four_eyes',
         'primary_color',
         'secondary_color',
         'quotation_prefix',
@@ -71,6 +73,8 @@ class Company extends Model
             'tcs_applicable' => 'boolean',
             'is_active' => 'boolean',
             'financial_year_start' => 'integer',
+            'enforce_production_stages' => 'boolean',
+            'stage_approval_four_eyes' => 'boolean',
         ];
     }
 

@@ -18,9 +18,15 @@ class BatchStageLog extends Model
         'duration_minutes',
         'notes',
         'logged_by_user_id',
+        'approved_by_user_id',
+        'approved_at',
+        'rejected_at',
+        'rejection_reason',
     ];
 
     protected $casts = [
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
@@ -47,5 +53,10 @@ class BatchStageLog extends Model
     public function attachments()
     {
         return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    public function approvedByUser()
+    {
+        return $this->belongsTo(User::class, 'approved_by_user_id');
     }
 }

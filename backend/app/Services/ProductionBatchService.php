@@ -130,6 +130,8 @@ class ProductionBatchService
             throw new \Exception('Cannot complete batch not in production');
         }
 
+        $this->guardStagesComplete($batch);
+
         $batch->update([
             'completed_quantity' => $data['completed_quantity'] ?? $batch->planned_quantity,
             'status' => 'qc_pending',
@@ -159,6 +161,41 @@ class ProductionBatchService
                 $order->update(['status' => 'pending']);
             }
         });
+    }
+
+    /**
+     * Stage gate (PB-031). Until now `areAllStagesCompleted()` existed but was
+     * never called, so a batch could be completed — then QC'd and dispatched —
+     * with zero stage logs. The stage system was decoration.
+     *
+     * Opt-in per company, and deliberately so: `areAllStagesCompleted()` returns
+     * false when a company has no stages at all, so enforcing this globally
+     * would make batches impossible to complete for any tenant not using stages,
+     * and would strand every batch already in flight. A tenant switches
+     * `enforce_production_stages` on once their stages are set up.
+     *
+     * @throws \Exception naming the stages still outstanding.
+     */
+    private function guardStagesComplete(ProductionBatch $batch): void
+    {
+        if (!($batch->company?->enforce_production_stages)) {
+            return;
+        }
+
+        $stageLog = app(BatchStageLogService::class);
+        if ($stageLog->areAllStagesCompleted($batch)) {
+            return;
+        }
+
+        $outstanding = collect($stageLog->getProgressSummary($batch))
+            ->reject(fn ($s) => $s['status'] === 'completed')
+            ->map(fn ($s) => $s['stage_name'] . ' (' . $s['status'] . ')')
+            ->implode(', ');
+
+        throw new \Exception(
+            'Cannot complete this batch until every production stage is completed and approved. Outstanding: '
+            . ($outstanding ?: 'no stages have been started')
+        );
     }
 
     /**

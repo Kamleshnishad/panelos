@@ -45,12 +45,67 @@ class BatchStageLogService
         $completedAt = now();
         $duration = $completedAt->diffInMinutes($log->started_at);
 
+        // A stage flagged requires_approval parks at pending_approval until a
+        // supervisor signs it off; the next stage stays locked until then.
+        $needsApproval = (bool) ($log->stage?->requires_approval);
+
         $log->update([
-            'status' => 'completed',
+            'status' => $needsApproval ? 'pending_approval' : 'completed',
             'completed_at' => $completedAt,
             'duration_minutes' => $duration,
             'notes' => $notes ?? $log->notes,
             'logged_by_user_id' => $userId,
+        ]);
+
+        return $log->fresh();
+    }
+
+    /**
+     * Sign off a completed stage. This is the gate the next stage waits on.
+     *
+     * @throws \Exception when the stage is not awaiting approval, or when the
+     *                    company requires four-eyes and the approver ran the step.
+     */
+    public function approveStage(BatchStageLog $log, int $userId): BatchStageLog
+    {
+        if ($log->status !== 'pending_approval') {
+            throw new \Exception('Only a stage awaiting approval can be approved.');
+        }
+
+        $company = $log->batch?->company;
+        if (($company?->stage_approval_four_eyes) && (int) $log->logged_by_user_id === $userId) {
+            throw new \Exception('This company requires a second person to approve a stage. You ran this step yourself.');
+        }
+
+        $log->update([
+            'status'              => 'completed',
+            'approved_by_user_id' => $userId,
+            'approved_at'         => now(),
+            'rejected_at'         => null,
+            'rejection_reason'    => null,
+        ]);
+
+        return $log->fresh();
+    }
+
+    /**
+     * Reject a completed stage and send it back to the floor. The log is reset
+     * so the operator can start the same stage again (validateStageStartable
+     * treats a rejected log as "not yet done").
+     */
+    public function rejectStage(BatchStageLog $log, int $userId, string $reason): BatchStageLog
+    {
+        if ($log->status !== 'pending_approval') {
+            throw new \Exception('Only a stage awaiting approval can be rejected.');
+        }
+
+        $log->update([
+            'status'              => 'rejected',
+            'approved_by_user_id' => $userId,
+            'approved_at'         => null,
+            'rejected_at'         => now(),
+            'rejection_reason'    => $reason,
+            'completed_at'        => null,
         ]);
 
         return $log->fresh();
@@ -105,7 +160,7 @@ class BatchStageLogService
             ->count();
 
         $completedStages = BatchStageLog::where('batch_id', $batch->id)
-            ->whereNotNull('completed_at')
+            ->where('status', 'completed')
             ->count();
 
         return $totalStages === $completedStages && $totalStages > 0;
@@ -123,9 +178,11 @@ class BatchStageLogService
             ->get();
 
         foreach ($previousStages as $prevStage) {
+            // 'completed' only — a stage sitting at pending_approval or rejected
+            // must not unlock the next one.
             $completed = BatchStageLog::where('batch_id', $batch->id)
                 ->where('stage_id', $prevStage->id)
-                ->whereNotNull('completed_at')
+                ->where('status', 'completed')
                 ->exists();
 
             if (!$completed) {
@@ -134,8 +191,10 @@ class BatchStageLogService
         }
 
         // Check if stage already started
+        // A rejected stage is deliberately re-runnable — that is the rework path.
         $alreadyStarted = BatchStageLog::where('batch_id', $batch->id)
             ->where('stage_id', $stage->id)
+            ->where('status', '!=', 'rejected')
             ->exists();
 
         if ($alreadyStarted) {

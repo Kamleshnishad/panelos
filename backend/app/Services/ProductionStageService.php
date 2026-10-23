@@ -18,6 +18,7 @@ class ProductionStageService
             'sequence' => $data['sequence'] ?? $this->getNextSequence($data['company_id']),
             'description' => $data['description'] ?? null,
             'is_active' => $data['is_active'] ?? true,
+            'requires_approval' => $data['requires_approval'] ?? false,
         ]);
 
         return $stage;
@@ -57,6 +58,7 @@ class ProductionStageService
             'name' => $data['name'] ?? $stage->name,
             'description' => $data['description'] ?? $stage->description,
             'is_active' => $data['is_active'] ?? $stage->is_active,
+            'requires_approval' => $data['requires_approval'] ?? $stage->requires_approval,
             'sequence' => $data['sequence'] ?? $stage->sequence,
         ]);
 

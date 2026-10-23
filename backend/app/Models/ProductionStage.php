@@ -14,10 +14,12 @@ class ProductionStage extends BaseModel
         'sequence',
         'description',
         'is_active',
+        'requires_approval',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'requires_approval' => 'boolean',
     ];
 
     /**

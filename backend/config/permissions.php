@@ -21,6 +21,7 @@ return [
     'Production' => [
         'production.view'   => 'View production (batches/runs/QC)',
         'production.manage' => 'Plan / run production, QC',
+        'production.approve'=> 'Sign off production stages',
     ],
     'Inventory' => [
         'inventory.view'    => 'View stock',
