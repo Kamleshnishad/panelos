@@ -7,7 +7,7 @@ Sequenced delivery plan: [PRODUCTION_READINESS_PLAN.md](PRODUCTION_READINESS_PLA
 See [SYSTEM.md](SYSTEM.md) for how the system works and [CLAUDE.md](CLAUDE.md) for how to test.
 
 **ID scheme:** `PB-###`, assigned once and never reused — even if a bug is rejected or turns out to be a
-duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-046**. Feature requests use `FR-###` (next: **FR-005**).
+duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-046**. Feature requests use `FR-###` (next: **FR-006**).
 
 **Severity** — what it costs if left alone:
 
@@ -96,6 +96,7 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 | **FR-002** | `Low` | Open | Quotations | **Installation does not appear as a line item on the quotation PDF.** It is folded into `installation_amount` and shown only in the totals block ("Installation: ₹109,350"). The client's own proforma lists it as line 9 with quantity (364.5 MTR) and rate (₹300), so customers will notice the difference. Same applies to door/custom rows with no master accessory. Needs the installation rows kept as data (qty/rate/unit), not only a sum. |
 | **FR-003** | `Medium` | Deployed | Notifications | **Real in-app notifications (the header bell).** The bell was only a shortcut to Receivables with a dot computed once at page load — nothing stored, no read/unread, a stage awaiting approval told nobody, and the dot led to the wrong page for stock alerts. Now a real notification store with a dropdown, unread count, mark-read, click-through, and a 60 s poll. Phase N1 covers stage awaiting approval / approved / rejected, low coil and chemical stock, and overdue invoices; N2/N3 add the rest. Plan: [NOTIFICATIONS_PLAN.md](NOTIFICATIONS_PLAN.md). Tests: `AppNotificationsTest` (13). Deployed 2026-10-23 16:50 UTC and verified live: endpoints respond, own-rows-only 404 for an unknown id, `notifications:scan` registered hourly in the live scheduler. |
 | **FR-004** | `Medium` | Deployed | UX | **No feedback while something slow runs.** Clicking BOQ "Sheet" (and every other PDF/export) sat silent for 8–13 s, so the system looked frozen — and because the new tab was opened only *after* the wait, browsers (pop-up allowance ≈5 s) could silently block it. Now: every file download shows a progress card (estimate while the server builds the file, real % while it downloads, then Ready); the tab opens immediately with a "preparing" page; a thin top bar shows for any other request slower than 300 ms. Covers quotation/BOQ/invoice/challan/template-preview PDFs, CSV + Tally exports, platform-admin invoices. Tests: `src/services/transfers.test.mjs`. **Does not make the PDFs faster — see PB-022.** |
+| **FR-005** | `Medium` | Open | Documents | **Three new quotation PDF templates — Ledger, Showcase, Executive.** Designs approved for review in the "Quotation Templates" artifact. Needs a foundation first: bank-details bug (the PDF reads `bank_account` / `ifsc_code`, which do not exist), installation as real lines (PB-045), `legal_name` / editable terms / document title on the company, delivery address and site contact on the quotation, and one presenter class so the templates are layout only. Plan and phases: [QUOTATION_TEMPLATES_PLAN.md](QUOTATION_TEMPLATES_PLAN.md). |
 
 ### Production data — not code
 
