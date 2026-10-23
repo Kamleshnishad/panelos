@@ -24,4 +24,15 @@ php artisan event:cache  2>&1 || true
 # the command just warns and no-ops if the link already exists.
 php artisan storage:link 2>&1 || true
 
+# Hand the logs back to the user the web workers run as (see docker/php/www.conf).
+# This entrypoint and every `docker exec ... php artisan` in the deploy workflows run
+# as root, so any log line they write creates laravel.log root:root 0644 — which the
+# unprivileged php-fpm workers cannot append to. Every error after that then failed to
+# log AND made the error handler itself throw, so users got an empty 500 (PB-042).
+# storage/ is a persistent volume, so a bad file survives container recreation; this
+# repairs it on every start. The logging config also sets permission 0666 so a file
+# created later by root stays writable.
+chown -R panelos:panelos storage/logs 2>/dev/null || true
+chmod -R u+rwX,g+rwX storage/logs 2>/dev/null || true
+
 exec /usr/bin/supervisord -c /etc/supervisord.conf

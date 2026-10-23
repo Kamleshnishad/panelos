@@ -55,7 +55,12 @@ return [
         'stack' => [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),
-            'ignore_exceptions' => false,
+            // true: if a channel cannot be written, swallow that rather than throw.
+            // This stack is called FROM the exception handler (bootstrap/app.php
+            // logs every unhandled error before building its SERVER_ERROR response),
+            // so with false, an unwritable log made the handler itself throw and the
+            // user got an empty 500 with no reason and no log line (PB-042).
+            'ignore_exceptions' => true,
         ],
 
         'single' => [
@@ -63,6 +68,10 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+            // Files created by a root `docker exec php artisan ...` come out 0644
+            // root:root, which the unprivileged php-fpm user cannot append to.
+            // 0666 lets either account keep writing to a file the other created.
+            'permission' => 0666,
         ],
 
         'daily' => [
