@@ -18,4 +18,10 @@ cd /var/www/html
 php artisan config:cache 2>&1 || { echo "[entrypoint] config:cache failed — booting un-cached"; php artisan config:clear || true; }
 php artisan event:cache  2>&1 || true
 
+# public/storage -> storage/app/public. storage/ is a named volume (see
+# docker-compose.prod.yml) so this must run at container start, not build
+# time: the volume isn't mounted yet during the image build. Idempotent —
+# the command just warns and no-ops if the link already exists.
+php artisan storage:link 2>&1 || true
+
 exec /usr/bin/supervisord -c /etc/supervisord.conf
