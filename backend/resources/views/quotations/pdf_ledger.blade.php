@@ -91,11 +91,13 @@ td, th { vertical-align: top; padding: 0; }
         <div class="co">{{ strtoupper($co['name']) }}</div>
         @if($co['address'])<div class="sub">{{ $co['address'] }}</div>@endif
         <div class="sub">{{ $co['phone'] }}@if($co['phone'] && $co['email']) &nbsp;|&nbsp; @endif{{ $co['email'] }}</div>
-        @if($co['gstin'] || $co['pan'])
+        @if($co['gstin'] || $co['pan'] || $co['certification'])
             <div class="sub">
                 @if($co['gstin'])GSTIN <b>{{ $co['gstin'] }}</b>@endif
                 @if($co['gstin'] && $co['pan']) &nbsp;|&nbsp; @endif
                 @if($co['pan'])PAN <b>{{ $co['pan'] }}</b>@endif
+                @if($co['certification'] && ($co['gstin'] || $co['pan'])) &nbsp;|&nbsp; @endif
+                @if($co['certification']){{ $co['certification'] }}@endif
             </div>
         @endif
     </td>
@@ -138,6 +140,8 @@ td, th { vertical-align: top; padding: 0; }
             <div class="lab">Project · deliver to</div>
             <div class="nm">{{ $dash($pr['name']) }}</div>
             @if($pr['location'])<div class="sub">{{ $pr['location'] }}</div>@endif
+            @if($pr['delivery_address'])<div class="sub">Deliver to: <b>{{ $pr['delivery_address'] }}</b></div>@endif
+            @if($pr['site_contact'])<div class="sub">Site contact: <b>{{ $pr['site_contact'] }}</b></div>@endif
             @if($pr['quality'])<div class="sub">Quality grade: <b>{{ $pr['quality'] }}</b></div>@endif
             @if($pr['prepared_by'])<div class="sub">Prepared by: <b>{{ $pr['prepared_by'] }}</b></div>@endif
         </div>
@@ -267,7 +271,7 @@ td, th { vertical-align: top; padding: 0; }
         <tr><td>Advance ({{ rtrim(rtrim($n($t['advance_pct']), '0'), '.') }}%)</td><td class="v">₹ {{ $n($t['advance']) }}</td></tr>
         <tr class="bal"><td>Balance due</td><td class="r">₹ {{ $n($t['balance']) }}</td></tr>
     </table>
-    <div class="sub r" style="margin-top: 8px">Total area: <b>{{ $n($t['total_sqm']) }} SQM</b> &nbsp;·&nbsp; This is a Proforma Invoice and not a valid tax document.</div>
+    <div class="sub r" style="margin-top: 8px">Total area: <b>{{ $n($t['total_sqm']) }} SQM</b> &nbsp;·&nbsp; {{ $doc['title_note'] }}</div>
 </td>
 </tr>
 </table>
@@ -317,7 +321,7 @@ td, th { vertical-align: top; padding: 0; }
     </td>
     <td style="width: 14px"></td>
     <td class="box2" style="width: 50%">
-        <div class="lab">For {{ strtoupper($co['name']) }}</div>
+        <div class="lab">For {{ strtoupper($co['legal_name']) }}</div>
         @if($doc['signatory']['name'])
             <div style="font-size: 11px; font-weight: bold; margin-top: 6px">{{ $doc['signatory']['name'] }}</div>
             @if($doc['signatory']['phone'])<div class="sub">{{ $doc['signatory']['phone'] }}</div>@endif

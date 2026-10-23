@@ -47,6 +47,8 @@
         <div class="info-label">Project</div>
         <div class="info-value bold">{{ quotation.project_name }}</div>
         <div class="info-sub">{{ quotation.project_location }}</div>
+        <div class="info-sub" v-if="quotation.delivery_address">Deliver to: {{ quotation.delivery_address }}</div>
+        <div class="info-sub" v-if="quotation.site_contact_name || quotation.site_contact_phone">Site contact: {{ [quotation.site_contact_name, quotation.site_contact_phone].filter(Boolean).join(' · ') }}</div>
       </div>
       <div class="info-cell">
         <div class="info-label">Dates</div>

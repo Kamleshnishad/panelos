@@ -13,7 +13,7 @@ class Quotation extends BaseModel
     protected $fillable = [
         'company_id', 'quotation_no', 'quotation_prefix', 'revision_number',
         'parent_quotation_id', 'customer_id', 'status',
-        'project_name', 'project_location', 'quality_grade', 'validity_days',
+        'project_name', 'project_location', 'delivery_address', 'site_contact_name', 'site_contact_phone', 'quality_grade', 'validity_days',
         'quoted_on', 'valid_until', 'sent_at', 'accepted_at', 'rejected_at', 'expired_at',
         'panel_subtotal', 'accessory_subtotal', 'installation_amount', 'total_sqm',
         'subtotal', 'discount_pct', 'discount_amount', 'taxable_amount',

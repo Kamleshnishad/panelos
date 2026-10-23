@@ -19,6 +19,11 @@ class Company extends Model
 
     protected $fillable = [
         'name',
+        'legal_name',
+        'certification_line',
+        'quotation_title',
+        'quotation_terms',
+        'quotation_exclusions',
         'subdomain',
         'logo',
         'gstin',
@@ -67,6 +72,8 @@ class Company extends Model
     {
         return [
             'settings' => 'array',
+            'quotation_terms' => 'array',
+            'quotation_exclusions' => 'array',
             'trial_ends_at' => 'datetime',
             'subscription_ends_at' => 'datetime',
             'e_invoice_applicable' => 'boolean',

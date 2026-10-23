@@ -98,10 +98,16 @@ class PdfWeightTest extends TestCase
     {
         $admin = $this->companyWithLogo($this->png(2000, 800));
 
+        $path = Storage::disk('public')->path('logos/logo.png');
         $first = $admin->company->fresh()->image_data_uri;
-        Storage::disk('public')->put('logos/logo.png', 'overwritten but same mtime second');
-        // Same path and mtime second → same cache key → no re-decode of the (now corrupt) file.
-        touch(Storage::disk('public')->path('logos/logo.png'), filemtime(Storage::disk('public')->path('logos/logo.png')));
+        $mtime = filemtime($path);
+
+        // Overwrite the file, then put its modified time back. Same path and same mtime → same cache
+        // key → the (now corrupt) file is not decoded again. (Restoring the time explicitly matters:
+        // without it the test depends on the clock not ticking over to the next second in between.)
+        Storage::disk('public')->put('logos/logo.png', 'overwritten but same mtime');
+        touch($path, $mtime);
+        clearstatcache();
 
         $this->assertSame($first, $admin->company->fresh()->image_data_uri);
     }

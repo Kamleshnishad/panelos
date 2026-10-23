@@ -2,15 +2,15 @@
 
 /**
  * Default terms printed by the quotation templates that use QuotationDocumentService.
- * Placeholders ({advance_amount}, {valid_until}, {company}, {city} …) are filled per quotation
- * and shown in bold. Per-company editable terms are a later step (QUOTATION_TEMPLATES_PLAN.md,
- * step 0.3); until then every tenant gets this wording.
+ * Placeholders ({advance_amount}, {valid_until}, {company}, {document}, {city} …) are filled per quotation
+ * and shown in bold. A company can replace these in Settings → Company (companies.quotation_terms /
+ * quotation_exclusions); this is what it gets until it does.
  */
 return [
     'terms' => [
         ['title' => 'Scope of work', 'text' => 'Scope is limited to supply of material as per the specifications above.'],
         ['title' => 'Price basis', 'text' => 'Prices are ex works.'],
-        ['title' => 'Payment', 'text' => '{advance_pct} of order value including taxes at the time of placing the order ({advance_amount}); balance {balance_pct} ({balance_amount}) against Proforma Invoice at least 2 days before delivery. Payment by NEFT / RTGS / cheque in favour of {company}.'],
+        ['title' => 'Payment', 'text' => '{advance_pct} of order value including taxes at the time of placing the order ({advance_amount}); balance {balance_pct} ({balance_amount}) against {document} at least 2 days before delivery. Payment by NEFT / RTGS / cheque in favour of {company}.'],
         ['title' => 'Taxes', 'text' => 'GST and TCS extra as applicable.'],
         ['title' => 'Delivery', 'text' => 'Within 14 days for standard material and 21 days for non-standard material, after techno-commercial clearance.'],
         ['title' => 'Freight and transit insurance', 'text' => 'In customer scope.'],

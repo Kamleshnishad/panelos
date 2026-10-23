@@ -1138,6 +1138,13 @@ HSN/SAC, amount in words, payment schedule and resolved terms (`config/quotation
 filled and HTML-escaped). DomPDF limits for any template: tables only, no flex/grid/`calc()`/CSS variables
 (inject colours with Blade), `<thead>` repeats across pages, a `position: fixed` element repeats on every page.
 The accent colour comes from `companies.primary_color` and is only used if it is a plain `#rrggbb`.
+Company settings that drive these templates (all optional, Settings → Company → *Quotation Document*):
+`legal_name` ("pay to", "in favour of", signature block; blank = `name`), `quotation_title` (`PROFORMA INVOICE` or
+`QUOTATION`; also changes "against {document}" and the footer note), `certification_line` (printed only when
+set), and `quotation_terms` / `quotation_exclusions` (JSON lists; empty = the standard wording in
+`config/quotation_terms.php`, which is also returned by `GET /api/company` so the screen can start from it).
+Quotations also carry `delivery_address`, `site_contact_name`, `site_contact_phone` (optional; they may be
+cleared on update). Bank details are `bank_name`, `bank_branch`, `bank_account_no`, `bank_ifsc`.
 Plan for the further templates: [QUOTATION_TEMPLATES_PLAN.md](QUOTATION_TEMPLATES_PLAN.md).
 
 ### 19.8 Billing & the platform (super admin)

@@ -45,6 +45,21 @@
           </div>
 
           <div class="form-group">
+            <label>Delivery Address <span class="opt">(if different from the buyer)</span></label>
+            <FormInput v-model="form.delivery_address" name="delivery_address" :rules="[{ maxLength: 500 }]" placeholder="Site address the goods are delivered to" />
+          </div>
+
+          <div class="form-group">
+            <label>Site Contact</label>
+            <FormInput v-model="form.site_contact_name" name="site_contact_name" :rules="[{ maxLength: 100 }]" placeholder="Name of the person at site" />
+          </div>
+
+          <div class="form-group">
+            <label>Site Contact Phone</label>
+            <FormInput v-model="form.site_contact_phone" name="site_contact_phone" :rules="[{ maxLength: 20 }]" placeholder="e.g. 63545 66678" />
+          </div>
+
+          <div class="form-group">
             <label>Quality Grade</label>
             <select v-model="form.quality_grade">
               <option value="High">High (Premium)</option>
@@ -595,6 +610,9 @@ const form = reactive({
   customer_id: '',
   project_name: '',
   project_location: '',
+  delivery_address: '',
+  site_contact_name: '',
+  site_contact_phone: '',
   quality_grade: 'High',
   validity_days: 10,
   quoted_on: new Date().toISOString().slice(0, 10),
@@ -972,6 +990,9 @@ async function loadForEdit() {
   form.customer_id      = q.customer_id
   form.project_name     = q.project_name || ''
   form.project_location = q.project_location || ''
+  form.delivery_address = q.delivery_address || ''
+  form.site_contact_name = q.site_contact_name || ''
+  form.site_contact_phone = q.site_contact_phone || ''
   form.quality_grade    = q.quality_grade || 'High'
   form.validity_days    = q.validity_days || 10
   form.quoted_on        = q.quoted_on?.slice(0, 10) || form.quoted_on

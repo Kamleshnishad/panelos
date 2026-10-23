@@ -119,6 +119,62 @@
         </div>
       </section>
 
+      <!-- Quotation document wording -->
+      <section class="card">
+        <h3>Quotation Document</h3>
+        <p class="hint doc-hint">Used by the quotation PDF templates that support it (for example <b>Ledger</b>). Leave a field blank to use the standard wording.</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Legal company name</label>
+            <input v-model="form.legal_name" :disabled="!canEdit" placeholder="e.g. UMA SIGNATURE PUF PANEL LLP" />
+            <small class="hint">Printed as "pay to", "in favour of" and on the signature block. Blank = the company name above.</small>
+          </div>
+          <div class="form-group">
+            <label>Document title</label>
+            <select v-model="form.quotation_title" :disabled="!canEdit">
+              <option value="">Proforma Invoice (standard)</option>
+              <option value="PROFORMA INVOICE">Proforma Invoice</option>
+              <option value="QUOTATION">Quotation</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Certification line</label>
+            <input v-model="form.certification_line" :disabled="!canEdit" placeholder="e.g. AN ISO 9001:2015 COMPANY" />
+            <small class="hint">Printed under the company details. Leave blank if you hold no certification to quote.</small>
+          </div>
+        </div>
+
+        <h4 class="doc-sub">Terms &amp; conditions</h4>
+        <div v-if="!termsCustom" class="doc-std">
+          Using the standard {{ defaultTerms.length }} terms.
+          <button type="button" class="btn btn-secondary" :disabled="!canEdit" @click="customiseTerms">Customise…</button>
+        </div>
+        <div v-else>
+          <div v-for="(t, i) in form.quotation_terms" :key="i" class="term-row">
+            <input v-model="t.title" :disabled="!canEdit" placeholder="Heading, e.g. Delivery" maxlength="100" />
+            <textarea v-model="t.text" :disabled="!canEdit" rows="2" placeholder="Wording" maxlength="1000"></textarea>
+            <button type="button" class="btn btn-secondary" :disabled="!canEdit" aria-label="Remove term" @click="form.quotation_terms.splice(i, 1)">✕</button>
+          </div>
+          <div class="doc-actions">
+            <button type="button" class="btn btn-secondary" :disabled="!canEdit" @click="form.quotation_terms.push({ title: '', text: '' })">+ Add term</button>
+            <button type="button" class="btn btn-secondary" :disabled="!canEdit" @click="form.quotation_terms = []">Use the standard wording</button>
+          </div>
+          <p class="hint doc-hint">Placeholders filled in per quotation: <code>{company}</code> <code>{document}</code> <code>{city}</code> <code>{advance_pct}</code> <code>{advance_amount}</code> <code>{balance_pct}</code> <code>{balance_amount}</code> <code>{validity_days}</code> <code>{quoted_on}</code> <code>{valid_until}</code></p>
+        </div>
+
+        <h4 class="doc-sub">Exclusions</h4>
+        <div v-if="!form.exclusions_text.trim()" class="doc-std">
+          Using the standard {{ defaultExclusions.length }} exclusions.
+          <button type="button" class="btn btn-secondary" :disabled="!canEdit" @click="form.exclusions_text = defaultExclusions.join(String.fromCharCode(10))">Customise…</button>
+        </div>
+        <div v-else>
+          <textarea v-model="form.exclusions_text" :disabled="!canEdit" rows="6" class="doc-excl" placeholder="One exclusion per line"></textarea>
+          <div class="doc-actions">
+            <button type="button" class="btn btn-secondary" :disabled="!canEdit" @click="form.exclusions_text = ''">Use the standard wording</button>
+          </div>
+        </div>
+      </section>
+
       <!-- Document prefixes -->
       <section class="card">
         <h3>Document Number Prefixes</h3>
@@ -152,12 +208,21 @@ const months = ['January','February','March','April','May','June','July','August
 
 const form = ref(null)
 
+// Standard terms / exclusions come from the server so they are always the wording that is really printed.
+const defaultTerms      = ref([])
+const defaultExclusions = ref([])
+const termsCustom       = computed(() => (form.value?.quotation_terms?.length ?? 0) > 0)
+function customiseTerms() {
+  form.value.quotation_terms = defaultTerms.value.map(t => ({ title: t.title, text: t.text }))
+}
+
 const fields = [
   'name','gstin','pan','address_line1','city','state','state_code','pincode','phone','email',
   'bank_name','bank_account_no','bank_ifsc','bank_branch','authorized_signatory','signatory_phone',
   'primary_color','secondary_color','quotation_prefix','invoice_prefix','order_prefix','challan_prefix',
   'financial_year_start','e_invoice_applicable','tcs_applicable',
   'enforce_production_stages','stage_approval_four_eyes',
+  'legal_name','certification_line','quotation_title',
 ]
 
 async function load() {
@@ -174,6 +239,10 @@ async function load() {
     f.stage_approval_four_eyes  = !!c.stage_approval_four_eyes
     f.primary_color        = c.primary_color || '#2B50E0'
     f.secondary_color      = c.secondary_color || '#2140C0'
+    f.quotation_terms  = Array.isArray(c.quotation_terms) ? c.quotation_terms.map(t => ({ title: t.title, text: t.text })) : []
+    f.exclusions_text  = Array.isArray(c.quotation_exclusions) ? c.quotation_exclusions.join(String.fromCharCode(10)) : ''
+    defaultTerms.value      = c.default_quotation_terms ?? []
+    defaultExclusions.value = c.default_quotation_exclusions ?? []
     form.value  = f
     logoUrl.value = c.logo_url ?? null
   } catch (e) {
@@ -187,7 +256,13 @@ async function save() {
   saving.value = true
   error.value = null; success.value = null
   try {
-    const res = await companyService.update(form.value)
+    // Blank rows are dropped; an empty list means "use the standard wording".
+    const payload = {
+      ...form.value,
+      quotation_terms: (form.value.quotation_terms || []).filter(t => t.title.trim() && t.text.trim()),
+      quotation_exclusions: form.value.exclusions_text.split(/\r?\n/).map(l => l.trim()).filter(Boolean),
+    }
+    const res = await companyService.update(payload)
     success.value = 'Company settings saved.'
     const c = res?.data ?? res
     logoUrl.value = c.logo_url ?? logoUrl.value
@@ -258,6 +333,14 @@ onMounted(load)
 .logo-placeholder { color: #bbb; font-size: 12px; }
 .logo-actions { display: flex; flex-direction: column; gap: 8px; }
 .hint { font-size: 11px; color: #aaa; }
+.doc-hint { margin: 0 0 12px; color: #667085; }
+.doc-sub { margin: 18px 0 8px; font-size: 13px; }
+.doc-std { font-size: 13px; color: #454c59; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.term-row { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; gap: 8px; margin-bottom: 8px; align-items: start; }
+.term-row textarea, .doc-excl { width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); resize: vertical; }
+.doc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.doc-hint code { background: #f2f4f7; padding: 0 4px; border-radius: 3px; font-size: 10.5px; }
+@media (max-width: 720px) { .term-row { grid-template-columns: 1fr; } }
 
 .btn { padding: 8px 18px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .btn-primary { background: var(--primary); color: white; }

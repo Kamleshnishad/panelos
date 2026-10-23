@@ -54,6 +54,15 @@ class CompanyController extends Controller
 
             $validated = $request->validate([
                 'name'                 => 'required|string|max:255',
+                'legal_name'           => 'nullable|string|max:255',
+                'certification_line'   => 'nullable|string|max:255',
+                'quotation_title'      => 'nullable|in:PROFORMA INVOICE,QUOTATION',
+                // Empty / null means "use the standard wording" (config/quotation_terms.php).
+                'quotation_terms'          => 'nullable|array|max:30',
+                'quotation_terms.*.title'  => 'required|string|max:100',
+                'quotation_terms.*.text'   => 'required|string|max:1000',
+                'quotation_exclusions'     => 'nullable|array|max:30',
+                'quotation_exclusions.*'   => 'required|string|max:300',
                 'gstin'                => ['nullable', 'string', 'max:20', new IndianGstin()],
                 'pan'                  => ['nullable', 'string', 'max:20', new IndianPan()],
                 'address_line1'        => 'nullable|string|max:255',
@@ -83,6 +92,11 @@ class CompanyController extends Controller
                 'e_invoice_applicable' => 'nullable|boolean',
                 'tcs_applicable'       => 'nullable|boolean',
             ]);
+
+            foreach (['quotation_terms', 'quotation_exclusions'] as $list) {
+                if (array_key_exists($list, $validated) && empty($validated[$list])) $validated[$list] = null;
+                elseif (isset($validated[$list])) $validated[$list] = array_values($validated[$list]);
+            }
 
             $company->update($validated);
 
@@ -130,6 +144,9 @@ class CompanyController extends Controller
     {
         $data = $company->toArray();
         $data['logo_url'] = $company->logo ? Storage::disk('public')->url($company->logo) : null;
+        // The standard wording, so the settings screen can offer it as a starting point.
+        $data['default_quotation_terms']      = config('quotation_terms.terms', []);
+        $data['default_quotation_exclusions'] = config('quotation_terms.exclusions', []);
         return $data;
     }
 }

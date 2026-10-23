@@ -28,15 +28,21 @@ class QuotationDocumentService
         $customer = $q->customer;
 
         $lines = $this->lines($q, $company);
+        $legalName = trim((string) $company->legal_name) !== '' ? $company->legal_name : $company->name;
+        $title = $company->quotation_title === 'QUOTATION' ? 'QUOTATION' : 'PROFORMA INVOICE';
+        $documentWord = $title === 'QUOTATION' ? 'quotation' : 'Proforma Invoice';
         $totalWords = 'Rupees ' . InvoiceService::amountInWords((float) $q->total_amount) . ' Only';
         $advancePct = (float) $q->advance_pct;
         $inter = (bool) $q->is_inter_state;
 
         return [
             'accent' => $this->accent($company->primary_color ?? null),
-            'title'  => 'PROFORMA INVOICE',
+            'title'  => $title,
+            'title_note' => "This is a {$documentWord} and not a valid tax document.",
             'company' => [
                 'name'    => $company->name,
+                'legal_name' => $legalName,
+                'certification' => trim((string) $company->certification_line) ?: null,
                 'logo'    => $company->image_data_uri,
                 'address' => $this->address([$company->address_line1, $company->city, $company->state], $company->pincode),
                 'phone'   => $company->phone,
@@ -69,6 +75,8 @@ class QuotationDocumentService
             'project' => [
                 'name'     => $q->project_name,
                 'location' => $q->project_location,
+                'delivery_address' => trim((string) $q->delivery_address) ?: null,
+                'site_contact' => trim(implode(' · ', array_filter([$q->site_contact_name, $q->site_contact_phone]))) ?: null,
                 'quality'  => $q->quality_grade,
                 'prepared_by' => trim(implode(' · ', array_filter([$company->authorized_signatory, $company->signatory_phone]))),
             ],
@@ -95,14 +103,15 @@ class QuotationDocumentService
             'words'   => $totalWords,
             'hsn'     => $this->hsnSummary($lines, (float) $q->discount_pct, $inter, $q),
             'bank'    => [
-                'account_name' => $company->name,
+                'account_name' => $legalName,
                 'bank'         => $company->bank_name,
                 'branch'       => $company->bank_branch,
                 'account_no'   => $company->bank_account_no,
                 'ifsc'         => $company->bank_ifsc,
             ],
-            'terms'      => $this->terms($q, $company, config('quotation_terms.terms', [])),
-            'exclusions' => array_map(fn ($t) => $this->resolve($t, $q, $company), config('quotation_terms.exclusions', [])),
+            'terms'      => $this->terms($q, $company, $legalName, $documentWord, $this->customOr($company->quotation_terms, config('quotation_terms.terms', []), fn ($t) => isset($t['title'], $t['text']))),
+            'exclusions' => array_map(fn ($t) => $this->resolve($t, $q, $company, $legalName, $documentWord),
+                $this->customOr($company->quotation_exclusions, config('quotation_terms.exclusions', []), 'is_string')),
             'notes'      => trim((string) $q->notes) ?: null,
             'signatory'  => [
                 'name'  => $company->authorized_signatory,
@@ -296,16 +305,25 @@ class QuotationDocumentService
      *
      * @return array<int, array{title:string, text:string}>
      */
-    private function terms(Quotation $q, Company $company, array $terms): array
+    private function terms(Quotation $q, Company $company, string $legalName, string $documentWord, array $terms): array
     {
-        return array_map(fn ($t) => ['title' => $t['title'], 'text' => $this->resolve($t['text'], $q, $company)], $terms);
+        return array_map(fn ($t) => ['title' => $t['title'], 'text' => $this->resolve($t['text'], $q, $company, $legalName, $documentWord)], $terms);
     }
 
-    private function resolve(string $text, Quotation $q, Company $company): string
+    /** The company's own list when it has a usable one, otherwise the standard wording. */
+    private function customOr($custom, array $default, $isValid): array
+    {
+        if (!is_array($custom) || !$custom) return $default;
+        $valid = array_values(array_filter($custom, $isValid));
+        return $valid ?: $default;
+    }
+
+    private function resolve(string $text, Quotation $q, Company $company, string $legalName, string $documentWord): string
     {
         $advancePct = (float) $q->advance_pct;
         $values = [
-            '{company}'        => $company->name,
+            '{company}'        => $legalName,
+            '{document}'       => $documentWord,
             '{city}'           => $company->city,
             '{advance_pct}'    => rtrim(rtrim(number_format($advancePct, 2), '0'), '.') . '%',
             '{advance_amount}' => '₹ ' . number_format((float) $q->advance_amount, 2),

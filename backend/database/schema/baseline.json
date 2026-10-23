@@ -137,6 +137,7 @@
     "companies": {
         "id": "bigint unsigned",
         "name": "varchar(255)",
+        "legal_name": "varchar(255)",
         "subdomain": "varchar(255)",
         "logo": "varchar(255)",
         "gstin": "varchar(20)",
@@ -177,7 +178,11 @@
         "signup_referrer": "varchar(255)",
         "created_at": "timestamp",
         "updated_at": "timestamp",
-        "deleted_at": "timestamp"
+        "deleted_at": "timestamp",
+        "certification_line": "varchar(255)",
+        "quotation_title": "varchar(20)",
+        "quotation_terms": "json/longtext",
+        "quotation_exclusions": "json/longtext"
     },
     "company_document_templates": {
         "id": "bigint unsigned",
@@ -846,7 +851,10 @@
         "notes": "text",
         "created_at": "timestamp",
         "updated_at": "timestamp",
-        "deleted_at": "timestamp"
+        "deleted_at": "timestamp",
+        "delivery_address": "text",
+        "site_contact_name": "varchar(100)",
+        "site_contact_phone": "varchar(20)"
     },
     "quotation_accessories": {
         "id": "bigint unsigned",
