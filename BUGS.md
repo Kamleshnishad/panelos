@@ -7,7 +7,7 @@ Sequenced delivery plan: [PRODUCTION_READINESS_PLAN.md](PRODUCTION_READINESS_PLA
 See [SYSTEM.md](SYSTEM.md) for how the system works and [CLAUDE.md](CLAUDE.md) for how to test.
 
 **ID scheme:** `PB-###`, assigned once and never reused — even if a bug is rejected or turns out to be a
-duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-033**. Feature requests use `FR-###` (next: **FR-002**).
+duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-035**. Feature requests use `FR-###` (next: **FR-002**).
 
 **Severity** — what it costs if left alone:
 
@@ -63,6 +63,8 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
+| **PB-033** | `Medium` | Open | Inventory | **Opening stock is silently discarded on create.** `POST /api/stock/coils|chemicals|consumables` hard-codes `quantity_in_stock => 0` and does not even validate a supplied quantity, yet returns 201. A tenant entering opening stock sees success and gets zero — then every production start fails with *Insufficient stock* and no clue why. Found during Phase 1 on production. Arguably deliberate (stock should be booked in via `/add` so it writes a `stock_transactions` ledger row) but the silent discard is the trap. Fix: accept an optional opening quantity and book it **through `StockService`** so the ledger stays honest. |
+| **PB-034** | `Low` | Cannot reproduce | Auth | `POST /api/auth/register` returned a bare **502** once, ~4 minutes after the Phase 0 container recreate, while `/api/health`, `/` and `/api/auth/login` were all healthy. A retry 12 minutes later succeeded (201 in 1.7s). Most likely a cold php-fpm worker right after the restart. Logged for pattern-matching; re-open if it recurs after a deploy. |
 | **PB-030** | `Critical` | Deployed | Operations | **Nothing is scheduled.** `app/Console/Kernel.php` defines four jobs (nightly `db:backup --keep=14`, daily `reminders:send` 09:00, daily `sms:send-reminders` 10:00, weekly `reminders:cleanup`) but it is a Laravel 10 artifact — Laravel 11 does not load it, and `php artisan schedule:list` confirms *"No scheduled tasks have been defined."* Supervisord dutifully runs `schedule:run` every 60s and does nothing. **Consequence: there is no routine database backup** (dumps only happen at deploy time), and no automated payment or SMS reminders at all. Fix: port the four definitions into `routes/console.php` using Laravel 11's `Schedule` facade, then verify with `schedule:list`. |
 | **PB-021** | `Medium` | **Needs decision** | Invoicing | Fixed transport is never invoiced. The quotation adds it *after* tax and untaxed; a per-line invoice can't express an untaxed line, so billing it would silently change its tax treatment. **Decide whether transport should be taxed** — then it's a one-line change on both sides. |
 | **PB-022** | `Low` | Deferred | PDF | Generated PDFs are ~1 MB each, dominated by the company logo embedded as a full-size base64 data-URI. Correct, just heavy. |
@@ -116,6 +118,7 @@ Baseline on MySQL: 418 tests, 152 passing, 266 failing/erroring.
 
 | When | Commit | Carried | Outcome |
 |---|---|---|---|
+| 2026-10-23 12:35 UTC | — (verification only) | **Phase 1** | ✅ Full cycle walked on production as the live tenant: BOQ → quotation → order → run → QC → dispatch → invoice → payment → order closed. 36 checks, all passed. `GET /reports/reconciliation` for the new order: **ordered 69,974 = invoiced 69,974 = paid 69,974, gap 0** — the report that showed `revenue_leak: 128,725.88` before the fixes. Found PB-033 and PB-034 on the way. |
 | 2026-10-23 12:16 UTC | [`c6a05c5`](https://github.com/Kamleshnishad/panelos/commit/c6a05c5) | PB-030 (+ PB-026 migration) | ✅ Deployed. Verified on the live container: `schedule:list` shows all four tasks with next-due times, and the supervisord `schedule:run` loop is running. **Restore rehearsed**: the deploy's own backup artifact was loaded into a scratch database — 773 statements, 0 failures, 65 tables, data intact. |
 | 2026-10-23 11:42 UTC | [`7409193`](https://github.com/Kamleshnishad/panelos/commit/7409193) | PB-001 → PB-020 | ✅ Deployed. Pre-migration backup taken (221.9 KB, archived as GH artifact `db-backup-7409193`). Migration `2026_10_23_000001_fix_invoice_dispatch_item_precision_and_non_panel_lines` applied. `schema:check` → *Schema matches baseline*. `/api/health` → `{"status":"OK","database":"OK"}`. |
 
@@ -145,3 +148,24 @@ Append a row with the next free id (update "Next free id" at the top), pick a se
 above, and start at `Open`. When it's fixed, move it to `Deployed` and name the regression
 test; when it's live and verified on the server, `Deployed`. A row is never deleted — a rejected bug stays
 with `Not a bug` and a one-line reason, so the same thing doesn't get re-reported in six months.
+
+---
+
+## 6. Test records created on production (Phase 1, 2026-10-23)
+
+Left in place deliberately so the numbers can be re-checked. All are prefixed **ZZ TEST** and are safe to
+delete once reviewed. Note the stock movements are real and would need manual `adjust` entries to reverse.
+
+| Type | Identifier |
+|---|---|
+| Customer | id 9 — "ZZ TEST Cold Store (Claude E2E)", credit limit ₹50,00,000 |
+| Quotation | **SCP-2027-008** (accepted) — 37.2 sqm + ₹5,000 installation |
+| Order | **ORD-2027-003** (completed) — ₹69,974 |
+| Production run | **RUN-2026-0002** (completed) |
+| Batch | **BATCH-2026-000003** (dispatched) |
+| Dispatch | **DISP-2026-000003** (delivered) |
+| Invoice | **INV-2026-000003** (paid, ₹69,974 incl. ₹10,674 GST) |
+| Payments | ZZ-TEST-1 ₹30,000 · ZZ-TEST-2 ₹39,974 |
+| Coil stock | New row for panel type 9, +310 kg booked in, 300.78 kg consumed, **9.22 kg remaining** |
+| Chemicals consumed | Polyol 79.68 kg · Isocyanate 87.65 kg · Film 38.70 sqm (incl. the 2% actuals overage) |
+| Tenant (signup probe) | company id 7 — "ZZ TEST Signup Probe", trial. Created while retesting PB-034; **delete this one** |

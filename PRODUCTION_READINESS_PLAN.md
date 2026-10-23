@@ -25,7 +25,7 @@ Not a feeling — a checklist. We are ready when all of these are true:
    **on the production server**, not just in tests.
 7. The money paths (tax, invoicing, payments) have **regression tests that run**.
 
-Today: **4 and 5 are met** (Phase 0). 2, 6 and 7 are not. Items 1 and 3 are partially met.
+Today: **3, 4, 5 and 6 are met** (Phases 0–1). **2 and 7 are not.** Item 1 is partially met — a new tenant still hits the opening-stock trap (PB-033).
 
 ---
 
@@ -52,7 +52,12 @@ Today: **4 and 5 are met** (Phase 0). 2, 6 and 7 are not. Items 1 and 3 are part
 
 ---
 
-## Phase 1 — Prove it works on the live server *(before the client touches it)*
+## Phase 1 — Prove it works on the live server ✅ *(done 2026-10-23)*
+
+> Walked end to end on production as the live tenant — 36 checks, all passed. Reconciliation for the test
+> order: ordered 69,974 = invoiced 69,974 = paid 69,974, **gap 0**. Two new defects found on the way
+> (PB-033 opening stock discarded, PB-034 a one-off 502 on signup).
+> Test records left in the tenant are listed at the end of BUGS.md §3.
 
 Everything deployed today is verified by tests and by reading code. **Nobody has logged into production and
 walked the flow.** That is the single largest unknown in this plan.
