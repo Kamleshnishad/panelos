@@ -1557,8 +1557,11 @@ as live defects; what is listed below is what is still true of the code today.
     immediately. This is expected, not a bug.
 20. **`StockService::getStockLevel/getStockHistory` query legacy columns** (`coil_id` / `chemical_id`) that
     the current tables do not use. The live code paths go through the controller endpoints instead.
-21. **Generated PDFs are ~1 MB each**, dominated by the company logo embedded as a full-size base64
-    data-URI (`HasImageDataUri`). Correct, just heavy; downscale before embedding if it starts to matter.
+21. **Generated PDFs are ~1 MB each** — mostly fonts, not the logo. DomPDF defaults font subsetting to
+    on, but the Laravel wrapper's bundled config turns it off and the app never published its own, so two
+    whole DejaVu files (717 KB) ride in every PDF; the logo adds a further 173 KB because it is stored at
+    3381×1085 px and shown at 200×46. Correct output, just heavy. See PB-022 in `BUGS.md` for the measured
+    breakdown and the two-line fix (97% smaller).
 22. **Much of the legacy test suite is stale.** 24 tests fail against the current API because they post
     long-superseded payloads (e.g. `items` instead of `panel_rows`) or call routes that no longer exist.
     They were failing before the October 2026 fixes and are unrelated to them. The suite runs against
