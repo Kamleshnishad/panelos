@@ -23,9 +23,11 @@ class QuotationPdfService
     {
         $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer', 'company');
 
-        $pdf = Pdf::loadView($this->view($quotation, 'quotation', 'quotations.pdf', $template), [
+        $view = $this->view($quotation, 'quotation', 'quotations.pdf', $template);
+        $pdf = Pdf::loadView($view, [
             'quotation' => $quotation,
         ]);
+        $this->stampPageNumbers($pdf, 'quotation', $view);
 
         return $pdf->download("quotation-{$quotation->quotation_no}.pdf");
     }
@@ -34,11 +36,36 @@ class QuotationPdfService
     {
         $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer', 'company');
 
-        $pdf = Pdf::loadView($this->view($quotation, 'quotation', 'quotations.pdf', $template), [
+        $view = $this->view($quotation, 'quotation', 'quotations.pdf', $template);
+        $pdf = Pdf::loadView($view, [
             'quotation' => $quotation,
         ]);
+        $this->stampPageNumbers($pdf, 'quotation', $view);
 
         return $pdf->stream();
+    }
+
+    /**
+     * "Page x of y" for templates that opt in (registry `page_numbers`). The total is only known
+     * once the document has been laid out, so it is drawn on every page after rendering. Does
+     * nothing for any other template, so their output is untouched.
+     */
+    private function stampPageNumbers($pdf, string $docType, string $view): void
+    {
+        if (!$this->templates->wantsPageNumbers($docType, $view)) return;
+
+        $pdf->render();
+        $dompdf = $pdf->getDomPDF();
+        $canvas = $dompdf->getCanvas();
+        $metrics = $dompdf->getFontMetrics();
+        $font = $metrics->getFont('DejaVu Sans');
+        $size = 8.5;
+        $width = $metrics->getTextWidth('Page 00 of 00', $font, $size);
+
+        $canvas->page_text(
+            ($canvas->get_width() - $width) / 2, $canvas->get_height() - 25.4,
+            'Page {PAGE_NUM} of {PAGE_COUNT}', $font, $size, [0.349, 0.38, 0.435],
+        );
     }
 
     /**

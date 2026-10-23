@@ -45,6 +45,17 @@ class DocumentTemplateService
         return $fallbackView;
     }
 
+    /** Whether the template that renders $view asked for "Page x of y" stamping. Off for anything unknown. */
+    public function wantsPageNumbers(string $docType, string $view): bool
+    {
+        foreach ($this->templatesFor($docType) as $meta) {
+            if (($meta['view'] ?? null) === $view) {
+                return (bool) ($meta['page_numbers'] ?? false);
+            }
+        }
+        return false;
+    }
+
     public function setTemplate(int $companyId, string $docType, string $key): void
     {
         if (!isset($this->templatesFor($docType)[$key])) {

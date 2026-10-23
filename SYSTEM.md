@@ -1127,6 +1127,16 @@ Read: `GET /api/audit-logs` (needs `audit.view`; UI = `AuditLog.vue`).
 `config/document_templates.php`, **verifies the Blade actually exists**, and otherwise falls back to the
 default view — a removed template can never break PDF generation.
 
+**Quotation templates available:** `classic` (default, unchanged) and `ledger`. A registry entry may set
+`page_numbers => true`, which makes `QuotationPdfService` stamp "Page x of y" after rendering (the total is only
+known once laid out); entries without it are untouched. Templates that use `QuotationDocumentService` receive
+only layout work to do — it builds the numbered lines (panel, accessory, door, installation), GST summary by
+HSN/SAC, amount in words, payment schedule and resolved terms (`config/quotation_terms.php`, placeholders
+filled and HTML-escaped). DomPDF limits for any template: tables only, no flex/grid/`calc()`/CSS variables
+(inject colours with Blade), `<thead>` repeats across pages, a `position: fixed` element repeats on every page.
+The accent colour comes from `companies.primary_color` and is only used if it is a plain `#rrggbb`.
+Plan for the further templates: [QUOTATION_TEMPLATES_PLAN.md](QUOTATION_TEMPLATES_PLAN.md).
+
 ### 19.8 Billing & the platform (super admin)
 
 **Tenant side** (reachable even when expired): `GET /api/billing/status`,

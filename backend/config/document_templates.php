@@ -9,7 +9,8 @@
  *   - invoice   : $invoice, $total
  *
  * To add a new template: create a DomPDF-compatible blade (tables/inline-block,
- * no flex/grid) and add one line here. It becomes selectable automatically.
+ * no flex/grid, no CSS variables or calc) and add one line here. It becomes selectable
+ * automatically. Optional `page_numbers => true` stamps "Page x of y" after rendering.
  */
 return [
     'quotation' => [
@@ -17,6 +18,12 @@ return [
             'name'        => 'Classic',
             'view'        => 'quotations.pdf',
             'description' => 'Standard 3-page: Proforma Invoice + Terms & Conditions + BOQ cutting sheet.',
+        ],
+        'ledger' => [
+            'name'         => 'Ledger',
+            'view'         => 'quotations.pdf_ledger',
+            'description'  => 'Dense, tabular GST-style proforma: size schedules, GST summary by HSN/SAC, payment schedule, bank details, terms and acceptance. "Page x of y" on every page.',
+            'page_numbers' => true,
         ],
     ],
 

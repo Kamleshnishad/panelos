@@ -47,6 +47,8 @@ are the fixture: 772,437.50 / 139,038.75 / 911,476), field round-trip tests, the
 
 ## Phase 1 — Ledger (Template 1)
 
+**Status: built, not deployed (2026-10-23).** Built ahead of Phase 0 on today's data so nothing existing changes: new files only (`QuotationDocumentService`, `config/quotation_terms.php`, `quotations/pdf_ledger.blade.php`, one registry line, an opt-in page-number step), Classic untouched. Still to come from Phase 0: ISO line, legal name, site contact / delivery address, installation as real lines, editable per-company terms, Classic bank-details fix.
+
 Closest to Classic, so the lowest risk and the proof of the foundation. Blade `quotations/pdf_ledger.blade.php`,
 registered as `ledger`. Build from the artboard; compare a rendered PNG against it page by page; deploy; check
 the live preview (time, size, ₹, logo, a quotation with many lines so it really flows to a second and third page).
