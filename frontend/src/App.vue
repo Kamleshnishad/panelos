@@ -35,7 +35,9 @@ async function onLogout() {
 function onRetry() { subInactive.value = false; window.location.reload() }
 
 // Session expired (401 caught by the global axios interceptor) — drop to login.
-function onSessionExpired() { loggedIn.value = false }
+// Straight to the sign-in form. Dropping to the marketing landing page (the old
+// behaviour, since showAuth was false) looked like being thrown out of the product.
+function onSessionExpired() { loggedIn.value = false; authMode.value = 'login'; showAuth.value = true }
 // Subscription/trial inactive (402) — show the renew/upgrade gate.
 function onSubInactive(e) { subInfo.value = e.detail ?? {}; subInactive.value = true }
 

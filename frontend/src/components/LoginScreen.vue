@@ -59,6 +59,7 @@
         <!-- ── SIGN IN ─────────────────────────────────── -->
         <template v-else-if="mode === 'login'">
           <h2>Welcome back</h2>
+          <div v-if="notice" class="notice-msg">{{ notice }}</div>
           <p class="muted">Sign in to your company account to continue.</p>
 
           <form @submit.prevent="submit">
@@ -146,6 +147,15 @@ const email = ref(isDev ? 'admin@panelos.local' : '')
 const password = ref(isDev ? 'Admin@123' : '')
 const loading = ref(false)
 const error = ref(null)
+
+// Arriving here because a session ended, rather than by choice? Say so — it used
+// to just appear, which reads as being thrown out for no reason.
+const ENDED = { expired: 'Your session expired, so you were signed out. Please sign in again.' }
+const notice = ref(null)
+try {
+  const why = sessionStorage.getItem('session_ended')
+  if (why) { notice.value = ENDED[why] ?? 'You were signed out. Please sign in again.'; sessionStorage.removeItem('session_ended') }
+} catch { /* private mode: no notice, nothing lost */ }
 const otpEmail = ref('')
 const otpCode = ref('')
 
@@ -258,6 +268,7 @@ h2 { margin: 0 0 6px; font-size: 25px; color: var(--text, #15181E); letter-spaci
 .field input { padding: 12px 14px; border: 1px solid var(--border-2, #d9dee6); border-radius: var(--r, 9px); font-size: 14px; transition: all .15s; background: var(--surface-2, #f7f9fc); }
 .field input:focus { outline: none; border-color: var(--brand-500, var(--primary)); box-shadow: 0 0 0 3px var(--brand-50, #eef1fe); background: #fff; }
 
+.notice-msg { background: #fff8e1; border: 1px solid #f0c36d; color: #7a5a1c; padding: 10px 14px; border-radius: var(--r-sm, 7px); font-size: 13px; margin: 0 0 14px; line-height: 1.5; }
 .error-msg { background: var(--danger-bg, #ffebee); border: 1px solid var(--danger-bd, #ef9a9a); color: var(--danger, #c62828); padding: 10px 14px; border-radius: var(--r-sm, 7px); font-size: 13px; margin-bottom: 15px; }
 
 .btn-login {

@@ -290,7 +290,7 @@ class AuthControllerTest extends TestCase
             'new_password_confirmation' => 'new-password-123',
         ]);
 
-        $response->assertStatus(401)
+        $response->assertStatus(422)   // was 401, which the browser read as an expired session and signed the user out
             ->assertJson([
                 'success' => false,
                 'error_code' => 'PASSWORD_MISMATCH',

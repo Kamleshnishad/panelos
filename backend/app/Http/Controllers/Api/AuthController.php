@@ -14,6 +14,27 @@ class AuthController extends Controller
 {
     use ApiResponse;
 
+    /**
+     * How long a refreshed-away token keeps working. Refresh used to DELETE the
+     * old token outright, which killed it under anything still using it: a
+     * second browser tab, or the requests the screen you just opened fires at the
+     * same instant AppShell refreshes. Measured on production: the old token
+     * returned 401 immediately, and 2 of 40 simulated page loads lost a request
+     * to it — each one a forced logout.
+     */
+    private const REFRESH_GRACE_SECONDS = 90;
+
+    /**
+     * Seconds of life a freshly issued token has. The client schedules its own
+     * renewal and warning from this DURATION rather than from a server timestamp,
+     * so a wrong clock on the user's machine cannot make it warn too early or
+     * never.
+     */
+    private function sessionSeconds(): int
+    {
+        return (int) config('sanctum.expiration', 720) * 60;
+    }
+
     /** Shared password policy for setting/changing a password (min 8, letters + numbers). */
     public static function passwordPolicy(): Password
     {
@@ -65,6 +86,7 @@ class AuthController extends Controller
                 ],
                 'token' => $token,
                 'token_type' => 'Bearer',
+                'expires_in' => $this->sessionSeconds(),
             ], 'Account created — welcome to your 14-day trial!', 201);
         } catch (\Throwable $e) {
             return $this->errorResponse(['error' => $e->getMessage()], 'Could not create account: ' . $e->getMessage(), 'SIGNUP_ERROR', 400);
@@ -129,6 +151,7 @@ class AuthController extends Controller
             ],
             'token' => $token,
             'token_type' => 'Bearer',
+                'expires_in' => $this->sessionSeconds(),
         ], 'Login successful', 200);
     }
 
@@ -253,10 +276,16 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        // Delete old token if it exists
+        // Retire the old token on a short fuse rather than deleting it (see
+        // REFRESH_GRACE_SECONDS). It never LENGTHENS a cutoff: a token already
+        // inside its own grace window keeps the earlier one, so a chain of
+        // refreshes cannot keep an old credential alive.
         $currentToken = $user->currentAccessToken();
-        if ($currentToken) {
-            $currentToken->delete();
+        if ($currentToken instanceof \Laravel\Sanctum\PersonalAccessToken) {
+            $cutoff = now()->addSeconds(self::REFRESH_GRACE_SECONDS);
+            if (!$currentToken->expires_at || $currentToken->expires_at->gt($cutoff)) {
+                $currentToken->forceFill(['expires_at' => $cutoff])->save();
+            }
         }
 
         // Create new token
@@ -265,6 +294,7 @@ class AuthController extends Controller
         return $this->successResponse([
             'token' => $token,
             'token_type' => 'Bearer',
+                'expires_in' => $this->sessionSeconds(),
         ], 'Token refreshed successfully', 200);
     }
 
@@ -295,7 +325,9 @@ class AuthController extends Controller
                 ['current_password' => ['Current password is incorrect']],
                 'Current password verification failed',
                 'PASSWORD_MISMATCH',
-                401
+                // Was 401. The browser treats any 401 as "your session expired" and
+                // signs you out, so mistyping your current password threw you out.
+                422
             );
         }
 

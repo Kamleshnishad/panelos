@@ -46,3 +46,10 @@ Schedule::command('db:backup --keep=14')
     ->dailyAt('01:30')
     ->withoutOverlapping(30)
     ->runInBackground();
+
+// Refresh now leaves the old token alive for a short grace window instead of
+// deleting it (see AuthController::REFRESH_GRACE_SECONDS), so expired token rows
+// accumulate — one per refresh, per user. Sweep them daily.
+Schedule::command('sanctum:prune-expired --hours=24')
+    ->dailyAt('02:15')
+    ->withoutOverlapping(10);

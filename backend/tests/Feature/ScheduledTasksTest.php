@@ -42,6 +42,7 @@ class ScheduledTasksTest extends TestCase
         $this->assertTrue($this->hasScheduled('reminders:send'), 'Payment reminders are not scheduled.');
         $this->assertTrue($this->hasScheduled('sms:send-reminders'), 'SMS reminders are not scheduled.');
         $this->assertTrue($this->hasScheduled('reminders:cleanup'), 'Reminder cleanup is not scheduled.');
+        $this->assertTrue($this->hasScheduled('sanctum:prune-expired'), 'Expired API tokens are never pruned.');
     }
 
     public function test_every_scheduled_command_actually_exists(): void

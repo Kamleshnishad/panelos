@@ -1,5 +1,15 @@
 <template>
   <div class="app-root">
+    <!-- Session about to end and couldn't be renewed quietly -->
+    <session-warning
+      v-if="session.warning.value"
+      :seconds-left="session.secondsLeft.value ?? 0"
+      :renewing="session.renewing.value"
+      :failed="session.failed.value"
+      @extend="session.extend()"
+      @signout="$emit('logout')"
+    />
+
     <!-- Impersonation banner -->
     <div v-if="impersonating" class="imp-banner">
       <span>👁 Viewing as <b>{{ impersonating }}</b> (platform support mode)</span>
@@ -124,6 +134,8 @@
 import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, h } from 'vue'
 import axios from 'axios'
 import authService from '../services/authService.js'
+import { useSessionGuard } from '../composables/useSessionGuard.js'
+import SessionWarning from './SessionWarning.vue'
 import dashboardService from '../services/dashboardService.js'
 import companyService from '../services/companyService.js'
 import productionService from '../services/productionService.js'
@@ -191,7 +203,15 @@ const MasterDataManager = lazy(() => import('./MasterDataManager.vue'))
 const UserManagement = lazy(() => import('./UserManagement.vue'))
 const SuperAdmin = lazy(() => import('./SuperAdmin.vue'))
 
-defineEmits(['logout'])
+const emit = defineEmits(['logout'])
+
+// Replaces "refresh on every load + every 6h". See useSessionGuard for why.
+const session = useSessionGuard({
+  onExpired: () => {
+    authService.endSession('expired')
+    window.dispatchEvent(new CustomEvent('auth:expired'))
+  },
+})
 
 const active      = ref(authService.currentUser()?.is_super_admin ? 'superadmin' : 'dashboard')
 const user        = ref(authService.currentUser())
@@ -352,17 +372,8 @@ function quickJump() {
   if (hit) { go(hit.key); searchQ.value = '' }
 }
 
-let refreshTimer = null
-onBeforeUnmount(() => { if (refreshTimer) clearInterval(refreshTimer) })
 
 onMounted(async () => {
-  // Sliding session (OPS-H2): tokens now expire after 12h. Refresh to a fresh
-  // window on load, then keep it alive on an interval while the app stays open,
-  // so an active user is never logged out mid-shift. Failure is non-fatal — a
-  // genuinely-expired token is caught by the 401 interceptor (→ login).
-  await authService.refreshToken()
-  refreshTimer = setInterval(() => authService.refreshToken(), 6 * 60 * 60 * 1000)
-
   // Refresh the user so permissions/is_admin are current (drives nav gating).
   try { const u = await authService.me(); if (u) user.value = u } catch { /* ignore */ }
 
