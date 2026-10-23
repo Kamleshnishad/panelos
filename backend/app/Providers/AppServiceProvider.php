@@ -19,6 +19,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // The Laravel wrapper ships with font subsetting OFF, which embeds whole
+        // DejaVu font files (~0.7 MB) in every PDF. On, a PDF carries only the glyphs
+        // it uses (PB-022).
+        config(['dompdf.options.enable_font_subsetting' => true]);
     }
 }
