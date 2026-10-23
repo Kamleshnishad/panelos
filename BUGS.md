@@ -67,12 +67,15 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 
 ### Production data — not code
 
-These cannot be fixed by deploying. They need a decision and a deliberate correction.
-
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
-| **PB-024** | `Critical` | **Needs decision** | Data | `INV-2026-000001` — ₹3,77,100, already part-paid ₹1.5L, issued with ₹0 GST and ~₹29,250 of accessories unbilled. Needs a credit note + reissue. **Do not mutate it silently.** |
-| **PB-025** | `High` | Open | Data | `ORD-2027-001` is still `pending` despite being produced, dispatched and invoiced. PB-003 stops it recurring but won't correct this row. |
+| **PB-024** | ~~`Critical`~~ | **Not a bug** | Data | `INV-2026-000001` — ₹3,77,100 part-paid, ₹0 GST, ~₹29,250 accessories unbilled. Owner confirmed 2026-10-23 that the Signature PUF Panel tenant holds **dummy data only**, so no credit note or reissue is needed. The audit report labelled this order "real"; that label was wrong. |
+| **PB-025** | ~~`High`~~ | **Not a bug** | Data | `ORD-2027-001` stuck `pending`. Same reason — dummy data. PB-003 stops it recurring. |
+
+> **Open question, not yet answered:** PB-001 zero-rated the GST on *every* invoice for *every* tenant, not
+> just this one. If any other tenant issued invoices before 2026-10-23, those are still wrong in the
+> database and a deploy cannot fix them. Worth one query against production before considering PB-001 fully
+> closed.
 
 ---
 
@@ -112,8 +115,9 @@ added `description`), so rolling the code back without it is safe.
 2. **Verify on the live server while logged in** (not yet done): raise one invoice and confirm it now
    carries 18% GST split correctly, that accessories/installation appear as lines, and that saving a
    customer works. The deploy only proves the app is healthy, not that each fix behaves on real data.
-3. **Decide PB-021 and PB-024** — both are business calls, not engineering ones.
-4. **Correct PB-025.**
+3. **Check whether any other tenant has pre-2026-10-23 invoices** — those still carry ₹0 GST (see the
+   note under §1). ~~PB-024 / PB-025~~ are closed: dummy data.
+4. **Decide PB-021** — does fixed transport get taxed? A business call, not an engineering one.
 5. **Test suite PB-026 → PB-029**, in that order; PB-026 alone is expected to clear ~212.
 
 ---
