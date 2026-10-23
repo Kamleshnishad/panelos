@@ -22,6 +22,57 @@
         </div>
       </div>
 
+      <template v-if="a">
+        <!-- Business-performance headline tiles (FY) -->
+        <div class="stat-strip">
+          <div v-for="s in statTiles" :key="s.label" class="stat-tile">
+            <div class="stat-val mono">{{ s.value }}</div>
+            <div class="stat-lbl">{{ s.label }}</div>
+            <div class="stat-hint">{{ s.hint }}</div>
+          </div>
+        </div>
+
+        <div class="bi-section">Sales &amp; Revenue</div>
+        <div class="bi-grid">
+          <BiChart class="span-2" title="Revenue vs Collections" subtitle="Last 12 months · invoiced, collected and order bookings"
+                   :labels="monthLabels" :fmt="money" :height="260"
+                   :series="[{ name: 'Invoiced', data: a.trend.invoiced }, { name: 'Collected', data: a.trend.collected }, { name: 'Orders booked', data: a.trend.booked }]" />
+          <BiChart title="Quotations vs Orders" subtitle="Monthly value quoted vs converted" type="bar"
+                   :labels="monthLabels" :fmt="money" :height="260"
+                   :series="[{ name: 'Quoted', data: a.trend.quoted }, { name: 'Booked', data: a.trend.booked }]" />
+          <BiChart title="Top Customers" subtitle="Order value this FY" type="hbar" :fmt="money"
+                   :labels="a.top_customers.map(c => c.name)" :series="[{ name: 'Order value', data: a.top_customers.map(c => c.total) }]" />
+          <BiChart title="Revenue by State" subtitle="Order value this FY" type="donut" :fmt="money"
+                   :labels="a.revenue_by_state.map(r => r.label)" :series="[{ name: 'Order value', data: a.revenue_by_state.map(r => r.value) }]" />
+          <BiChart title="Quotation Outcomes" subtitle="Quotations created this FY, by value" type="donut" :fmt="money"
+                   :labels="a.quotation_outcomes.map(r => r.label)" :series="[{ name: 'Value', data: a.quotation_outcomes.map(r => r.value) }]" />
+        </div>
+
+        <div class="bi-section">Leads &amp; Cash</div>
+        <div class="bi-grid">
+          <BiChart title="Lead Funnel" subtitle="All leads by stage" type="hbar"
+                   :labels="a.lead_funnel.map(r => r.label)" :series="[{ name: 'Leads', data: a.lead_funnel.map(r => r.value) }]" />
+          <BiChart title="Lead Sources" subtitle="Leads vs won this FY" type="bar"
+                   :labels="a.lead_sources.map(r => r.label)"
+                   :series="[{ name: 'Leads', data: a.lead_sources.map(r => r.value) }, { name: 'Won', data: a.lead_sources.map(r => r.won) }]" />
+          <BiChart title="Collections by Method" subtitle="Payments received this FY" type="donut" :fmt="money"
+                   :labels="a.payment_methods.map(r => r.label)" :series="[{ name: 'Collected', data: a.payment_methods.map(r => r.value) }]" />
+          <BiChart title="Receivables Aging" subtitle="Outstanding by days overdue" type="bar" :fmt="money"
+                   :labels="['Current', '1–30', '31–60', '61–90', '90+']"
+                   :series="[{ name: 'Outstanding', data: ['current', '30_days', '60_days', '90_days', 'over_90_days'].map(k => Number(data.receivables?.[k] || 0)) }]" />
+        </div>
+
+        <div class="bi-section">Operations</div>
+        <div class="bi-grid">
+          <BiChart title="Production Output" subtitle="Quantity completed per month" type="bar"
+                   :labels="monthLabels" :series="[{ name: 'Completed qty', data: a.trend.produced }]" />
+          <BiChart title="Batch Status" subtitle="All production batches" type="hbar"
+                   :labels="a.batch_status.map(r => r.label.replace('_', ' '))" :series="[{ name: 'Batches', data: a.batch_status.map(r => r.value) }]" />
+          <BiChart title="Dispatch Status" subtitle="All dispatches" type="donut"
+                   :labels="a.dispatch_status.map(r => r.label.replace('_', ' '))" :series="[{ name: 'Dispatches', data: a.dispatch_status.map(r => r.value) }]" />
+        </div>
+      </template>
+
       <div class="dash-cols">
         <!-- Left column -->
         <div class="dash-col">
@@ -37,25 +88,6 @@
             </div>
           </div>
 
-          <!-- AR aging mini -->
-          <div class="card" v-if="data.receivables">
-            <h3>Receivables Aging</h3>
-            <div class="aging-mini">
-              <div class="age-seg current" :style="segStyle('current')" :title="'Current: ₹' + fmtNum(data.receivables.current)"></div>
-              <div class="age-seg amber"   :style="segStyle('30_days')" :title="'1–30d: ₹' + fmtNum(data.receivables['30_days'])"></div>
-              <div class="age-seg orange"  :style="segStyle('60_days')" :title="'31–60d: ₹' + fmtNum(data.receivables['60_days'])"></div>
-              <div class="age-seg red"     :style="segStyle('90_days')" :title="'61–90d: ₹' + fmtNum(data.receivables['90_days'])"></div>
-              <div class="age-seg darkred" :style="segStyle('over_90_days')" :title="'90+d: ₹' + fmtNum(data.receivables.over_90_days)"></div>
-            </div>
-            <div class="aging-legend">
-              <span><i class="dot current"></i> Current ₹{{ fmtShort(data.receivables.current) }}</span>
-              <span><i class="dot amber"></i> 1–30 ₹{{ fmtShort(data.receivables['30_days']) }}</span>
-              <span><i class="dot orange"></i> 31–60 ₹{{ fmtShort(data.receivables['60_days']) }}</span>
-              <span><i class="dot red"></i> 61–90 ₹{{ fmtShort(data.receivables['90_days']) }}</span>
-              <span><i class="dot darkred"></i> 90+ ₹{{ fmtShort(data.receivables.over_90_days) }}</span>
-            </div>
-            <button class="btn btn-link" @click="$emit('navigate', 'receivables')">View full receivables →</button>
-          </div>
         </div>
 
         <!-- Right column -->
@@ -125,6 +157,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import dashboardService from '../services/dashboardService.js'
+import BiChart from './BiChart.vue'
 
 defineEmits(['navigate'])
 
@@ -171,6 +204,25 @@ const kpiCards = computed(() => {
   ]
 })
 
+const a = computed(() => data.value?.analytics)
+const monthLabels = computed(() => (a.value?.trend.months ?? []).map(m =>
+  new Date(m + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })))
+const money = v => '₹' + fmtShort(v)
+const pctOr = (v, suffix = '%') => v === null || v === undefined ? '—' : v + suffix
+
+const statTiles = computed(() => {
+  const h = a.value?.headline ?? {}
+  return [
+    { label: 'Invoiced (FY)',        value: money(h.invoiced_fy),          hint: 'Billed this financial year' },
+    { label: 'Orders (FY)',          value: h.orders_fy ?? 0,              hint: 'Excluding cancelled' },
+    { label: 'Avg Order Value',      value: money(h.avg_order_value),      hint: 'This financial year' },
+    { label: 'Quote Win Rate',       value: pctOr(h.win_rate_pct),         hint: 'Accepted ÷ decided' },
+    { label: 'Collection Efficiency', value: pctOr(h.collection_eff_pct),  hint: 'Collected ÷ invoiced (FY)' },
+    { label: 'DSO',                  value: pctOr(h.dso_days, ' days'),    hint: 'Days sales outstanding' },
+    { label: 'On-time Delivery',     value: pctOr(h.on_time_pct),          hint: 'Delivered by expected date' },
+  ]
+})
+
 async function load() {
   loading.value = true
   error.value   = null
@@ -184,18 +236,10 @@ async function load() {
   }
 }
 
-function segStyle(key) {
-  const r = data.value?.receivables
-  if (!r || !r.total_ar) return { width: '0%' }
-  const pct = (Number(r[key] || 0) / Number(r.total_ar)) * 100
-  return { width: pct + '%' }
-}
-
 function alertIcon(a) {
   return { low_stock: '⚠', expiring: '⏰', expired: '❌', overdue: '💸', quote_expired: '📅' }[a.type] ?? 'ℹ'
 }
 
-function fmtNum(n)   { return Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }) }
 function fmtShort(n) {
   const v = Number(n || 0)
   if (v >= 10000000) return (v / 10000000).toFixed(2) + ' Cr'
@@ -243,6 +287,17 @@ onMounted(load)
 .kpi-delta.down { color: var(--danger); }
 .kpi-delta.mut  { color: var(--text-3); }
 
+/* BI section */
+.stat-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 13px; margin-bottom: 8px; }
+.stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px 16px; box-shadow: var(--shadow-xs); }
+.stat-val { font-size: 19px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+.stat-lbl { font-size: 12px; color: var(--text-2); font-weight: 600; margin-top: 4px; }
+.stat-hint { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.bi-section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin: 18px 0 10px; }
+.bi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 4px; }
+.bi-grid .span-2 { grid-column: span 2; }
+.bi-grid + .dash-cols, .bi-grid ~ .dash-cols { margin-top: 18px; }
+
 .dash-cols { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; align-items: start; }
 .dash-col { display: flex; flex-direction: column; gap: 16px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 20px 22px; box-shadow: var(--shadow-xs); }
@@ -256,19 +311,6 @@ onMounted(load)
 .alert-row.danger  { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; }
 .alert-row.info    { background: #f0f7ff; border: 1px solid #bbdefb; color: var(--primary); }
 .alert-icon { font-size: 15px; }
-
-/* Aging mini bar */
-.aging-mini { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: #f0f0f0; margin-bottom: 10px; }
-.age-seg { height: 100%; }
-.age-seg.current { background: var(--primary); }
-.age-seg.amber   { background: #f57f17; }
-.age-seg.orange  { background: #e65100; }
-.age-seg.red     { background: #c62828; }
-.age-seg.darkred { background: #b71c1c; }
-.aging-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: #666; margin-bottom: 8px; }
-.aging-legend i.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; }
-.dot.current { background: var(--primary); } .dot.amber { background: #f57f17; } .dot.orange { background: #e65100; }
-.dot.red { background: #c62828; } .dot.darkred { background: #b71c1c; }
 
 /* Pipeline */
 .pipeline { display: flex; align-items: stretch; gap: 4px; overflow-x: auto; }
@@ -303,5 +345,14 @@ onMounted(load)
 @media (max-width: 900px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
   .dash-cols { grid-template-columns: 1fr; }
+}
+@media (max-width: 1280px) {
+  .stat-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .bi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bi-grid { grid-template-columns: 1fr; }
+  .bi-grid .span-2 { grid-column: auto; }
 }
 </style>

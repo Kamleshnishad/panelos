@@ -121,7 +121,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, h } from 'vue'
 import axios from 'axios'
 import authService from '../services/authService.js'
 import dashboardService from '../services/dashboardService.js'
@@ -129,30 +129,35 @@ import companyService from '../services/companyService.js'
 import productionService from '../services/productionService.js'
 import leadService from '../services/leadService.js'
 
-import HomeDashboard      from './HomeDashboard.vue'
-import LeadManager        from './LeadManager.vue'
-import CustomerManager    from './CustomerManager.vue'
-import QuotationManager   from './QuotationManager.vue'
-import BoqManager         from './BoqManager.vue'
-import OrderManager       from './OrderManager.vue'
-import BatchManager       from './BatchManager.vue'
-import ProductionPlanner  from './ProductionPlanner.vue'
-import ProductionRuns     from './ProductionRuns.vue'
-import QcDashboard        from './QcDashboard.vue'
-import StockManager       from './StockManager.vue'
-import ProcurementManager from './ProcurementManager.vue'
-import DispatchManager    from './DispatchManager.vue'
-import InvoiceManager     from './InvoiceManager.vue'
-import AccountsReceivable from './AccountsReceivable.vue'
-import BusinessReports    from './BusinessReports.vue'
-import CompanySettings    from './CompanySettings.vue'
-import NotificationSettings from './NotificationSettings.vue'
-import BillingSettings    from './BillingSettings.vue'
-import DocumentTemplates  from './DocumentTemplates.vue'
-import AuditLog           from './AuditLog.vue'
-import MasterDataManager  from './MasterDataManager.vue'
-import UserManagement     from './UserManagement.vue'
-import SuperAdmin         from './SuperAdmin.vue'
+// Each screen is its own chunk, fetched on first visit (keeps the initial bundle small);
+// a spinner shows if the chunk takes more than 150ms.
+const ScreenLoader = { render: () => h('div', { class: 'screen-loader' }, [h('span', { class: 'screen-spinner' }), 'Loading…']) }
+const lazy = loader => defineAsyncComponent({ loader, loadingComponent: ScreenLoader, delay: 150 })
+
+const HomeDashboard = lazy(() => import('./HomeDashboard.vue'))
+const LeadManager = lazy(() => import('./LeadManager.vue'))
+const CustomerManager = lazy(() => import('./CustomerManager.vue'))
+const QuotationManager = lazy(() => import('./QuotationManager.vue'))
+const BoqManager = lazy(() => import('./BoqManager.vue'))
+const OrderManager = lazy(() => import('./OrderManager.vue'))
+const BatchManager = lazy(() => import('./BatchManager.vue'))
+const ProductionPlanner = lazy(() => import('./ProductionPlanner.vue'))
+const ProductionRuns = lazy(() => import('./ProductionRuns.vue'))
+const QcDashboard = lazy(() => import('./QcDashboard.vue'))
+const StockManager = lazy(() => import('./StockManager.vue'))
+const ProcurementManager = lazy(() => import('./ProcurementManager.vue'))
+const DispatchManager = lazy(() => import('./DispatchManager.vue'))
+const InvoiceManager = lazy(() => import('./InvoiceManager.vue'))
+const AccountsReceivable = lazy(() => import('./AccountsReceivable.vue'))
+const BusinessReports = lazy(() => import('./BusinessReports.vue'))
+const CompanySettings = lazy(() => import('./CompanySettings.vue'))
+const NotificationSettings = lazy(() => import('./NotificationSettings.vue'))
+const BillingSettings = lazy(() => import('./BillingSettings.vue'))
+const DocumentTemplates = lazy(() => import('./DocumentTemplates.vue'))
+const AuditLog = lazy(() => import('./AuditLog.vue'))
+const MasterDataManager = lazy(() => import('./MasterDataManager.vue'))
+const UserManagement = lazy(() => import('./UserManagement.vue'))
+const SuperAdmin = lazy(() => import('./SuperAdmin.vue'))
 
 defineEmits(['logout'])
 
@@ -373,6 +378,9 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.screen-loader { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 80px 0; color: var(--text-3); font-size: 13px; }
+.screen-spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: screen-spin .7s linear infinite; }
+@keyframes screen-spin { to { transform: rotate(360deg); } }
 /* Lock the whole shell to exactly the viewport height so .content scrolls
    internally rather than the entire document. Otherwise the sidebar and
    topbar scroll along with the page content — the classic "sidebar slides

@@ -27,7 +27,128 @@ class DashboardService
             'receivables'    => $this->receivables($companyId),
             'alerts'         => $this->alerts($companyId),
             'recent_activity'=> $this->recentActivity($companyId),
+            'analytics'      => $this->analytics($companyId),
         ]);
+    }
+
+    /**
+     * BI section: 12-month trends plus FY breakdowns by customer, region,
+     * lead source, payment method, and operational status mixes.
+     */
+    private function analytics(int $companyId): array
+    {
+        $from    = now()->startOfMonth()->subMonths(11);
+        $months  = collect(range(0, 11))->map(fn ($i) => $from->copy()->addMonths($i)->format('Y-m'));
+        $fyStart = $this->fyStart();
+
+        $series = function ($q, $dateCol, $valCol) use ($months, $from) {
+            $sums = $this->monthlySum($q, $dateCol, $valCol, $from);
+            return $months->map(fn ($m) => round((float) ($sums[$m] ?? 0), 2))->all();
+        };
+
+        $invoicedQ = Invoice::where('company_id', $companyId)->whereNotIn('status', ['draft', 'cancelled']);
+        $paidQ     = PaymentTransaction::where('company_id', $companyId)->where('payment_method', '!=', 'write_off');
+        // Columns qualified: this query is reused with a customers join below.
+        $ordersQ   = Order::where('orders.company_id', $companyId)->where('orders.status', '!=', 'cancelled');
+
+        $trend = [
+            'months'     => $months->all(),
+            'invoiced'   => $series(clone $invoicedQ, 'invoice_date', 'total_amount'),
+            'collected'  => $series(clone $paidQ, 'transaction_date', 'amount'),
+            'booked'     => $series(clone $ordersQ, 'order_date', 'total_amount'),
+            'quoted'     => $series(Quotation::where('company_id', $companyId), 'created_at', 'total_amount'),
+            'produced'   => $series(ProductionBatch::where('company_id', $companyId)->whereNotNull('completed_at'), 'completed_at', 'completed_quantity'),
+        ];
+
+        $topCustomers = (clone $ordersQ)->where('order_date', '>=', $fyStart)
+            ->selectRaw('customer_id, SUM(total_amount) as total, COUNT(*) as orders')
+            ->groupBy('customer_id')->orderByDesc('total')->limit(8)
+            ->with('customer:id,name')->get()
+            ->map(fn ($r) => ['name' => $r->customer->name ?? '—', 'total' => round((float) $r->total, 2), 'orders' => (int) $r->orders])
+            ->all();
+
+        $byState = (clone $ordersQ)->where('orders.order_date', '>=', $fyStart)
+            ->join('customers', 'customers.id', '=', 'orders.customer_id')
+            ->selectRaw('customers.state as state, SUM(orders.total_amount) as total')
+            ->groupBy('customers.state')->orderByDesc('total')->get()
+            ->map(fn ($r) => ['label' => $r->state ?: 'Unknown', 'value' => round((float) $r->total, 2)]);
+
+        $quoteStatus = Quotation::where('company_id', $companyId)->where('created_at', '>=', $fyStart)
+            ->selectRaw('status, COUNT(*) as n, SUM(total_amount) as total')->groupBy('status')->get()->keyBy('status');
+        $won  = (int) ($quoteStatus['accepted']->n ?? 0);
+        $lost = (int) ($quoteStatus['rejected']->n ?? 0);
+
+        $invoicedFy  = (float) (clone $invoicedQ)->where('invoice_date', '>=', $fyStart)->sum('total_amount');
+        $collectedFy = $this->collectedThisFinancialYear($companyId);
+        $ordersFy    = (clone $ordersQ)->where('order_date', '>=', $fyStart);
+        $orderCount  = (clone $ordersFy)->count();
+        $invoiced90  = (float) (clone $invoicedQ)->where('invoice_date', '>=', now()->subDays(90)->startOfDay())->sum('total_amount');
+
+        $deliveries = Dispatch::where('company_id', $companyId)->where('status', 'delivered')
+            ->whereNotNull('actual_delivery_date')->get(['actual_delivery_date', 'expected_delivery_date']);
+        $onTime = $deliveries->filter(fn ($d) => !$d->expected_delivery_date || $d->actual_delivery_date <= $d->expected_delivery_date)->count();
+
+        return [
+            'trend' => $trend,
+            'headline' => [
+                'invoiced_fy'        => round($invoicedFy, 2),
+                'avg_order_value'    => $orderCount ? round((float) (clone $ordersFy)->sum('total_amount') / $orderCount, 2) : 0,
+                'orders_fy'          => $orderCount,
+                'win_rate_pct'       => ($won + $lost) ? round($won / ($won + $lost) * 100) : null,
+                'collection_eff_pct' => $invoicedFy > 0 ? round($collectedFy / $invoicedFy * 100) : null,
+                // DSO = outstanding ÷ average daily billing over the last 90 days
+                'dso_days'           => $invoiced90 > 0 ? round($this->totalOutstanding($companyId) / ($invoiced90 / 90)) : null,
+                'on_time_pct'        => $deliveries->count() ? round($onTime / $deliveries->count() * 100) : null,
+            ],
+            'top_customers'  => $topCustomers,
+            'revenue_by_state' => $this->foldOther($byState, 6),
+            'quotation_outcomes' => collect(['draft', 'sent', 'accepted', 'rejected'])->map(fn ($s) => [
+                'label' => $s, 'count' => (int) ($quoteStatus[$s]->n ?? 0), 'value' => round((float) ($quoteStatus[$s]->total ?? 0), 2),
+            ])->all(),
+            'lead_funnel' => $this->countBy(\App\Models\Lead::where('company_id', $companyId), 'status', ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost']),
+            'lead_sources' => \App\Models\Lead::where('company_id', $companyId)->where('created_at', '>=', $fyStart)
+                ->selectRaw("source, COUNT(*) as n, SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as won")
+                ->groupBy('source')->orderByDesc('n')->get()
+                ->map(fn ($r) => ['label' => $r->source, 'value' => (int) $r->n, 'won' => (int) $r->won])->all(),
+            'payment_methods' => $this->foldOther(
+                (clone $paidQ)->where('transaction_date', '>=', $fyStart)
+                    ->selectRaw('payment_method, SUM(amount) as total')->groupBy('payment_method')->orderByDesc('total')->get()
+                    ->map(fn ($r) => ['label' => str_replace('_', ' ', $r->payment_method), 'value' => round((float) $r->total, 2)]),
+                4
+            ),
+            'batch_status' => $this->countBy(ProductionBatch::where('company_id', $companyId), 'status', ['draft', 'in_progress', 'completed', 'qc_pending', 'qc_passed', 'qc_failed', 'dispatched']),
+            'dispatch_status' => $this->countBy(Dispatch::where('company_id', $companyId), 'status', ['pending', 'in_transit', 'delivered', 'cancelled']),
+        ];
+    }
+
+    // ponytail: buckets in PHP so it runs on MySQL and the SQLite test DB alike; move to a GROUP BY on a month expression if row counts get large.
+    private function monthlySum($query, string $dateCol, string $valCol, $from): \Illuminate\Support\Collection
+    {
+        return $query->where($dateCol, '>=', $from)->get([$dateCol, $valCol])
+            ->groupBy(fn ($r) => \Carbon\Carbon::parse($r->$dateCol)->format('Y-m'))
+            ->map(fn ($g) => $g->sum($valCol));
+    }
+
+    private function countBy($query, string $col, array $keys): array
+    {
+        $counts = $query->selectRaw("{$col}, COUNT(*) as n")->groupBy($col)->pluck('n', $col);
+        return array_map(fn ($k) => ['label' => $k, 'value' => (int) ($counts[$k] ?? 0)], $keys);
+    }
+
+    /** Keep the top $keep rows and fold the rest into "Other" (charts never get a generated 9th hue). */
+    private function foldOther(\Illuminate\Support\Collection $rows, int $keep): array
+    {
+        $out = $rows->take($keep)->values();
+        if ($rows->count() > $keep) {
+            $out->push(['label' => 'Other', 'value' => round($rows->slice($keep)->sum('value'), 2)]);
+        }
+        return $out->all();
+    }
+
+    private function fyStart(): \Carbon\Carbon
+    {
+        $today = now();
+        return \Carbon\Carbon::create($today->month >= 4 ? $today->year : $today->year - 1, 4, 1)->startOfDay();
     }
 
     private function kpis(int $companyId): array
@@ -240,12 +361,8 @@ class DashboardService
 
     private function collectedThisFinancialYear(int $companyId): float
     {
-        $today  = now();
-        $fyYear = $today->month >= 4 ? $today->year : $today->year - 1;
-        $fyStart = \Carbon\Carbon::create($fyYear, 4, 1)->startOfDay();
-
         return (float) PaymentTransaction::where('company_id', $companyId)
-            ->where('transaction_date', '>=', $fyStart)
+            ->where('transaction_date', '>=', $this->fyStart())
             ->where('payment_method', '!=', 'write_off')
             ->sum('amount');
     }
