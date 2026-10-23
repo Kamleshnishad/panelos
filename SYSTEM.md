@@ -75,6 +75,17 @@ Two global interceptors drive session behaviour:
 * **401** with a token present → clear storage, fire `auth:expired` → drop to login.
 * **402 `SUBSCRIPTION_INACTIVE`** → fire `subscription:inactive` → show `SubscriptionGate`.
 
+**Progress feedback.** Two global pieces, both mounted once in `UiHost.vue` (`TransferProgress.vue`):
+
+* **Top bar** (`services/activity.js`) — appears when any request is still running after 300 ms. Installed
+  on both bare `axios` and the shared `api` instance in `main.js`. Background calls opt out with
+  `{ silent: true }` (notification polling, token refresh).
+* **File cards** (`services/transfers.js`) — every PDF/CSV/XML download shows a card ("Preparing… 40%" →
+  "Downloading 90%" → "Ready"). Before the first byte arrives the % is an *estimate* learned from earlier
+  runs of that file kind; once bytes flow it follows the real download. Use `openPdfFile()` /
+  `downloadFile()` — never `window.open` after an `await`: the new tab is opened immediately (while the click
+  still counts as a gesture, browsers block pop-ups after ~5 s) and navigated when the file is ready.
+
 ---
 
 ## 2. API conventions

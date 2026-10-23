@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { openPdfFile, downloadFile } from './transfers.js'
 
 const BASE = '/api/quotations'
 
@@ -67,38 +68,20 @@ export default {
     return api('post', `${BASE}/${id}/create-order`, opts)
   },
 
-  // PDF — fetched as a blob so the Bearer token is sent (Sanctum ignores ?token=)
-  async openPdf(id) {
-    const res = await axios({ method: 'get', url: `${BASE}/${id}/pdf`, responseType: 'blob', headers: authHeaders() })
-    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    window.open(url, '_blank')
-    setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+  // PDFs — generated on demand (several seconds), so each shows a progress card
+  openPdf(id) {
+    return openPdfFile(`${BASE}/${id}/pdf`, { label: 'Quotation PDF', kind: 'quotation-pdf', filename: `quotation-${id}.pdf` })
   },
-  async downloadPdf(id, quotationNo = 'quotation') {
-    const res = await axios({ method: 'get', url: `${BASE}/${id}/pdf`, responseType: 'blob', headers: authHeaders() })
-    const url  = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `quotation-${quotationNo}.pdf`
-    document.body.appendChild(link); link.click(); link.remove()
-    setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+  downloadPdf(id, quotationNo = 'quotation') {
+    return downloadFile(`${BASE}/${id}/pdf`, `quotation-${quotationNo}.pdf`, { label: `Quotation ${quotationNo}`, kind: 'quotation-pdf' })
   },
 
   // Worker copy — BOQ cutting sheet only (no rates)
-  async openBoqPdf(id) {
-    const res = await axios({ method: 'get', url: `${BASE}/${id}/boq-pdf`, responseType: 'blob', headers: authHeaders() })
-    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    window.open(url, '_blank')
-    setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+  openBoqPdf(id) {
+    return openPdfFile(`${BASE}/${id}/boq-pdf`, { label: 'BOQ cutting sheet', kind: 'boq-pdf', filename: `boq-cutting-sheet-${id}.pdf` })
   },
-  async downloadBoqPdf(id, quotationNo = 'boq') {
-    const res = await axios({ method: 'get', url: `${BASE}/${id}/boq-pdf`, params: { download: 1 }, responseType: 'blob', headers: authHeaders() })
-    const url  = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `boq-cutting-sheet-${quotationNo}.pdf`
-    document.body.appendChild(link); link.click(); link.remove()
-    setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+  downloadBoqPdf(id, quotationNo = 'boq') {
+    return downloadFile(`${BASE}/${id}/boq-pdf`, `boq-cutting-sheet-${quotationNo}.pdf`, { label: `BOQ sheet ${quotationNo}`, kind: 'boq-pdf', params: { download: 1 } })
   },
 
   // Returns { data: { rate } }

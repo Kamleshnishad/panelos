@@ -290,8 +290,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
 import reportService from '../services/reportService.js'
+import { downloadFile } from '../services/transfers.js'
 
 const from = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10))
 const to   = ref(new Date().toISOString().slice(0, 10))
@@ -321,11 +321,6 @@ const exportErr = ref(null)
 // Tally
 const tallyLoading = ref(null)
 const tallyError   = ref(null)
-
-function authHeaders() {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
 
 const maxBar = computed(() => {
   if (!trend.value) return 1
@@ -403,13 +398,10 @@ function flagLabel(f) {
 async function doExport(type) {
   exporting.value = true; exportErr.value = null
   try {
-    const res = await axios.get(`/api/export/${type}`, {
-      params: { from: from.value, to: to.value }, headers: authHeaders(), responseType: 'blob',
+    await downloadFile(`/api/export/${type}`, `${type}_${to.value}.csv`, {
+      label: `Export ${type}`, kind: `export-${type}`, type: 'text/csv', estimateMs: 3000,
+      params: { from: from.value, to: to.value },
     })
-    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = `${type}_${to.value}.csv`; a.click()
-    window.URL.revokeObjectURL(url)
   } catch (e) {
     exportErr.value = e?.response?.data?.message ?? `Failed to export ${type}.`
   } finally { exporting.value = false }
@@ -418,18 +410,12 @@ async function doExport(type) {
 async function downloadTally(type) {
   tallyLoading.value = type; tallyError.value = null
   try {
-    const res = await axios.get(`/api/reports/tally/${type}`, {
+    const ext = type === 'xml' ? 'xml' : 'csv'
+    await downloadFile(`/api/reports/tally/${type}`, `tally_sales_${from.value}_${to.value}.${ext}`, {
+      label: `Tally ${type.toUpperCase()} export`, kind: `tally-${type}`, estimateMs: 3000,
+      type: type === 'xml' ? 'application/xml' : 'text/csv',
       params: { from: from.value, to: to.value },
-      headers: authHeaders(),
-      responseType: 'blob',
     })
-    const ext      = type === 'xml' ? 'xml' : 'csv'
-    const mime     = type === 'xml' ? 'application/xml' : 'text/csv'
-    const filename = `tally_sales_${from.value}_${to.value}.${ext}`
-    const url      = window.URL.createObjectURL(new Blob([res.data], { type: mime }))
-    const a        = document.createElement('a')
-    a.href = url; a.download = filename; a.click()
-    window.URL.revokeObjectURL(url)
   } catch (e) {
     tallyError.value = e?.response?.data?.message ?? `Failed to download ${type.toUpperCase()}.`
   } finally { tallyLoading.value = null }

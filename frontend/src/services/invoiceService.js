@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { openPdfFile, downloadFile } from './transfers.js'
 
 function authHeaders() {
   const token = localStorage.getItem('token')
@@ -25,21 +26,12 @@ export default {
   cancel(id)                    { return api('post', `/api/invoices/${id}/cancel`) },
   duplicate(id)                 { return api('post', `/api/invoices/${id}/duplicate`) },
 
-  // PDF (blob — sends bearer token)
-  async openPdf(id) {
-    const res = await axios({ method: 'get', url: `/api/invoices/${id}/pdf`, responseType: 'blob', headers: authHeaders() })
-    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    window.open(url, '_blank')
-    setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+  // PDF — generated on demand, shown with a progress card
+  openPdf(id) {
+    return openPdfFile(`/api/invoices/${id}/pdf`, { label: 'Invoice PDF', kind: 'invoice-pdf', filename: `invoice-${id}.pdf` })
   },
-  async downloadPdf(id, invoiceNo = 'invoice') {
-    const res = await axios({ method: 'get', url: `/api/invoices/${id}/pdf`, responseType: 'blob', headers: authHeaders() })
-    const url  = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `invoice-${invoiceNo}.pdf`
-    document.body.appendChild(link); link.click(); link.remove()
-    setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+  downloadPdf(id, invoiceNo = 'invoice') {
+    return downloadFile(`/api/invoices/${id}/pdf`, `invoice-${invoiceNo}.pdf`, { label: `Invoice ${invoiceNo}`, kind: 'invoice-pdf' })
   },
 
   // Sources for the create flow

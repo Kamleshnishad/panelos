@@ -1,4 +1,6 @@
 <template>
+  <transfer-progress />
+
   <!-- Toasts -->
   <div class="toast-stack" role="status" aria-live="polite">
     <div v-for="t in toasts" :key="t.id" :class="['toast', `toast--${t.type}`]">
@@ -22,6 +24,7 @@
 
 <script setup>
 import { toasts, dismissToast, confirmState, resolveConfirm } from '../services/ui.js'
+import TransferProgress from './TransferProgress.vue'
 </script>
 
 <style scoped>

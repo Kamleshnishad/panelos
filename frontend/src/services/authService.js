@@ -60,7 +60,7 @@ export default {
   // handled by the 401 interceptor (→ login).
   async refreshToken() {
     try {
-      const res = await axios.post('/api/auth/refresh-token', {}, { headers: authHeaders() })
+      const res = await axios.post('/api/auth/refresh-token', {}, { headers: authHeaders(), silent: true })
       const data = res.data?.data ?? {}
       storeSession(data)
       return data.token ? data : null

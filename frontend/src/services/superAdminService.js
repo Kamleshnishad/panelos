@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { downloadFile } from './transfers.js'
 
 function authHeaders() {
   const token = localStorage.getItem('token')
@@ -30,12 +31,8 @@ export default {
   getSettings()               { return api('get',  '/api/admin/settings') },
   saveSettings(data)          { return api('put',  '/api/admin/settings', data) },
   testRazorpay()              { return api('post', '/api/admin/settings/test-razorpay') },
-  async downloadInvoice(paymentId, invoiceNo) {
-    const res = await axios.get(`/api/admin/payments/${paymentId}/invoice`, { headers: authHeaders(), responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = `${invoiceNo || 'invoice'}.pdf`; a.click()
-    window.URL.revokeObjectURL(url)
+  downloadInvoice(paymentId, invoiceNo) {
+    return downloadFile(`/api/admin/payments/${paymentId}/invoice`, `${invoiceNo || 'invoice'}.pdf`, { label: `Invoice ${invoiceNo || ''}`.trim(), kind: 'sa-invoice-pdf' })
   },
   platformAdmins()            { return api('get',  '/api/admin/platform-admins') },
   createPlatformAdmin(data)   { return api('post', '/api/admin/platform-admins', data) },

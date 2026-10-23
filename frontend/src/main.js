@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import axios from 'axios'
 import App from './App.vue'
+import { api } from './services/api.js'
+import { trackActivity } from './services/activity.js'
 import './styles.css'
 
 // Global auth guard: an expired/invalid Sanctum token must not leave the app
@@ -25,5 +27,9 @@ axios.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+// Top progress bar for anything slow — both the bare axios used by most services and the shared `api` instance.
+trackActivity(axios)
+trackActivity(api)
 
 createApp(App).mount('#app')

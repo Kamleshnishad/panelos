@@ -70,8 +70,7 @@ async function apply(docType, key) {
 async function preview(docType, key) {
   previewing.value = docType + key
   try {
-    const url = await documentTemplateService.preview(docType, key)
-    window.open(url, '_blank')
+    await documentTemplateService.openPreview(docType, key)
   } catch (e) { toastError(e.message || 'Preview not available.') }
   finally { previewing.value = null }
 }

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { openPdfFile, downloadFile } from './transfers.js'
 
 function authHeaders() {
   const token = localStorage.getItem('token')
@@ -26,36 +27,13 @@ export default {
   // Challan
   getChallan(id)              { return api('get',  `/api/dispatches/${id}/challan`) },
 
-  // Challan PDF — fetched as a blob so the bearer token is sent, then opened/downloaded
-  async openChallanPdf(id) {
-    const res = await axios({
-      method: 'get',
-      url: `/api/dispatches/${id}/challan/pdf`,
-      responseType: 'blob',
-      headers: authHeaders(),
-    })
-    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    window.open(url, '_blank')
-    // Revoke after a delay so the new tab can load it
-    setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+  // Challan PDF — generated on demand, shown with a progress card
+  openChallanPdf(id) {
+    return openPdfFile(`/api/dispatches/${id}/challan/pdf`, { label: 'Delivery challan', kind: 'challan-pdf', filename: `challan-${id}.pdf` })
   },
 
-  async downloadChallanPdf(id, dispatchNo = 'challan') {
-    const res = await axios({
-      method: 'get',
-      url: `/api/dispatches/${id}/challan/pdf`,
-      params: { download: 1 },
-      responseType: 'blob',
-      headers: authHeaders(),
-    })
-    const url  = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `challan-${dispatchNo}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+  downloadChallanPdf(id, dispatchNo = 'challan') {
+    return downloadFile(`/api/dispatches/${id}/challan/pdf`, `challan-${dispatchNo}.pdf`, { label: `Challan ${dispatchNo}`, kind: 'challan-pdf', params: { download: 1 } })
   },
 
   // Batches available for dispatch (qc_passed / completed)
