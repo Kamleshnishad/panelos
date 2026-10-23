@@ -54,6 +54,9 @@ trait ApiResponse
                     'count' => count($items),
                     'per_page' => $paginated->perPage(),
                     'current_page' => $paginated->currentPage(),
+                    // Additive: every list screen was deriving this from
+                    // total/per_page by hand.
+                    'last_page' => $paginated->lastPage(),
                 ],
                 'timestamp' => now()->toIso8601String(),
                 'version' => '1.0',

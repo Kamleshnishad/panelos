@@ -9,7 +9,7 @@ function api(method, url, data = null, params = null) {
 }
 
 export default {
-  suppliers()              { return api('get',  '/api/suppliers') },
+  suppliers(params = {})   { return api('get',  '/api/suppliers', null, params) },
   createSupplier(data)     { return api('post', '/api/suppliers', data) },
   updateSupplier(id, data) { return api('put',  `/api/suppliers/${id}`, data) },
   purchasable()            { return api('get',  '/api/procurement/purchasable') },

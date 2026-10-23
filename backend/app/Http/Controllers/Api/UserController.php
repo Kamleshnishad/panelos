@@ -30,13 +30,14 @@ class UserController extends Controller
         if ($deny = $this->authorizeAdmin($request)) return $deny;
 
         try {
-            $users = User::where('company_id', $request->user()->company_id)
+            $paginated = User::where('company_id', $request->user()->company_id)
                 ->with('role')
                 ->orderBy('name')
-                ->get()
-                ->map(fn ($u) => $this->present($u));
+                ->paginate(min((int) $request->query('per_page', 50), 200), ['*'], 'page', (int) $request->query('page', 1));
 
-            return $this->successResponse($users, 'Users retrieved');
+            $users = collect($paginated->items())->map(fn ($u) => $this->present($u))->all();
+
+            return $this->paginatedResponse($users, $paginated, 'Users retrieved');
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], 'Failed to load users', 'USER_LIST_ERROR', 500);
         }

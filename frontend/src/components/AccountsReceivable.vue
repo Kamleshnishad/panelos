@@ -102,6 +102,12 @@
           </tr>
         </tfoot>
       </table>
+
+      <div class="pager" v-if="lastPage > 1">
+        <button class="pg-btn" :disabled="page <= 1" @click="goPage(page - 1)">← Prev</button>
+        <span class="pg-info">Page {{ page }} of {{ lastPage }} · {{ total }} outstanding</span>
+        <button class="pg-btn" :disabled="page >= lastPage" @click="goPage(page + 1)">Next →</button>
+      </div>
     </div>
   </div>
 </template>
@@ -143,14 +149,29 @@ const bucketLabel = computed(() => ({
   current: 'Current (not due)', '30': '1–30 days', '60': '31–60 days', '90': '61–90 days', '90plus': '90+ days',
 }[bucket.value] ?? ''))
 
+const page = ref(1)
+const lastPage = ref(1)
+const total = ref(0)
+
+function goPage(p) {
+  if (p < 1 || p > lastPage.value) return
+  page.value = p
+  load()
+}
+
 async function load() {
   loading.value = true
   error.value   = null
   try {
-    const res = await invoiceService.accountsReceivable({ as_of: asOf.value })
+    const res = await invoiceService.accountsReceivable({
+      as_of: asOf.value, page: page.value, per_page: 50,
+    })
     const data = res?.data ?? {}
     summary.value = data.summary ?? null
     rows.value    = data.details ?? []
+    const pg = data.pagination ?? {}
+    lastPage.value = pg.last_page ?? 1
+    total.value    = pg.total ?? rows.value.length
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Failed to load receivables.'
   } finally {
@@ -259,4 +280,8 @@ td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle
 .btn-remind:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .foot-row td { background: var(--surface-2); border-top: 2px solid var(--primary); padding: 10px 12px; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0; }
+.pg-info { font-size: 13px; color: var(--text-3); }
+.pg-btn { padding: 6px 13px; border: 1px solid var(--border-2); background: var(--surface); border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-2); }
+.pg-btn:disabled { opacity: .4; cursor: not-allowed; }
 </style>

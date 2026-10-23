@@ -9,7 +9,7 @@ function api(method, url, data = null, params = null) {
 }
 
 export default {
-  list()                  { return api('get',  '/api/users') },
+  list(params = {})                  { return api('get',  '/api/users', null, params) },
   roles()                 { return api('get',  '/api/roles') },
   create(data)            { return api('post', '/api/users', data) },
   update(id, data)        { return api('put',  `/api/users/${id}`, data) },

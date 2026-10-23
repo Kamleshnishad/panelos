@@ -95,7 +95,9 @@ class ReportingController extends Controller
 
             $ar = $this->reportingService->getAccountsReceivable(
                 auth()->user()->company_id,
-                $asOf
+                $asOf,
+                (int) $request->query('page', 1),
+                (int) $request->query('per_page', 100),
             );
 
             return response()->json([

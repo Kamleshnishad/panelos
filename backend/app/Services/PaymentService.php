@@ -186,14 +186,44 @@ class PaymentService
 
         $invoices = Invoice::where('company_id', $companyId)
             ->whereNotIn('status', ['draft', 'cancelled', 'paid'])
-            ->with('items', 'taxCalculation', 'dispatch.batch.order.customer')
+            // 'payments' is not optional here: Invoice::$appends exposes
+            // remaining_due, whose accessor sums $this->payments — so every
+            // toArray() lazy-loads payments and costs a query per row unless
+            // the relation is already there.
+            ->with('items', 'taxCalculation', 'payments', 'dispatch.batch.order.customer', 'order.customer')
             ->orderBy('due_date', 'asc')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        return $invoices->map(function ($invoice) {
+        // One grouped query for paid-per-invoice instead of getPaymentStatus()
+        // per row, which re-fetched the invoice and summed its payments every
+        // time. Receivables are exactly what grows when business is good, so
+        // the old shape got slower precisely when it mattered most.
+        $paid = PaymentTransaction::whereIn('invoice_id', collect($invoices->items())->pluck('id'))
+            ->groupBy('invoice_id')
+            ->selectRaw('invoice_id, SUM(amount) as paid')
+            ->pluck('paid', 'invoice_id');
+
+        $now = now();
+        $invoices->getCollection()->transform(function ($invoice) use ($paid, $now) {
+            $total     = round((float) $invoice->total_amount, 2);
+            $paidSoFar = round((float) ($paid[$invoice->id] ?? 0), 2);
+            $remaining = round(max(0, $total - $paidSoFar), 2);
+            $overdue   = $invoice->due_date && $invoice->due_date < $now && $remaining > 0;
+
             return array_merge($invoice->toArray(), [
-                'payment_status' => $this->getPaymentStatus($invoice->id)
+                'payment_status' => [
+                    'invoice_id'         => $invoice->id,
+                    'total_amount'       => $total,
+                    'paid_amount'        => $paidSoFar,
+                    'remaining_due'      => $remaining,
+                    'payment_percentage' => $total > 0 ? round(($paidSoFar / $total) * 100, 2) : 0,
+                    'status'             => $invoice->status,
+                    'is_overdue'         => (bool) $overdue,
+                    'days_overdue'       => $overdue ? (int) floor($invoice->due_date->diffInDays($now)) : 0,
+                ],
             ]);
         });
+
+        return $invoices;
     }
 }

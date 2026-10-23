@@ -148,7 +148,16 @@ class ReportingService
             ->pluck('paid', 'invoice_id');
     }
 
-    public function getAccountsReceivable($companyId = null, $asOf = null)
+    /**
+     * Ageing summary plus the invoice rows behind it.
+     *
+     * The summary has to see every outstanding invoice to be correct, so the
+     * scan stays. What is bounded is `details`: it used to return every row to
+     * the browser, and receivables are exactly what grows when business is good.
+     * Zero rows are dropped from the list (they carry no balance) but still
+     * count towards the summary.
+     */
+    public function getAccountsReceivable($companyId = null, $asOf = null, int $page = 1, int $perPage = 100)
     {
         $companyId = $companyId ?? auth()->user()->company_id;
         $asOf = $asOf ?? now();
@@ -202,9 +211,24 @@ class ReportingService
             $summary[$bucket] += $r;
         }
 
+        // Outstanding first, oldest debt at the top — what a collections person wants.
+        $outstanding = $arData->filter(fn ($r) => $r['remaining_due'] > 0)
+            ->sortByDesc('days_overdue')
+            ->values();
+
+        $perPage = max(1, min($perPage, 500));
+        $page    = max(1, $page);
+        $total   = $outstanding->count();
+
         return [
-            'summary' => $summary,
-            'details' => $arData
+            'summary'    => $summary,
+            'details'    => $outstanding->forPage($page, $perPage)->values(),
+            'pagination' => [
+                'total'        => $total,
+                'per_page'     => $perPage,
+                'current_page' => $page,
+                'last_page'    => (int) max(1, ceil($total / $perPage)),
+            ],
         ];
     }
 

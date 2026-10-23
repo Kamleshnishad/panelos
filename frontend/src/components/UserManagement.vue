@@ -61,6 +61,12 @@
       </tbody>
     </table>
 
+      <div class="pager" v-if="lastPage > 1">
+        <button class="pg-btn" :disabled="page <= 1" @click="goPage(page - 1)">← Prev</button>
+        <span class="pg-info">Page {{ page }} of {{ lastPage }} · {{ total }} users</span>
+        <button class="pg-btn" :disabled="page >= lastPage" @click="goPage(page + 1)">Next →</button>
+      </div>
+
     <!-- Create / Edit modal -->
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
       <div class="modal-box">
@@ -122,6 +128,8 @@ import FormSelect from './Form/FormSelect.vue'
 import userService from '../services/userService.js'
 
 const users = ref([])
+const page = ref(1), lastPage = ref(1), total = ref(0)
+function goPage(n) { if (n < 1 || n > lastPage.value) return; page.value = n; load() }
 const roles = ref([])
 const loading = ref(false)
 const error = ref(null)
@@ -172,8 +180,13 @@ const roleOptions = computed(() => roles.value.map(r => ({ value: r.id, label: r
 async function load() {
   loading.value = true; error.value = null; forbidden.value = false
   try {
-    const [uRes, rRes] = await Promise.all([userService.list(), userService.roles()])
+    const [uRes, rRes] = await Promise.all([
+      userService.list({ page: page.value, per_page: 50 }),
+      userService.roles(),
+    ])
     users.value = uRes?.data ?? []
+    lastPage.value = uRes?.meta?.pagination?.last_page ?? 1
+    total.value = uRes?.meta?.pagination?.total ?? users.value.length
     roles.value = rRes?.data ?? []
     // best-effort current user id from /auth/me cache if present (optional)
     currentUserId.value = Number(localStorage.getItem('user_id')) || null
@@ -296,4 +309,8 @@ onMounted(load)
 .toggle { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #444; cursor: pointer; text-transform: none; font-weight: 500; }
 .toggle input { width: 15px; height: 15px; }
 .error-msg { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0; }
+.pg-info { font-size: 13px; color: var(--text-3); }
+.pg-btn { padding: 6px 13px; border: 1px solid var(--border-2); background: var(--surface); border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-2); }
+.pg-btn:disabled { opacity: .4; cursor: not-allowed; }
 </style>

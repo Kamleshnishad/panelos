@@ -42,6 +42,12 @@
           </tr>
         </tbody>
       </table>
+
+      <div class="pager" v-if="poLastPage > 1">
+        <button class="pg-btn" :disabled="poPage <= 1" @click="goPoPage(poPage - 1)">← Prev</button>
+        <span class="pg-info">Page {{ poPage }} of {{ poLastPage }} · {{ poTotal }} purchase orders</span>
+        <button class="pg-btn" :disabled="poPage >= poLastPage" @click="goPoPage(poPage + 1)">Next →</button>
+      </div>
     </template>
 
     <!-- Suppliers tab -->
@@ -66,6 +72,12 @@
           </tr>
         </tbody>
       </table>
+
+      <div class="pager" v-if="supLastPage > 1">
+        <button class="pg-btn" :disabled="supPage <= 1" @click="goSupPage(supPage - 1)">← Prev</button>
+        <span class="pg-info">Page {{ supPage }} of {{ supLastPage }}</span>
+        <button class="pg-btn" :disabled="supPage >= supLastPage" @click="goSupPage(supPage + 1)">Next →</button>
+      </div>
     </template>
 
     <!-- Create PO modal -->
@@ -111,6 +123,7 @@
             <tr v-if="!form.items.length"><td colspan="5" class="empty-sm">Add at least one item</td></tr>
           </tbody>
         </table>
+
 
         <div class="po-totals">
           <span>Subtotal: <b>₹ {{ fmt(subtotal) }}</b></span>
@@ -168,6 +181,7 @@
             </tr>
           </tbody>
         </table>
+
         <div v-if="recvError" class="error-msg">{{ recvError }}</div>
         <div class="modal-actions">
           <button class="btn btn-ghost" @click="receivePO = null">Cancel</button>
@@ -189,6 +203,11 @@ const loading = ref(false)
 const valuation = ref(null)
 const purchasable = ref([])
 const suppliers = ref([])
+const poPage = ref(1), poLastPage = ref(1), poTotal = ref(0)
+const supPage = ref(1), supLastPage = ref(1)
+
+function goPoPage(n) { if (n < 1 || n > poLastPage.value) return; poPage.value = n; loadPOs() }
+function goSupPage(n) { if (n < 1 || n > supLastPage.value) return; supPage.value = n; loadSuppliers() }
 
 const showCreate = ref(false)
 const saving = ref(false)
@@ -218,8 +237,10 @@ function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '—'
 async function load() {
   loading.value = true
   try {
-    const [poRes, valRes] = await Promise.all([procurementService.listPOs(), procurementService.valuation()])
+    const [poRes, valRes] = await Promise.all([procurementService.listPOs({ page: poPage.value, per_page: 20 }), procurementService.valuation()])
     pos.value = poRes?.data ?? poRes ?? []
+    poLastPage.value = poRes?.meta?.pagination?.last_page ?? 1
+    poTotal.value = poRes?.meta?.pagination?.total ?? pos.value.length
     valuation.value = valRes?.data ?? valRes
   } catch (e) { toastError(e?.response?.data?.message ?? 'Could not load procurement.') }
   finally { loading.value = false }
@@ -227,7 +248,7 @@ async function load() {
 
 async function loadRefs() {
   try {
-    const [p, s] = await Promise.all([procurementService.purchasable(), procurementService.suppliers()])
+    const [p, s] = await Promise.all([procurementService.purchasable(), procurementService.suppliers({ per_page: 500 })])
     purchasable.value = p?.data ?? p ?? []
     suppliers.value = s?.data ?? s ?? []
   } catch { /* ignore */ }
@@ -301,8 +322,9 @@ async function savePO() {
 
 async function loadSuppliers() {
   try {
-    const res = await procurementService.suppliers()
+    const res = await procurementService.suppliers({ page: supPage.value, per_page: 50 })
     suppliers.value = res?.data ?? res ?? []
+    supLastPage.value = res?.meta?.pagination?.last_page ?? 1
   } catch { /* ignore */ }
 }
 
@@ -446,4 +468,8 @@ onMounted(load)
 .error-msg { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
 
 @media (max-width: 900px) { .pm-wrap { padding: 16px 16px 40px; } }
+.pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0; }
+.pg-info { font-size: 13px; color: var(--text-3); }
+.pg-btn { padding: 6px 13px; border: 1px solid var(--border-2); background: var(--surface); border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-2); }
+.pg-btn:disabled { opacity: .4; cursor: not-allowed; }
 </style>

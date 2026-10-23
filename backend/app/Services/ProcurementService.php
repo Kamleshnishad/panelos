@@ -15,9 +15,19 @@ class ProcurementService
     public function __construct(private StockService $stock) {}
 
     // ── Suppliers ────────────────────────────────────────────────────────
-    public function listSuppliers(int $companyId)
+    /** Query, not results — the caller decides how many it wants. */
+    public function listSuppliers(int $companyId, array $filters = [])
     {
-        return Supplier::where('company_id', $companyId)->orderBy('name')->get();
+        $q = Supplier::where('company_id', $companyId);
+
+        if (!empty($filters['search'])) {
+            $term = $filters['search'];
+            $q->where(fn ($w) => $w->where('name', 'like', "%{$term}%")
+                ->orWhere('phone', 'like', "%{$term}%")
+                ->orWhere('gstin', 'like', "%{$term}%"));
+        }
+
+        return $q->orderBy('name');
     }
 
     public function createSupplier(int $companyId, array $data): Supplier
@@ -108,11 +118,22 @@ class ProcurementService
     }
 
     // ── Purchase Orders ──────────────────────────────────────────────────
+    /**
+     * Query, not results. This used to ->get() every PO a company had ever
+     * raised — one a day is 250 a year, all loaded and rendered at once.
+     */
     public function listPurchaseOrders(int $companyId, array $filters = [])
     {
         $q = PurchaseOrder::where('company_id', $companyId)->with('supplier', 'items');
+
         if (!empty($filters['status'])) $q->where('status', $filters['status']);
-        return $q->orderByDesc('created_at')->get();
+        if (!empty($filters['search'])) {
+            $term = $filters['search'];
+            $q->where(fn ($w) => $w->where('po_no', 'like', "%{$term}%")
+                ->orWhereHas('supplier', fn ($sup) => $sup->where('name', 'like', "%{$term}%")));
+        }
+
+        return $q->orderByDesc('created_at');
     }
 
     public function getPurchaseOrder(PurchaseOrder $po): PurchaseOrder

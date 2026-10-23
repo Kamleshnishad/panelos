@@ -26,7 +26,13 @@ class ProcurementController extends Controller
     // Suppliers
     public function suppliers(Request $r)
     {
-        return $this->successResponse($this->proc->listSuppliers($this->cid($r)), 'Suppliers retrieved');
+        // Default 50 for the table. The PO form asks for a big page so its
+        // dropdown stays complete; beyond a few hundred vendors that dropdown
+        // needs a search box rather than a bigger number.
+        $paginated = $this->proc->listSuppliers($this->cid($r), $r->only('search'))
+            ->paginate(min((int) $r->query('per_page', 50), 500), ['*'], 'page', (int) $r->query('page', 1));
+
+        return $this->paginatedResponse($paginated->items(), $paginated, 'Suppliers retrieved');
     }
 
     public function storeSupplier(Request $r)
@@ -78,7 +84,10 @@ class ProcurementController extends Controller
     // Purchase Orders
     public function index(Request $r)
     {
-        return $this->successResponse($this->proc->listPurchaseOrders($this->cid($r), $r->only('status')), 'POs retrieved');
+        $paginated = $this->proc->listPurchaseOrders($this->cid($r), $r->only('status', 'search'))
+            ->paginate(min((int) $r->query('per_page', 20), 200), ['*'], 'page', (int) $r->query('page', 1));
+
+        return $this->paginatedResponse($paginated->items(), $paginated, 'POs retrieved');
     }
 
     public function show(Request $r, int $id)

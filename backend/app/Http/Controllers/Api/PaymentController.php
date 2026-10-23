@@ -169,7 +169,14 @@ class PaymentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $invoices
+                'data' => $invoices->items(),
+                'meta'  => ['pagination' => [
+                    'total'        => $invoices->total(),
+                    'count'        => count($invoices->items()),
+                    'per_page'     => $invoices->perPage(),
+                    'current_page' => $invoices->currentPage(),
+                    'last_page'    => $invoices->lastPage(),
+                ]],
             ]);
         } catch (\Exception $e) {
             return response()->json([
