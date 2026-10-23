@@ -186,6 +186,12 @@ class QuotationService
         if (!in_array($original->status, ['draft', 'sent', 'accepted'], true)) {
             throw new \Exception("Cannot revise a quotation in '{$original->status}' status.");
         }
+        // An accepted quotation that has already produced an order is locked:
+        // revising it leaves an open v2 draft that can be accepted and ordered
+        // again, giving two live orders for one job.
+        if ($original->orders()->exists()) {
+            throw new \Exception('This quotation already has an order and can no longer be revised.');
+        }
 
         return DB::transaction(function () use ($original) {
             // Lock the original
@@ -357,7 +363,9 @@ class QuotationService
 
     public function calculateRate(PanelType $panelType, array $rowData, string $qualityGrade, Customer $customer): float
     {
-        $baseRate = $panelType->base_price ?? 850;
+        // `?? 850` only caught NULL, so a panel type left at the 0.00 column
+        // default produced a suggestion built from premiums alone (e.g. ₹160).
+        $baseRate = (float) ($panelType->base_price ?: 0) > 0 ? (float) $panelType->base_price : 850;
 
         // Thickness premium
         $thickness = (int) ($rowData['thickness'] ?? 50);
@@ -511,9 +519,10 @@ class QuotationService
             }
         }
 
-        if ($installationTotal > 0) {
-            $quotation->update(['installation_amount' => $installationTotal]);
-        }
+        // Written unconditionally: the old `if ($installationTotal > 0)` meant
+        // removing every installation row on an edit left the previous amount
+        // sitting in the total forever — and it now flows through to the invoice.
+        $quotation->update(['installation_amount' => $installationTotal]);
     }
 
     /** Public entry point to recompute a quotation's totals (used after accessory changes). */
@@ -570,28 +579,9 @@ class QuotationService
 
     private function detectInterState(Company $company, Customer $customer): bool
     {
-        // Use GSTIN first 2 digits as state code
-        $companyState  = $this->stateFromGstin($company->gstin ?? '');
-        $customerState = $customer->state_code ?? '';
-
-        if (!$companyState || !$customerState) return false;
-        return strtoupper($companyState) !== strtoupper($customerState);
-    }
-
-    private function stateFromGstin(string $gstin): string
-    {
-        // GSTIN format: 27XXXXX → first 2 digits = state code number
-        // Map numeric to alpha
-        $map = [
-            '01'=>'JK','02'=>'HP','03'=>'PB','04'=>'CH','05'=>'UT','06'=>'HR','07'=>'DL',
-            '08'=>'RJ','09'=>'UP','10'=>'BR','11'=>'SK','12'=>'AR','13'=>'NL','14'=>'MN',
-            '15'=>'MZ','16'=>'TR','17'=>'ML','18'=>'AS','19'=>'WB','20'=>'JH','21'=>'OD',
-            '22'=>'CG','23'=>'MP','24'=>'GJ','25'=>'DD','26'=>'DN','27'=>'MH','28'=>'AP',
-            '29'=>'KA','30'=>'GA','31'=>'LD','32'=>'KL','33'=>'TN','34'=>'PY','35'=>'AN',
-            '36'=>'TG','37'=>'AP','38'=>'LA',
-        ];
-        $num = substr($gstin, 0, 2);
-        return $map[$num] ?? '';
+        // Shared with TaxService so a quotation and its invoice can never
+        // disagree about CGST+SGST vs IGST for the same supply.
+        return \App\Support\GstState::isInterState($company, $customer);
     }
 
     private function generateQuotationNumber(int $companyId, string $prefix): string
@@ -602,20 +592,22 @@ class QuotationService
         $fyStart = \Carbon\Carbon::create($fyYear, 4, 1);
         $fyEnd   = \Carbon\Carbon::create($fyYear + 1, 3, 31, 23, 59, 59);
 
-        // Only look at root quotations (not revision suffixes like SCP-2026-001-v2)
-        // Pattern: PREFIX-YYYY-NNN (exactly 3 parts when split on '-')
-        $all = Quotation::where('company_id', $companyId)
+        // Only root quotations count, not revision suffixes like SCP-2026-001-v2.
+        // The shape is checked in PHP rather than with REGEXP, which only MySQL
+        // has — it made this whole code path unrunnable on any other driver.
+        $candidates = Quotation::where('company_id', $companyId)
             ->whereBetween('created_at', [$fyStart, $fyEnd])
-            ->whereRaw("quotation_no REGEXP ?", ['^' . preg_quote($prefix, '/') . '-[0-9]{4}-[0-9]+$'])
+            ->where('quotation_no', 'like', $prefix . '-%')
             ->orderByDesc('id')
-            ->value('quotation_no');
+            ->pluck('quotation_no');
 
         $seq = 1;
-        if ($all) {
-            // Format is PREFIX-YYYY-NNN — last segment is always the sequence
-            $parts   = explode('-', $all);
-            $lastNum = (int) end($parts);
-            if ($lastNum > 0) $seq = $lastNum + 1;
+        $pattern = '/^' . preg_quote($prefix, '/') . '-[0-9]{4}-([0-9]+)$/';
+        foreach ($candidates as $no) {
+            if (preg_match($pattern, $no, $m)) {
+                $seq = ((int) $m[1]) + 1;
+                break;   // ordered by id desc, so the first match is the latest
+            }
         }
 
         return sprintf('%s-%d-%03d', $prefix, $fyYear + 1, $seq); // e.g. SCP-2026-001

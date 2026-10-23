@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\DB;
 
 class TaxService
 {
+    /** Standard Indian GST rate for sandwich panels — used when a tenant has never configured tax. */
+    public const DEFAULT_GST_RATE = 18.0;
+
     public function applyTaxToInvoice($invoiceId, $companyId = null)
     {
         $companyId = $companyId ?? auth()->user()->company_id;
@@ -64,12 +67,12 @@ class TaxService
         // taxed as inter-state (IGST only). This is the canonical India-GST rule.
         $isIntraState = false;
         if ($invoice) {
-            $supplierState = $invoice->company?->state_code;
-            $customer      = $invoice->order?->customer ?? $invoice->dispatch?->batch?->order?->customer;
-            $customerState = $customer?->state_code;
-            if ($supplierState && $customerState) {
-                $isIntraState = ((string) $supplierState === (string) $customerState);
-            }
+            $customer = $invoice->order?->customer ?? $invoice->dispatch?->batch?->order?->customer;
+            // Compared raw state_code strings, so "24" vs "GJ" (the same state,
+            // two formats the app both accepts) read as inter-state and charged
+            // IGST where the quotation had charged CGST+SGST. GstState normalises
+            // both sides to the 2-digit GST code and is shared with QuotationService.
+            $isIntraState = !\App\Support\GstState::isInterState($invoice->company, $customer);
         }
 
         if ($isIntraState) {
@@ -112,11 +115,33 @@ class TaxService
         }
     }
 
+    /**
+     * The tenant's tax configuration, auto-provisioning a standard 18% exclusive
+     * GST setup the first time one is needed.
+     *
+     * Nothing in the app ever created a TaxConfiguration (/gst/register writes a
+     * GstConfiguration, a different model), so this returned null for every
+     * tenant and applyTaxToInvoice() bailed out early — every invoice ever
+     * issued carried ₹0 GST, silently, with no warning anywhere. Falling back to
+     * the same 18% the quotation engine uses makes the two agree by default.
+     *
+     * An existing row that the tenant deactivated is returned as-is: switching
+     * tax off is a deliberate choice and must stay honoured.
+     */
     public function getTaxConfiguration($companyId)
     {
-        return TaxConfiguration::where('company_id', $companyId)
-            ->where('is_active', true)
-            ->first();
+        $config = TaxConfiguration::where('company_id', $companyId)->first();
+        if ($config) {
+            return $config;
+        }
+
+        return TaxConfiguration::create([
+            'company_id'       => $companyId,
+            'gst_number'       => \App\Models\Company::find($companyId)?->gstin,
+            'tax_type'         => 'exclusive',
+            'default_tax_rate' => self::DEFAULT_GST_RATE,
+            'is_active'        => true,
+        ]);
     }
 
     public function updateTaxConfiguration($companyId, $data)

@@ -13,6 +13,7 @@ class InvoiceItem extends Model
     protected $fillable = [
         'invoice_id',
         'panel_type_id',
+        'description',
         'quantity',
         'unit_price',
         'amount',
@@ -35,7 +36,7 @@ class InvoiceItem extends Model
     }
 
     protected $casts = [
-        'quantity' => 'decimal:2',
+        'quantity' => 'decimal:4',
         'unit_price' => 'decimal:2',
         'amount' => 'decimal:2',
         'tax_rate' => 'decimal:2',

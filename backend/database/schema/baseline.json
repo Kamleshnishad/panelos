@@ -6,14 +6,14 @@
         "code": "varchar(50)",
         "description": "text",
         "image": "varchar(255)",
-        "unit": "varchar(20)",
-        "hsn_code": "varchar(20)",
-        "rate": "decimal(12,2)",
         "unit_price": "decimal(12,2)",
         "is_active": "tinyint",
         "created_at": "timestamp",
         "updated_at": "timestamp",
-        "deleted_at": "timestamp"
+        "deleted_at": "timestamp",
+        "unit": "varchar(20)",
+        "hsn_code": "varchar(20)",
+        "rate": "decimal(12,2)"
     },
     "analytics_snapshots": {
         "id": "bigint unsigned",
@@ -33,6 +33,18 @@
         "performance_status": "varchar(255)",
         "created_at": "timestamp",
         "updated_at": "timestamp"
+    },
+    "attachments": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "attachable_type": "varchar(255)",
+        "attachable_id": "bigint unsigned",
+        "type": "enum('qc_photo','stage_photo','delivery_proof','signature')",
+        "file_path": "varchar(255)",
+        "uploaded_by": "bigint unsigned",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
     },
     "audit_logs": {
         "id": "bigint unsigned",
@@ -246,7 +258,7 @@
         "id": "bigint unsigned",
         "dispatch_id": "bigint unsigned",
         "panel_type_id": "bigint unsigned",
-        "quantity": "int",
+        "quantity": "decimal(12,4)",
         "unit_price": "decimal(12,2)",
         "amount": "decimal(12,2)",
         "created_at": "timestamp"
@@ -366,7 +378,8 @@
         "id": "bigint unsigned",
         "invoice_id": "bigint unsigned",
         "panel_type_id": "bigint unsigned",
-        "quantity": "int",
+        "description": "varchar(255)",
+        "quantity": "decimal(12,4)",
         "unit_price": "decimal(12,2)",
         "amount": "decimal(12,2)",
         "tax_rate": "decimal(5,2)",
@@ -577,9 +590,6 @@
         "company_id": "bigint unsigned",
         "name": "varchar(255)",
         "code": "varchar(50)",
-        "category": "enum('roof','wall','ceiling','cold_room')",
-        "hsn_code": "varchar(20)",
-        "available_thicknesses": "json/longtext",
         "description": "text",
         "image": "varchar(255)",
         "thickness": "decimal(8,2)",
@@ -590,7 +600,10 @@
         "is_active": "tinyint",
         "created_at": "timestamp",
         "updated_at": "timestamp",
-        "deleted_at": "timestamp"
+        "deleted_at": "timestamp",
+        "category": "enum('roof','wall','ceiling','cold_room')",
+        "hsn_code": "varchar(20)",
+        "available_thicknesses": "json/longtext"
     },
     "payment_reminders": {
         "id": "bigint unsigned",
@@ -761,6 +774,7 @@
         "approved_by_user_id": "bigint unsigned",
         "approved_at": "timestamp",
         "notes": "text",
+        "checklist": "json/longtext",
         "created_at": "timestamp",
         "updated_at": "timestamp"
     },

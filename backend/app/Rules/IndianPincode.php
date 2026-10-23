@@ -2,20 +2,20 @@
 
 namespace App\Rules;
 
-use Illuminate\Contracts\Validation\Rule;
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
 
-class IndianPincode implements Rule
+class IndianPincode implements ValidationRule
 {
-    public function validate($attribute, $value, $parameters): bool
+    public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (empty($value)) return true;
-        $digits = preg_replace('/\D/', '', (string) $value);
-        if (strlen($digits) < 6) return true;
-        return (bool) preg_match('/^\d{6}$/', $digits);
-    }
+        if (empty($value)) return;
 
-    public function message(): string
-    {
-        return 'The :attribute must be a valid 6-digit pincode.';
+        $digits = preg_replace('/\D/', '', (string) $value);
+        if (strlen($digits) < 6) return; // allow partial input
+
+        if (!preg_match('/^\d{6}$/', $digits)) {
+            $fail('The :attribute must be a valid 6-digit pincode.');
+        }
     }
 }

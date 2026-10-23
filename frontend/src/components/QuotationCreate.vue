@@ -701,6 +701,7 @@ async function fetchSuggestedRate(row) {
       thickness: row.thickness,
       density_type: row.density_type,
       top_skin_thickness: row.top_skin_thickness,
+      bottom_skin_thickness: row.same_skin ? row.top_skin_thickness : row.bottom_skin_thickness,
       top_surface: row.top_surface,
     })
     // BOQ-first: surface the suggestion as a clickable chip but DO NOT auto-fill.

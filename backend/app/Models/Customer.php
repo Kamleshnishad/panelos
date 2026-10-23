@@ -42,6 +42,17 @@ class Customer extends BaseModel
         'is_active'           => 'boolean',
     ];
 
+    /**
+     * Store state_code in one canonical format: the 2-digit GST code.
+     * The form offers "GJ" while GSTIN-derived data is "24"; keeping both in the
+     * column made intra/inter-state GST a coin flip. Unrecognised values are
+     * stored as given rather than discarded.
+     */
+    public function setStateCodeAttribute($value): void
+    {
+        $this->attributes['state_code'] = \App\Support\GstState::normalize($value) ?? $value;
+    }
+
     // Returns the best available 2-char alpha state code for inter-state detection.
     // Priority: explicit state_code column → GSTIN first 2 digits → first 2 chars of state field.
     public function getDerivedStateCodeAttribute(): string

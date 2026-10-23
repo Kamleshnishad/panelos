@@ -185,17 +185,20 @@ class OrderService
         $fyStart = \Carbon\Carbon::create($fyYear, 4, 1);
         $fyEnd   = \Carbon\Carbon::create($fyYear + 1, 3, 31, 23, 59, 59);
 
-        $last = Order::where('company_id', $companyId)
+        // Shape checked in PHP — REGEXP is MySQL-only (see QuotationService).
+        $candidates = Order::where('company_id', $companyId)
             ->whereBetween('created_at', [$fyStart, $fyEnd])
-            ->whereRaw("order_no REGEXP ?", ['^' . preg_quote($prefix, '/') . '-[0-9]{4}-[0-9]+$'])
+            ->where('order_no', 'like', $prefix . '-%')
             ->orderByDesc('id')
-            ->value('order_no');
+            ->pluck('order_no');
 
         $seq = 1;
-        if ($last) {
-            $parts = explode('-', $last);
-            $lastNum = (int) end($parts);
-            if ($lastNum > 0) $seq = $lastNum + 1;
+        $pattern = '/^' . preg_quote($prefix, '/') . '-[0-9]{4}-([0-9]+)$/';
+        foreach ($candidates as $no) {
+            if (preg_match($pattern, $no, $m)) {
+                $seq = ((int) $m[1]) + 1;
+                break;
+            }
         }
 
         return sprintf('%s-%d-%03d', $prefix, $fyYear + 1, $seq);

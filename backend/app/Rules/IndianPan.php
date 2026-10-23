@@ -2,20 +2,20 @@
 
 namespace App\Rules;
 
-use Illuminate\Contracts\Validation\Rule;
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
 
-class IndianPan implements Rule
+class IndianPan implements ValidationRule
 {
-    public function validate($attribute, $value, $parameters): bool
+    public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (empty($value)) return true;
-        $clean = strtoupper(preg_replace('/\s/', '', (string) $value));
-        if (strlen($clean) < 10) return true; // allow partial input
-        return (bool) preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/', $clean);
-    }
+        if (empty($value)) return;
 
-    public function message(): string
-    {
-        return 'The :attribute must be a valid 10-character PAN (e.g. ABCDE1234F).';
+        $clean = strtoupper(preg_replace('/\s/', '', (string) $value));
+        if (strlen($clean) < 10) return; // allow partial input
+
+        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/', $clean)) {
+            $fail('The :attribute must be a valid 10-character PAN (e.g. ABCDE1234F).');
+        }
     }
 }

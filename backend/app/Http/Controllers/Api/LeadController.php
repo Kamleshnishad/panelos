@@ -65,10 +65,11 @@ class LeadController extends Controller
     public function store(Request $r)
     {
         try {
+            $this->normaliseSource($r);
             $data = $r->validate($this->rules(false, $this->cid($r)));
             return $this->createdResponse($this->leads->create($this->cid($r), $data), 'Lead created', 201);
         } catch (ValidationException $e) {
-            return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
+            return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
         }
     }
 
@@ -76,10 +77,11 @@ class LeadController extends Controller
     {
         try {
             $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $this->normaliseSource($r);
             $data = $r->validate($this->rules(true, $this->cid($r)));
             return $this->successResponse($this->leads->update($lead, $data), 'Lead updated');
         } catch (ValidationException $e) {
-            return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
+            return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'UPDATE_ERROR', 400);
         }
@@ -95,7 +97,7 @@ class LeadController extends Controller
             ]);
             return $this->successResponse($this->leads->changeStatus($lead, $data['status'], $data['lost_reason'] ?? null, $r->user()->id), 'Status updated');
         } catch (ValidationException $e) {
-            return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
+            return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'STATUS_ERROR', 400);
         }
@@ -113,7 +115,7 @@ class LeadController extends Controller
             $this->leads->addActivity($lead, $data, $r->user()->id);
             return $this->successResponse($this->leads->getDetails($lead), 'Activity added');
         } catch (ValidationException $e) {
-            return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
+            return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'ACTIVITY_ERROR', 400);
         }
@@ -139,6 +141,21 @@ class LeadController extends Controller
             return $this->noContentResponse('Lead deleted');
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'DELETE_ERROR', 400);
+        }
+    }
+
+    /** Source is a fixed list with mixed casing ("Website", "IndiaMART", "Walk-in") — match it case-insensitively. */
+    private function normaliseSource(Request $r): void
+    {
+        $source = $r->input('source');
+        if (!is_string($source) || $source === '') return;
+
+        $allowed = ['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other'];
+        foreach ($allowed as $option) {
+            if (strcasecmp($source, $option) === 0) {
+                $r->merge(['source' => $option]);
+                return;
+            }
         }
     }
 

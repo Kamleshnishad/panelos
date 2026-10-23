@@ -195,7 +195,10 @@ class QuotationController extends Controller
             // Lost the credit race inside the transaction.
             return $this->errorResponse($e->credit, $this->creditMsg($e->credit, $e->customerName), 'CREDIT_LIMIT_EXCEEDED', 422);
         } catch (\Exception $e) {
-            return $this->errorResponse(['error' => $e->getMessage()], 'Failed to create order', 'ORDER_ERROR', 500);
+            // Domain guards (e.g. "An order already exists for this quotation.")
+            // are ordinary rejections, not server faults — surface the real
+            // message with a 400 instead of swallowing it behind a generic 500.
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'ORDER_ERROR', 400);
         }
     }
 
@@ -231,14 +234,23 @@ class QuotationController extends Controller
     public function getSuggestedRate(Request $request)
     {
         try {
+            // Spec fields may arrive flat (what the quotation form sends) or
+            // nested under row_data. Merging first means a nested payload is no
+            // longer silently stripped by validate(), which left the engine
+            // pricing an all-defaults row.
+            if (is_array($request->input('row_data'))) {
+                $request->merge($request->input('row_data'));
+            }
+
             $validated = $request->validate([
-                'panel_type_id'      => 'required|exists:panel_types,id',
-                'customer_id'        => 'required|exists:customers,id',
-                'quality_grade'      => 'nullable|in:High,Medium,Standard',
-                'thickness'          => 'nullable|integer',
-                'density_type'       => 'nullable|in:PUF,PIR,Rockwool,EPS,Glasswool',
-                'top_skin_thickness' => 'nullable|numeric',
-                'top_surface'        => 'nullable|in:RIBBED,PLAIN',
+                'panel_type_id'         => 'required|exists:panel_types,id',
+                'customer_id'           => 'required|exists:customers,id',
+                'quality_grade'         => 'nullable|in:High,Medium,Standard',
+                'thickness'             => 'nullable|integer',
+                'density_type'          => 'nullable|in:PUF,PIR,Rockwool,EPS,Glasswool',
+                'top_skin_thickness'    => 'nullable|numeric',
+                'bottom_skin_thickness' => 'nullable|numeric',
+                'top_surface'           => 'nullable|in:RIBBED,PLAIN',
             ]);
 
             $rate = $this->quotationService->getSuggestedRate(

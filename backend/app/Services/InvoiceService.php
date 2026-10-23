@@ -61,10 +61,13 @@ class InvoiceService
                 'terms' => $data['terms'] ?? null
             ]);
 
-            // Copy items from dispatch
+            // Copy items from dispatch. The stored `amount` is authoritative —
+            // recomputing quantity × unit_price re-introduces the rounding the
+            // weighted-average rate already lost (78 m² at an averaged
+            // ₹1461.54 bills ₹114,000.12 instead of ₹114,000.00).
             $subtotal = 0;
             foreach ($dispatch->items as $item) {
-                $amount = $item->quantity * $item->unit_price;
+                $amount = (float) ($item->amount ?: $item->quantity * $item->unit_price);
                 $subtotal += $amount;
 
                 InvoiceItem::create([
@@ -78,6 +81,8 @@ class InvoiceService
                     'total_with_tax' => $amount
                 ]);
             }
+
+            $subtotal += $this->addNonPanelLines($invoice, $dispatch->batch?->order);
 
             $invoice->update(['subtotal' => $subtotal]);
 
@@ -131,12 +136,102 @@ class InvoiceService
                 ]);
             }
 
+            $subtotal += $this->addNonPanelLines($invoice, $order);
+
             $invoice->update(['subtotal' => $subtotal]);
 
             // Apply tax then persist total_amount/tax_amount so accessors and PDFs don't drift
             $this->taxService->applyTaxToInvoice($invoice->id, $companyId);
             return $this->persistTotals($invoice);
         }));
+    }
+
+    /**
+     * Bill the order's non-panel charges: accessories, doors/windows and
+     * installation. Dispatch items only ever carried panel rows, so these lines
+     * had no path to an invoice at all and the revenue was simply lost (the
+     * system's own /reports/reconciliation flagged the orders as under_invoiced).
+     *
+     * They are read from the order's accepted quotation — accepted quotations
+     * are immutable (QuotationService::update only allows boq/draft/sent), so
+     * that is a stable source and needs no second snapshot table.
+     *
+     * Billed once per order: if another live invoice for the same order already
+     * carries them, this is a no-op, so a multi-dispatch order can't double-bill.
+     *
+     * NOTE: fixed transport (orders.transport_amount) is deliberately NOT billed
+     * here. The quotation adds it after tax and leaves it untaxed (§21.2), which
+     * a per-line invoice cannot express today — billing it would change its tax
+     * treatment. It stays a known gap pending a business decision.
+     *
+     * @return float total added to the invoice subtotal
+     */
+    private function addNonPanelLines(Invoice $invoice, ?Order $order): float
+    {
+        if (!$order) {
+            return 0.0;
+        }
+
+        $alreadyBilled = InvoiceItem::whereIn('invoice_id',
+                Invoice::where('order_id', $order->id)
+                    ->where('id', '!=', $invoice->id)
+                    ->where('status', '!=', 'cancelled')
+                    ->pluck('id'))
+            ->whereNull('panel_type_id')
+            ->exists();
+        if ($alreadyBilled) {
+            return 0.0;
+        }
+
+        $quotation = $order->quotation;
+        if (!$quotation) {
+            return 0.0;
+        }
+
+        $added = 0.0;
+
+        foreach ($quotation->accessories as $accessory) {
+            $amount = (float) ($accessory->pivot->amount ?? 0);
+            if ($amount <= 0) continue;
+
+            $qty  = (float) ($accessory->pivot->quantity ?? 1);
+            $rate = (float) ($accessory->pivot->unit_price ?? 0);
+            $label = $accessory->pivot->description ?: $accessory->name;
+            if (($accessory->pivot->door_type ?? null)) {
+                $label .= " ({$accessory->pivot->door_type} {$accessory->pivot->door_width}×{$accessory->pivot->door_height}mm)";
+            }
+
+            InvoiceItem::create([
+                'invoice_id'     => $invoice->id,
+                'panel_type_id'  => null,
+                'description'    => $label,
+                'quantity'       => $qty,
+                'unit_price'     => $rate,
+                'amount'         => $amount,
+                'tax_rate'       => 0,
+                'tax_amount'     => 0,
+                'total_with_tax' => $amount,
+            ]);
+            $added += $amount;
+        }
+
+        $installation = (float) ($quotation->installation_amount ?? 0);
+        if ($installation > 0) {
+            InvoiceItem::create([
+                'invoice_id'     => $invoice->id,
+                'panel_type_id'  => null,
+                'description'    => 'Installation / site work',
+                'quantity'       => 1,
+                'unit_price'     => $installation,
+                'amount'         => $installation,
+                'tax_rate'       => 0,
+                'tax_amount'     => 0,
+                'total_with_tax' => $installation,
+            ]);
+            $added += $installation;
+        }
+
+        return $added;
     }
 
     public function addItem($invoiceId, $panelTypeId, $quantity, $unitPrice, $companyId = null)

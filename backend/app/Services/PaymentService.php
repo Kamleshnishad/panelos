@@ -77,7 +77,9 @@ class PaymentService
         $total = $invoice->subtotal + ($invoice->taxCalculation->tax_amount ?? 0);
         $paid = PaymentTransaction::where('invoice_id', $invoiceId)->sum('amount');
 
-        return max(0, $total - $paid);
+        // Rounded: binary float subtraction otherwise leaks values like
+        // 64000.119999999995 into the API and into "amount exceeds due" checks.
+        return round(max(0, $total - $paid), 2);
     }
 
     public function getPaymentStatus($invoiceId, $companyId = null)
@@ -87,12 +89,12 @@ class PaymentService
         $invoice = Invoice::where('company_id', $companyId)->findOrFail($invoiceId);
         $total = $invoice->subtotal + ($invoice->taxCalculation->tax_amount ?? 0);
         $paid = PaymentTransaction::where('invoice_id', $invoiceId)->sum('amount');
-        $remaining = max(0, $total - $paid);
+        $remaining = round(max(0, $total - $paid), 2);
 
         return [
             'invoice_id' => $invoiceId,
-            'total_amount' => $total,
-            'paid_amount' => $paid,
+            'total_amount' => round((float) $total, 2),
+            'paid_amount' => round((float) $paid, 2),
             'remaining_due' => $remaining,
             'payment_percentage' => $total > 0 ? round(($paid / $total) * 100, 2) : 0,
             'status' => $invoice->status,

@@ -45,6 +45,33 @@ class GstController extends Controller
         return response()->json($result, 400);
     }
 
+    /**
+     * The tax configuration the invoice engine actually reads (rate + type).
+     * Separate from /gst/register, which stores the GSTIN registration record.
+     */
+    public function taxConfiguration()
+    {
+        $config = app(\App\Services\TaxService::class)
+            ->getTaxConfiguration(auth()->user()->company_id);
+
+        return response()->json(['success' => true, 'data' => $config]);
+    }
+
+    public function updateTaxConfiguration(Request $request)
+    {
+        $validated = $request->validate([
+            'gst_number'       => ['nullable', 'string', 'max:20', new \App\Rules\IndianGstin()],
+            'tax_type'         => 'required|in:inclusive,exclusive',
+            'default_tax_rate' => 'required|numeric|min:0|max:100',
+            'is_active'        => 'nullable|boolean',
+        ]);
+
+        $config = app(\App\Services\TaxService::class)
+            ->updateTaxConfiguration(auth()->user()->company_id, $validated);
+
+        return response()->json(['success' => true, 'data' => $config, 'message' => 'Tax configuration saved']);
+    }
+
     public function addHsnCode(Request $request)
     {
         $validated = $request->validate([

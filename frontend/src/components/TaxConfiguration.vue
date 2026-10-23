@@ -55,16 +55,16 @@
     <div class="info-section">
       <h3>Tax Breakdown Example</h3>
       <div class="example">
-        <p><strong>Amount:</strong> $1,000</p>
+        <p><strong>Amount:</strong> ₹1,000</p>
         <p><strong>Tax Rate:</strong> 18%</p>
         <p v-if="config.tax_type === 'exclusive'">
-          <strong>Total with Exclusive Tax:</strong> $1,180
+          <strong>Total with Exclusive Tax:</strong> ₹1,180
         </p>
         <p v-else>
-          <strong>Total with Inclusive Tax:</strong> $1,000 (tax: $152.54)
+          <strong>Total with Inclusive Tax:</strong> ₹1,000 (tax: ₹152.54)
         </p>
         <p v-if="config.gst_number">
-          <strong>SGST (9%):</strong> $45 | <strong>CGST (9%):</strong> $45
+          <strong>SGST (9%):</strong> ₹45 | <strong>CGST (9%):</strong> ₹45
         </p>
       </div>
     </div>
@@ -73,12 +73,14 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { taxService } from '@/services/api'
+import api from '../services/api.js'
 
+// Defaults mirror the backend fallback (18% exclusive) so a tenant who has
+// never opened this screen still issues correctly-taxed invoices.
 const config = ref({
   gst_number: '',
   tax_type: 'exclusive',
-  default_tax_rate: 0,
+  default_tax_rate: 18,
   is_active: true
 })
 
@@ -87,9 +89,15 @@ const messageType = ref('')
 
 const fetchConfiguration = async () => {
   try {
-    const response = await taxService.getConfiguration()
-    if (response) {
-      config.value = response
+    const res = await api.get('/settings/tax')
+    const data = res?.data?.data
+    if (data) {
+      config.value = {
+        gst_number: data.gst_number ?? '',
+        tax_type: data.tax_type ?? 'exclusive',
+        default_tax_rate: Number(data.default_tax_rate ?? 18),
+        is_active: data.is_active ?? true,
+      }
     }
   } catch (error) {
     console.error('Failed to fetch tax configuration:', error)
@@ -98,14 +106,14 @@ const fetchConfiguration = async () => {
 
 const saveConfiguration = async () => {
   try {
-    await taxService.updateConfiguration(config.value)
+    await api.put('/settings/tax', config.value)
     message.value = 'Tax configuration saved successfully!'
     messageType.value = 'success'
     setTimeout(() => {
       message.value = ''
     }, 3000)
   } catch (error) {
-    message.value = 'Failed to save configuration: ' + error.message
+    message.value = 'Failed to save configuration: ' + (error?.response?.data?.message ?? error.message)
     messageType.value = 'error'
   }
 }

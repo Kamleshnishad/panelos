@@ -30,6 +30,16 @@ class ProductionBatchService
                 'notes' => $data['notes'] ?? null,
             ]);
 
+            // Claim the order the moment it has a batch, whether or not that
+            // batch belongs to a run. Only ProductionRunService used to do this,
+            // so an order produced through the standalone path stayed 'pending'
+            // forever — the planner kept offering it as work to do, and a second
+            // run could be built from it, producing the job twice and issuing
+            // raw material twice.
+            if ($order->status === 'pending') {
+                $order->update(['status' => 'in_production']);
+            }
+
             return $batch;
         });
     }
@@ -138,7 +148,17 @@ class ProductionBatchService
             throw new \Exception('Cannot delete batch not in draft status');
         }
 
-        $batch->delete();
+        DB::transaction(function () use ($batch) {
+            $batch->delete();
+
+            // Release the order again if this was its last batch, mirroring the
+            // claim in createFromOrder() (and ProductionRunService::cancel()).
+            $order = $batch->order;
+            if ($order && $order->status === 'in_production'
+                && !$order->batches()->exists()) {
+                $order->update(['status' => 'pending']);
+            }
+        });
     }
 
     /**

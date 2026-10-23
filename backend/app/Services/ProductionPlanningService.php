@@ -34,6 +34,11 @@ class ProductionPlanningService
         // 2. All panel rows from orders waiting to be produced.
         $pendingOrders = Order::where('company_id', $companyId)
             ->whereIn('status', self::PENDING_STATUSES)
+            // Belt-and-braces alongside the status flip in
+            // ProductionBatchService::createFromOrder: an order that already has
+            // a batch has been sent to the line, so it is never schedulable work
+            // again — offering it invites a second run and a second material issue.
+            ->whereDoesntHave('batches')
             ->with(['items.sizes', 'items.panelType', 'customer'])
             ->orderBy('expected_delivery_date')
             ->get();

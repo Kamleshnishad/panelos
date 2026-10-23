@@ -29,6 +29,7 @@ class ProductionRunService
             $orders = Order::where('company_id', $companyId)
                 ->whereIn('id', $orderIds)
                 ->where('status', 'pending')          // only un-started orders
+                ->whereDoesntHave('batches')          // …and never already sent to the line
                 ->with('items')
                 ->get();
 

@@ -2,19 +2,18 @@
 
 namespace App\Rules;
 
-use Illuminate\Contracts\Validation\Rule;
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
 
-class IndianPhone implements Rule
+class IndianPhone implements ValidationRule
 {
-    public function validate($attribute, $value, $parameters): bool
+    public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (empty($value)) return true;
-        $digits = preg_replace('/\D/', '', (string) $value);
-        return (bool) preg_match('/^[6-9]\d{9}$/', $digits);
-    }
+        if (empty($value)) return;
 
-    public function message(): string
-    {
-        return 'The :attribute must be a valid 10-digit Indian mobile number (starts with 6-9).';
+        $digits = preg_replace('/\D/', '', (string) $value);
+        if (!preg_match('/^[6-9]\d{9}$/', $digits)) {
+            $fail('The :attribute must be a valid 10-digit Indian mobile number (starts with 6-9).');
+        }
     }
 }

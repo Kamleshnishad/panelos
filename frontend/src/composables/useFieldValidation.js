@@ -1,4 +1,4 @@
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, toValue } from 'vue'
 
 // ── Built-in rule checkers ────────────────────────────────────────
 const VALIDATORS = {
@@ -113,6 +113,16 @@ function checkRule(rule, value) {
 
 // ── Composable ────────────────────────────────────────────────────
 export function useFieldValidation({ rules, getValues }) {
+  // Callers pass `rules`/`getValues` three different ways: a plain object, a
+  // computed ref (FormInput/FormSelect/FormTextarea) or a getter function
+  // (CustomerEditModal). toValue() normalises all three. Previously this read
+  // them raw, so a computed `getValues` blew up in the watcher below with
+  // "getValues is not a function" — which killed every form built on FormInput
+  // (the New Customer modal never submitted) — and a computed `rules` made
+  // Object.keys(rules) empty, so validation silently never ran at all.
+  const ruleMap = () => toValue(rules) ?? {}
+  const readValues = () => toValue(getValues) ?? null
+
   const errors = ref({})
   const warnings = ref({})
   const touched = ref({})
@@ -151,9 +161,9 @@ export function useFieldValidation({ rules, getValues }) {
   }
 
   function validate(name) {
-    const ruleSet = rules[name]
+    const ruleSet = ruleMap()[name]
     if (!ruleSet) return true
-    const value = getValues ? getValues()[name] : undefined
+    const value = (readValues() ?? {})[name]
     const err = checkAllRules(ruleSet, value)
     errors.value[name] = err
     touched.value[name] = true
@@ -176,7 +186,7 @@ export function useFieldValidation({ rules, getValues }) {
 
   function validateAll() {
     let allOk = true
-    for (const name of Object.keys(rules)) {
+    for (const name of Object.keys(ruleMap())) {
       if (!validate(name)) allOk = false
     }
     return allOk
@@ -200,24 +210,24 @@ export function useFieldValidation({ rules, getValues }) {
   }
 
   const isValid = computed(() => {
-    for (const name of Object.keys(rules)) {
+    for (const name of Object.keys(ruleMap())) {
       if (errors.value[name]) return false
     }
-    for (const name of Object.keys(rules)) {
+    for (const name of Object.keys(ruleMap())) {
       if (uniqueStatus.value[name] === 'taken') return false
     }
     return true
   })
 
   watch(
-    () => getValues ? getValues() : null,
+    () => readValues(),
     (newVals) => {
       if (!newVals) return
-      for (const name of Object.keys(rules)) {
+      for (const name of Object.keys(ruleMap())) {
         if (touched.value[name]) {
-          const err = checkAllRules(rules[name], newVals[name])
+          const err = checkAllRules(ruleMap()[name], newVals[name])
           errors.value[name] = err
-          const uniqueRule = rules[name].find(r => r.unique)
+          const uniqueRule = ruleMap()[name].find(r => r.unique)
           if (uniqueRule && uniqueRule.unique.table && dirty.value[name]) {
             runUniqueCheck(name, newVals[name], uniqueRule)
           }

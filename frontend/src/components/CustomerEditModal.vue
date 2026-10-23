@@ -103,12 +103,16 @@
             :rules="[{ maxLength: 100 }]"
           />
 
-          <FormInput
+          <!-- A free-text code let "GJ" and "24" both into the column, which
+               made intra- vs inter-state GST depend on how it was typed. -->
+          <FormSelect
             v-model="form.state_code"
             name="state_code"
-            label="State Code"
-            placeholder="e.g. GJ"
-            :rules="[{ maxLength: 2 }]"
+            label="State (GST)"
+            :options="stateOptions"
+            placeholder="Select state"
+            hint="Sets CGST+SGST vs IGST on quotations and invoices."
+            @update:modelValue="onStateChange"
           />
 
           <FormInput
@@ -117,6 +121,25 @@
             type="pincode"
             label="Pincode"
             placeholder="6 digits"
+          />
+
+          <FormInput
+            v-model.number="form.credit_limit"
+            name="credit_limit"
+            type="number"
+            label="Credit Limit (₹)"
+            placeholder="0 = no limit"
+            hint="Orders are blocked once outstanding + pending orders exceed this."
+            :rules="[{ min: 0 }]"
+          />
+
+          <FormInput
+            v-model.number="form.payment_terms_days"
+            name="payment_terms_days"
+            type="number"
+            label="Payment Terms (days)"
+            placeholder="30"
+            :rules="[{ min: 0, max: 365 }]"
           />
 
           <FormTextarea
@@ -141,7 +164,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, computed } from 'vue'
+import { ref, reactive, watch, computed, onMounted } from 'vue'
+import api from '../services/api.js'
 import FormInput from './Form/FormInput.vue'
 import FormSelect from './Form/FormSelect.vue'
 import FormTextarea from './Form/FormTextarea.vue'
@@ -158,10 +182,27 @@ const emit = defineEmits(['close', 'saved'])
 const form = reactive({
   name: '', type: 'retail', contact_person: '', phone: '', whatsapp_no: '',
   email: '', gstin: '', pan: '', address_line1: '', city: '', state: '',
-  state_code: '', pincode: '', notes: '',
+  state_code: '', pincode: '', notes: '', credit_limit: 0, payment_terms_days: 30,
 })
 const saving = ref(false)
 const error = ref(null)
+
+// GST state list: { "24": "Gujarat", … } keyed by the 2-digit GST code.
+const states = ref({})
+const stateOptions = computed(() =>
+  Object.entries(states.value).map(([code, name]) => ({ value: code, label: `${name} (${code})` }))
+)
+// Keep the free-text state name in step with the picked code.
+function onStateChange(code) {
+  if (states.value[code]) form.state = states.value[code]
+}
+
+onMounted(async () => {
+  try {
+    const res = await api.get('/gst/states')
+    states.value = res?.data?.data ?? {}
+  } catch { /* the field still accepts whatever is already stored */ }
+})
 
 watch(() => [props.open, props.customer], ([isOpen, cust]) => {
   if (isOpen) {
@@ -182,10 +223,14 @@ watch(() => [props.open, props.customer], ([isOpen, cust]) => {
         state_code: cust.state_code || '',
         pincode: cust.pincode || '',
         notes: cust.notes || '',
+        credit_limit: Number(cust.credit_limit ?? 0),
+        payment_terms_days: Number(cust.payment_terms_days ?? 30),
       })
     } else {
       Object.keys(form).forEach(k => form[k] = '')
       form.type = 'retail'
+      form.credit_limit = 0
+      form.payment_terms_days = 30
     }
   }
 }, { immediate: true })

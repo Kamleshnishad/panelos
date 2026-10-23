@@ -55,6 +55,12 @@ class Company extends Model
         'signup_referrer',
     ];
 
+    /** Canonical 2-digit GST state code — see Customer::setStateCodeAttribute. */
+    public function setStateCodeAttribute($value): void
+    {
+        $this->attributes['state_code'] = \App\Support\GstState::normalize($value) ?? $value;
+    }
+
     protected function casts(): array
     {
         return [

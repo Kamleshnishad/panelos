@@ -3,200 +3,166 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\Order;
 use App\Models\PanelType;
 use App\Models\ProductionBatch;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\Quotation;
+use App\Services\CuttingScheduleService;
 use Tests\TestCase;
-use Tests\Traits\HasAuthTestHelpers;
 
+/**
+ * The cutting schedule used to read `panelType->length` and treat
+ * `order_items.quantity` as a piece count — but that column holds SQUARE METRES.
+ * A 30-panel, 78 m² batch therefore reported 78 "items" at the panel type's
+ * nominal length and overstated material by roughly 6×.
+ *
+ * It now walks the order's size rows, which is where the real cut list lives,
+ * and applies the same DL rule as the BOQ sheet: panels under 2000 mm are
+ * produced two-to-a-strip at doubled length and cut afterwards.
+ */
 class CuttingScheduleTest extends TestCase
 {
-    use RefreshDatabase;
-    use HasAuthTestHelpers;
+    use \Tests\Traits\HasDatabaseTestHelpers;
 
-    /**
-     * Helper to create a batch ready for cutting schedule
-     */
-    private function createBatchForSchedule($length = 1500, $quantity = 5)
+    /** @param array<int,array{0:int,1:int}> $sizes list of [length_mm, nos] */
+    private function batchWithSizes(int $companyId, array $sizes): ProductionBatch
     {
-        $user = $this->loginSuperAdmin();
-        $company = $user->company;
+        $customer  = Customer::factory()->create(['company_id' => $companyId]);
+        $panelType = PanelType::factory()->create(['company_id' => $companyId, 'name' => 'PUF Wall Panel']);
 
-        $customer = Customer::factory()->for($company)->create();
-        $panelType = PanelType::factory()
-            ->for($company)
-            ->create(['length' => $length, 'width' => 1000]);
-
-        $quotResponse = $this->postJson('/api/quotations', [
-            'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => $quantity,
-                'unit_price' => 500,
-            ]],
+        $quotation = Quotation::create([
+            'company_id'   => $companyId,
+            'customer_id'  => $customer->id,
+            'quotation_no' => 'Q-TEST-' . uniqid(),
+            'status'       => 'accepted',
         ]);
 
-        $quotationId = $quotResponse->json('data.id');
-        $this->postJson("/api/quotations/{$quotationId}/send");
-        $this->postJson("/api/quotations/{$quotationId}/accept");
-        $orderResponse = $this->postJson("/api/quotations/{$quotationId}/create-order");
-        $orderId = $orderResponse->json('data.id');
+        $order = Order::create([
+            'company_id'   => $companyId,
+            'quotation_id' => $quotation->id,
+            'customer_id'  => $customer->id,
+            'order_no'     => 'ORD-TEST-' . uniqid(),
+            'order_date'   => now(),
+            'status'       => 'in_production',
+        ]);
 
-        $batchResponse = $this->postJson("/api/orders/{$orderId}/batches");
-        return ProductionBatch::find($batchResponse->json('data.id'));
-    }
+        $totalSqm = 0.0;
+        foreach ($sizes as [$length, $nos]) {
+            $totalSqm += ($length / 1000) * $nos;
+        }
 
-    /**
-     * Test calculate cutting schedule for short panels (doubling applicable)
-     */
-    public function test_calculate_schedule_with_doubling()
-    {
-        $batch = $this->createBatchForSchedule($length = 1500, $quantity = 5);
+        $item = $order->items()->create([
+            'panel_type_id' => $panelType->id,
+            'total_sqm'     => $totalSqm,
+            'rate_per_sqm'  => 1450,
+            'amount'        => $totalSqm * 1450,
+            'quantity'      => $totalSqm,
+            'unit_price'    => 1450,
+            'sort_order'    => 0,
+        ]);
 
-        $response = $this->postJson("/api/batches/{$batch->id}/calculate-cutting-schedule");
-
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'success',
-                'data' => [
-                    'batch_id',
-                    'batch_no',
-                    'schedule_items',
-                    'total_material_length',
-                    'total_items',
-                    'optimization' => [
-                        'double_cut_items',
-                        'single_cut_items',
-                        'total_items',
-                        'double_cut_percentage',
-                    ],
-                ],
-            ])
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'batch_id' => $batch->id,
-                    'total_items' => 5,
-                ],
+        foreach ($sizes as $i => [$length, $nos]) {
+            $item->sizes()->create([
+                'length_mm'    => $length,
+                'width_mm'     => 1000,
+                'nos'          => $nos,
+                'rate_per_sqm' => 1450,
+                'amount'       => ($length / 1000) * $nos * 1450,
+                'sort_order'   => $i,
             ]);
+        }
 
-        // Verify doubling is applied
-        $optimization = $response->json('data.optimization');
-        $this->assertGreaterThan(0, $optimization['double_cut_items']);
+        return ProductionBatch::create([
+            'company_id' => $companyId,
+            'order_id'   => $order->id,
+            'batch_no'   => 'PB-TEST-' . uniqid(),
+            'status'     => 'in_progress',
+            'planned_quantity'   => $totalSqm,
+            'completed_quantity' => 0,
+        ]);
     }
 
-    /**
-     * Test calculate schedule for long panels (no doubling)
-     */
-    public function test_calculate_schedule_no_doubling()
+    public function test_schedule_counts_panels_not_square_metres(): void
     {
-        $batch = $this->createBatchForSchedule($length = 2500, $quantity = 3);
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');
 
-        $response = $this->postJson("/api/batches/{$batch->id}/calculate-cutting-schedule");
+        // 20 × 3000mm + 10 × 1800mm = 30 panels, 78 m²
+        $batch = $this->batchWithSizes($admin->company_id, [[3000, 20], [1800, 10]]);
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'total_items' => 3,
-                ],
-            ]);
+        $schedule = app(CuttingScheduleService::class)->calculateSchedule($batch);
 
-        // Long panels should not use doubling
-        $optimization = $response->json('data.optimization');
-        $this->assertEquals(0, $optimization['double_cut_items']);
-        $this->assertEquals(3, $optimization['single_cut_items']);
+        $this->assertSame(30, $schedule['total_items']);
+
+        // 20 × 3000 single + 5 strips × 3600 doubled = 60000 + 18000 = 78000 mm
+        $this->assertSame(78000, $schedule['total_material_length']);
     }
 
-    /**
-     * Test get cutting instructions
-     */
-    public function test_get_cutting_instructions()
+    public function test_short_panels_are_paired_as_doubled_length(): void
     {
-        $batch = $this->createBatchForSchedule($length = 1500, $quantity = 4);
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');
 
-        $response = $this->get("/api/batches/{$batch->id}/cutting-schedule");
+        $batch = $this->batchWithSizes($admin->company_id, [[1800, 10]]);
+        $schedule = app(CuttingScheduleService::class)->calculateSchedule($batch);
+
+        $double = collect($schedule['schedule_items'])->firstWhere('method', 'double');
+        $this->assertNotNull($double);
+        $this->assertSame(10, $double['quantity']);
+        $this->assertSame(5, $double['strips_needed']);
+        $this->assertSame(3600, $double['material_length']);
+        $this->assertSame(100.0, (float) $schedule['optimization']['double_cut_percentage']);
+    }
+
+    public function test_odd_panel_in_a_doubled_set_runs_single(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');
+
+        $batch = $this->batchWithSizes($admin->company_id, [[1500, 5]]);
+        $schedule = app(CuttingScheduleService::class)->calculateSchedule($batch);
+
+        $this->assertSame(4, $schedule['optimization']['double_cut_items']);
+        $this->assertSame(1, $schedule['optimization']['single_cut_items']);
+        $this->assertSame(80.0, (float) $schedule['optimization']['double_cut_percentage']);
+    }
+
+    public function test_2000mm_is_not_doubled(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');
+
+        $batch = $this->batchWithSizes($admin->company_id, [[2000, 4]]);
+        $schedule = app(CuttingScheduleService::class)->calculateSchedule($batch);
+
+        $this->assertSame(0, $schedule['optimization']['double_cut_items']);
+        $this->assertSame(4, $schedule['optimization']['single_cut_items']);
+        $this->assertSame(8000, $schedule['total_material_length']);
+    }
+
+    public function test_instructions_endpoint_renders_the_schedule(): void
+    {
+        $admin = $this->createAdminUser();
+        $batch = $this->batchWithSizes($admin->company_id, [[3000, 20], [1800, 10]]);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->get("/api/batches/{$batch->id}/cutting-schedule");
 
         $response->assertStatus(200);
         $content = $response->getContent();
-
-        // Verify instructions contain expected information
         $this->assertStringContainsString('CUTTING SCHEDULE', $content);
         $this->assertStringContainsString($batch->batch_no, $content);
-        $this->assertStringContainsString('Total Items: 4', $content);
+        $this->assertStringContainsString('Total Items: 30', $content);
     }
 
-    /**
-     * Test get schedule as JSON
-     */
-    public function test_get_schedule_json()
+    public function test_json_endpoint_keeps_its_contract(): void
     {
-        $batch = $this->createBatchForSchedule($length = 1500, $quantity = 4);
+        $admin = $this->createAdminUser();
+        $batch = $this->batchWithSizes($admin->company_id, [[1800, 10]]);
 
-        $response = $this->getJson("/api/batches/{$batch->id}/cutting-schedule/json");
-
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'success',
-                'data' => [
-                    'batch_id',
-                    'schedule_items',
-                    'waste_percentage',
-                ],
-            ])
-            ->assertJson([
-                'success' => true,
-            ]);
-    }
-
-    /**
-     * Test optimization efficiency calculation
-     */
-    public function test_schedule_optimization_efficiency()
-    {
-        $batch = $this->createBatchForSchedule($length = 1500, $quantity = 6);
-
-        $response = $this->postJson("/api/batches/{$batch->id}/calculate-cutting-schedule");
-
-        $response->assertStatus(200);
-
-        $optimization = $response->json('data.optimization');
-        $this->assertNotNull($optimization['optimization_efficiency']);
-        $this->assertStringContainsString('%', $optimization['optimization_efficiency']);
-    }
-
-    /**
-     * Test doubling percentage for mixed quantities
-     */
-    public function test_doubling_percentage()
-    {
-        // Test with 4 items (2 double cuts) and 1 single cut
-        $batch = $this->createBatchForSchedule($length = 1500, $quantity = 5);
-
-        $response = $this->postJson("/api/batches/{$batch->id}/calculate-cutting-schedule");
-
-        $response->assertStatus(200);
-
-        $schedule = $response->json('data');
-        $this->assertEquals(5, $schedule['optimization']['total_items']);
-        $this->assertEquals(4, $schedule['optimization']['double_cut_items']);
-        $this->assertEquals(1, $schedule['optimization']['single_cut_items']);
-        $this->assertEquals(80.0, $schedule['optimization']['double_cut_percentage']);
-    }
-
-    /**
-     * Test schedule calculation for edge case (exactly 2000mm)
-     */
-    public function test_schedule_edge_case_2000mm()
-    {
-        // 2000mm should not be doubled
-        $batch = $this->createBatchForSchedule($length = 2000, $quantity = 3);
-
-        $response = $this->postJson("/api/batches/{$batch->id}/calculate-cutting-schedule");
-
-        $response->assertStatus(200);
-
-        $optimization = $response->json('data.optimization');
-        $this->assertEquals(0, $optimization['double_cut_items']);
+        $this->actingAs($admin, 'sanctum')
+            ->getJson("/api/batches/{$batch->id}/cutting-schedule/json")
+            ->assertStatus(200)
+            ->assertJsonStructure(['success', 'data' => ['batch_id', 'schedule_items', 'waste_percentage']]);
     }
 }

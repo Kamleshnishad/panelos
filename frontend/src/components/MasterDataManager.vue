@@ -5,11 +5,15 @@
       <button :class="['md-tab', { active: tab === 'panels' }]"      @click="tab = 'panels'">Panel Types</button>
       <button :class="['md-tab', { active: tab === 'accessories' }]" @click="tab = 'accessories'">Accessories</button>
       <button :class="['md-tab', { active: tab === 'stages' }]"      @click="tab = 'stages'">Production Stages</button>
+      <button :class="['md-tab', { active: tab === 'tax' }]"         @click="tab = 'tax'">Tax / GST</button>
+      <button :class="['md-tab', { active: tab === 'gst' }]"         @click="tab = 'gst'">GST Compliance</button>
     </div>
 
     <panel-type-master       v-if="tab === 'panels'" />
     <accessory-master        v-else-if="tab === 'accessories'" />
     <production-stage-master  v-else-if="tab === 'stages'" />
+    <tax-configuration       v-else-if="tab === 'tax'" />
+    <gst-config-manager      v-else-if="tab === 'gst'" />
   </div>
 </template>
 
@@ -18,6 +22,8 @@ import { ref } from 'vue'
 import PanelTypeMaster       from './PanelTypeMaster.vue'
 import AccessoryMaster       from './AccessoryMaster.vue'
 import ProductionStageMaster from './ProductionStageMaster.vue'
+import TaxConfiguration      from './TaxConfiguration.vue'
+import GstConfigManager      from './GstConfigManager.vue'
 
 const tab = ref('panels')
 </script>

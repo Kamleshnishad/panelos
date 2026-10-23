@@ -86,6 +86,9 @@ class CustomerController extends Controller
             'state'          => 'nullable|string|max:100',
             'state_code'     => 'nullable|string|max:2',
             'pincode'        => ['nullable', 'string', 'max:10', new IndianPincode()],
+            'credit_limit'       => 'nullable|numeric|min:0',
+            'payment_terms_days' => 'nullable|integer|min:0|max:365',
+            'notes'              => 'nullable|string|max:2000',
         ]);
 
         $customer = Customer::create([
@@ -101,14 +104,18 @@ class CustomerController extends Controller
             // These columns are NOT NULL (no default) — coalesce to '' so the
             // create never crashes when the form omits them.
             'address_line1'  => $validated['address_line1'] ?? '',
+            'address_line2'  => $validated['address_line2'] ?? null,
             'city'           => $validated['city'] ?? '',
             'state'          => $validated['state'] ?? '',
             'state_code'     => $validated['state_code'] ?? '',
             'pincode'        => $validated['pincode'] ?? '',
             'country'        => 'India',
-            'credit_limit'   => 0,
+            // Previously hard-coded 0/30, so a credit limit or payment terms sent
+            // by the form were silently dropped and credit control never engaged.
+            'credit_limit'   => $validated['credit_limit'] ?? 0,
             'outstanding_balance' => 0,
-            'payment_terms_days'  => 30,
+            'payment_terms_days'  => $validated['payment_terms_days'] ?? 30,
+            'notes'          => $validated['notes'] ?? null,
             'is_active'      => true,
         ]);
 

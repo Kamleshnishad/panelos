@@ -69,7 +69,10 @@ class GstService
             $config = GstConfiguration::create([
                 'company_id' => $companyId,
                 'state_code' => strtoupper($stateCode),
-                'state_name' => $this->stateMap[strtoupper($stateCode)] ?? 'Unknown',
+                // Was keyed by alpha code only, so a numeric GST code ("24")
+                // always stored "Unknown". GstState resolves either format.
+                'state_name' => \App\Support\GstState::name($stateCode)
+                    ?? ($this->stateMap[strtoupper($stateCode)] ?? 'Unknown'),
                 'gstin' => $gstin,
                 'registration_type' => $registrationType,
                 'is_primary' => $isPrimary,
@@ -195,7 +198,33 @@ class GstService
             $breakdown = $query->first();
 
             if (!$breakdown) {
-                return ['success' => false, 'message' => 'GST breakdown not found'];
+                // A GstTaxBreakdown row only exists once /calculate-gst has been
+                // called explicitly. Every invoice still has a TaxCalculation
+                // written by TaxService at creation, so fall back to that rather
+                // than 404-ing on an invoice that plainly does have GST on it.
+                $invoice = \App\Models\Invoice::when($companyId !== null,
+                        fn ($q) => $q->where('company_id', $companyId))
+                    ->with('taxCalculation')->find($invoiceId);
+
+                if (!$invoice) {
+                    return ['success' => false, 'message' => 'GST breakdown not found'];
+                }
+
+                $calc = $invoice->taxCalculation;
+
+                return [
+                    'success' => true,
+                    'data' => [
+                        'invoice_id'     => (int) $invoiceId,
+                        'source'         => 'tax_calculation',
+                        'taxable_amount' => (float) ($calc->taxable_amount ?? $invoice->subtotal),
+                        'tax_rate'       => (float) ($calc->tax_rate ?? 0),
+                        'cgst_amount'    => (float) ($calc->cgst_amount ?? 0),
+                        'sgst_amount'    => (float) ($calc->sgst_amount ?? 0),
+                        'igst_amount'    => (float) ($calc->igst_amount ?? 0),
+                        'total_tax'      => (float) ($calc->tax_amount ?? 0),
+                    ],
+                ];
             }
 
             return [
@@ -349,8 +378,9 @@ class GstService
         return 'B2B';
     }
 
+    /** Canonical list for state pickers: 2-digit GST code => state name. */
     public function getStatesList()
     {
-        return $this->stateMap;
+        return \App\Support\GstState::all();
     }
 }

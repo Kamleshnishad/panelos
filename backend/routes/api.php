@@ -398,6 +398,11 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::get('/sms/logs', [SmsController::class, 'getSmsLogs'])->name('sms.logs');
     Route::get('/sms/status', [SmsController::class, 'getSmsStatus'])->name('sms.status');
 
+    // Tax configuration — the rate/type the invoice engine reads. Lives under
+    // /settings so reads stay open (forms need it) and writes need settings.manage.
+    Route::get('/settings/tax', [GstController::class, 'taxConfiguration'])->name('settings.tax.show');
+    Route::put('/settings/tax', [GstController::class, 'updateTaxConfiguration'])->name('settings.tax.update');
+
     // GST Configuration & Compliance
     Route::post('/gst/register', [GstController::class, 'registerConfiguration'])->name('gst.register');
     Route::post('/gst/hsn-code', [GstController::class, 'addHsnCode'])->name('gst.hsn.add');

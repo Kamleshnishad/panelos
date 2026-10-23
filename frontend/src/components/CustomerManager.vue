@@ -18,6 +18,7 @@
         <div class="cm-actions">
           <input v-model="search" class="cm-search" placeholder="Search name / phone / email…" @keyup.enter="load" />
           <button class="btn btn-ghost" :disabled="loading" @click="load">↻</button>
+          <button class="btn btn-primary" @click="addCustomer">+ New Customer</button>
         </div>
       </div>
 
@@ -43,6 +44,13 @@
         <span class="page-info">Page {{ pagination.current_page }} of {{ pagination.last_page }} · {{ pagination.total }} total</span>
         <button class="pg-btn" :disabled="pagination.current_page >= pagination.last_page" @click="goPage(pagination.current_page + 1)">Next →</button>
       </div>
+
+      <customer-edit-modal
+        :open="showAdd"
+        :customer="null"
+        @close="showAdd = false"
+        @saved="onSaved"
+      />
     </template>
   </div>
 </template>
@@ -52,8 +60,13 @@ import { ref, reactive, onMounted } from 'vue'
 import customerService from '../services/customerService.js'
 import { toastError } from '../services/ui.js'
 import CustomerProfile from './CustomerProfile.vue'
+import CustomerEditModal from './CustomerEditModal.vue'
 
 defineEmits(['open-quotation', 'view-orders'])
+
+const showAdd = ref(false)
+function addCustomer() { showAdd.value = true }
+function onSaved() { showAdd.value = false; load(pagination.current_page) }
 
 const rows = ref([])
 const loading = ref(false)
@@ -109,4 +122,5 @@ onMounted(load)
 .view-link { color: var(--primary); font-weight: 600; font-size: 12px; }
 .btn { padding: 8px 14px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .btn-ghost { background: transparent; border: 1px solid #ddd; color: #555; }
+.btn-primary { background: var(--primary); color: #fff; }
 </style>

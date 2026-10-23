@@ -28,7 +28,7 @@ class DispatchItem extends Model
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:2',
+        'quantity' => 'decimal:4',
         'unit_price' => 'decimal:2',
         'amount' => 'decimal:2'
     ];
