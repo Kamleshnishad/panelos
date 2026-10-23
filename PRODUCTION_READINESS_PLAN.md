@@ -83,7 +83,12 @@ new `PB-###` row before we proceed.
 
 ---
 
-## Phase 2 — Shop-floor control *(the client's actual request)*
+## Phase 2 — Shop-floor control ✅ *(built 2026-10-23 — see commit `a8e2b11` + UI)*
+
+> Delivered: per-stage `requires_approval`, approve/reject with a rework path, `production.approve` as a
+> separate duty, four-eyes toggle, and `completeBatch()` refusing while stages are outstanding. Enforcement
+> is **opt-in per company** so nothing changes for anyone until they switch it on in
+> Settings → Company → Production Control. 9 feature tests.
 
 Today the stage system is **decoration**. `areAllStagesCompleted()` and `getNextStage()` exist and are
 **never called**; `completeBatch()` checks only that the batch is `in_progress`. A batch can be completed,

@@ -113,6 +113,19 @@
               <span v-if="stage.completed_at"> &nbsp;→&nbsp; Done: {{ fmtDateTime(stage.completed_at) }}</span>
             </div>
 
+            <!-- Sign-off trail -->
+            <div class="stage-signoff" v-if="stage.approved_by && stage.status === 'completed'">
+              <span class="signoff-icon">🖊</span>
+              Approved by <strong>{{ stage.approved_by }}</strong>
+              <span v-if="stage.approved_at"> · {{ fmtDateTime(stage.approved_at) }}</span>
+            </div>
+            <div class="stage-rejected" v-if="stage.status === 'rejected'">
+              <span class="signoff-icon">⛔</span>
+              Rejected<span v-if="stage.approved_by"> by <strong>{{ stage.approved_by }}</strong></span>
+              <span v-if="stage.rejected_at"> · {{ fmtDateTime(stage.rejected_at) }}</span>
+              <div class="reject-reason" v-if="stage.rejection_reason">“{{ stage.rejection_reason }}”</div>
+            </div>
+
             <!-- Saved notes -->
             <div class="stage-notes-display" v-if="stage.notes">
               <span class="notes-icon">📝</span> {{ stage.notes }}
@@ -121,8 +134,27 @@
             <!-- Action area (only while batch is in_progress) -->
             <div class="stage-actions" v-if="batch.status === 'in_progress'">
 
+              <!-- Awaiting sign-off -->
+              <template v-if="stage.status === 'pending_approval'">
+                <div class="await-note">
+                  Waiting for sign-off before <em>{{ stageProgress[si + 1]?.stage_name || 'the batch' }}</em> can proceed.
+                </div>
+                <div class="stage-action-row" v-if="canApprove">
+                  <input
+                    v-model="rejectReason[stage.stage_id]"
+                    class="stage-note-input"
+                    placeholder="Reason (required to reject)…"
+                  />
+                  <button class="btn-stage btn-stage-approve" :disabled="actionLoading" @click="approveStage(stage)">✓ Approve</button>
+                  <button class="btn-stage btn-stage-reject" :disabled="actionLoading" @click="rejectStage(stage)">✕ Reject</button>
+                </div>
+                <div class="locked-hint" v-else>
+                  You do not have permission to sign off production stages.
+                </div>
+              </template>
+
               <!-- Start button + optional notes -->
-              <template v-if="stage.status === 'pending'">
+              <template v-if="stage.status === 'pending' || stage.status === 'rejected'">
                 <div class="stage-action-row">
                   <input
                     v-model="stageNotes[stage.stage_id]"
@@ -135,7 +167,7 @@
                     :disabled="actionLoading || !canStartStage(si)"
                     :title="!canStartStage(si) ? 'Complete previous stage first' : 'Start ' + stage.stage_name"
                     @click="startStage(stage)"
-                  >▶ Start</button>
+                  >{{ stage.status === 'rejected' ? '↻ Re-run' : '▶ Start' }}</button>
                 </div>
                 <div class="locked-hint" v-if="!canStartStage(si)">
                   Complete <em>{{ stageProgress[si - 1]?.stage_name }}</em> first
@@ -367,8 +399,11 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import batchService from '../services/batchService.js'
+import authService from '../services/authService.js'
 
 const props = defineProps({ batchId: { type: Number, required: true } })
+
+const currentUser = ref(authService.currentUser())
 const emit  = defineEmits(['back', 'view-order'])
 
 const batch             = ref(null)
@@ -388,6 +423,7 @@ const completeQty       = ref(null)
 
 // Per-stage notes keyed by stage_id
 const stageNotes = reactive({})
+const rejectReason = reactive({})
 
 // ── QC state ────────────────────────────────────────────────────
 const qcForm = reactive({ status: '', notes: '' })
@@ -625,7 +661,48 @@ async function completeStage(stage) {
 
 function canStartStage(si) {
   if (si === 0) return true
+  // 'completed' only — a stage parked at pending_approval, or rejected, must
+  // not unlock the next one. Mirrors the server-side guard.
   return stageProgress.value.slice(0, si).every(s => s.status === 'completed')
+}
+
+// Sign-off is a separate duty from running the line (production.approve).
+const canApprove = computed(() => {
+  const u = currentUser.value
+  if (!u) return false
+  if (u.is_admin || u.is_company_admin || u.is_super_admin) return true
+  const p = u.permissions || []
+  return p.includes('*') || p.includes('production.approve')
+})
+
+async function approveStage(stage) {
+  actionLoading.value = true
+  actionError.value = null
+  try {
+    await batchService.approveStage(props.batchId, stage.stage_id, {})
+    actionSuccess.value = `${stage.stage_name} approved.`
+    await loadProgress()
+  } catch (e) {
+    actionError.value = e?.response?.data?.message ?? 'Failed to approve stage.'
+  } finally { actionLoading.value = false }
+}
+
+async function rejectStage(stage) {
+  const reason = (rejectReason[stage.stage_id] || '').trim()
+  if (!reason) {
+    actionError.value = 'Give a reason before rejecting a stage.'
+    return
+  }
+  actionLoading.value = true
+  actionError.value = null
+  try {
+    await batchService.rejectStage(props.batchId, stage.stage_id, { reason })
+    rejectReason[stage.stage_id] = ''
+    actionSuccess.value = `${stage.stage_name} sent back for rework.`
+    await loadProgress()
+  } catch (e) {
+    actionError.value = e?.response?.data?.message ?? 'Failed to reject stage.'
+  } finally { actionLoading.value = false }
 }
 
 // ── Formatters ──────────────────────────────────────────────────
@@ -634,7 +711,7 @@ function statusLabel(s) {
   return { draft: 'Draft', in_progress: 'In Progress', qc_pending: 'QC Pending', qc_passed: 'QC Passed', qc_failed: 'QC Failed', completed: 'Completed' }[s] ?? s
 }
 function stageStatusLabel(s) {
-  return { pending: 'Pending', in_progress: 'In Progress', completed: 'Done' }[s] ?? s
+  return { pending: 'Pending', in_progress: 'In Progress', pending_approval: 'Awaiting sign-off', completed: 'Done', rejected: 'Rejected' }[s] ?? s
 }
 function formatDuration(mins) {
   if (!mins && mins !== 0) return '—'
@@ -738,6 +815,18 @@ onUnmounted(clearTimers)
 .stage-status-badge.pending     { background: #f5f5f5; color: #aaa; }
 .stage-status-badge.in_progress { background: #e8f5e9; color: #2e7d32; }
 .stage-status-badge.completed   { background: var(--primary-tint); color: var(--primary); }
+.stage-status-badge.pending_approval { background: #fff3e0; color: #b5740a; }
+.stage-status-badge.rejected    { background: var(--danger-bg); color: var(--danger); }
+
+/* Sign-off trail (FR-001) */
+.stage-signoff  { font-size: 12px; color: #2e7d32; background: #f1f8f2; border-left: 3px solid #43a047; padding: 4px 8px; margin-top: 5px; border-radius: 0 4px 4px 0; }
+.stage-rejected { font-size: 12px; color: var(--danger); background: var(--danger-bg); border-left: 3px solid var(--danger); padding: 5px 8px; margin-top: 5px; border-radius: 0 4px 4px 0; }
+.reject-reason  { font-style: italic; margin-top: 2px; }
+.reject-hint    { font-size: 11px; opacity: .8; margin-top: 2px; }
+.signoff-icon   { margin-right: 4px; }
+.await-note     { font-size: 12px; color: #b5740a; margin-bottom: 4px; }
+.btn-stage-approve { background: #43a047; color: #fff; }
+.btn-stage-reject  { background: var(--danger); color: #fff; }
 
 /* Stage action area */
 .stage-actions     { margin-top: 8px; }

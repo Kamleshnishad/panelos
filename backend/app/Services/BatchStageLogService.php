@@ -216,16 +216,23 @@ class BatchStageLogService
         foreach ($allStages as $stage) {
             $log = BatchStageLog::where('batch_id', $batch->id)
                 ->where('stage_id', $stage->id)
+                ->with('user', 'approvedByUser')
                 ->first();
 
             $summary[] = [
-                'stage_id'         => $stage->id,
-                'stage_name'       => $stage->name,
-                'status'           => $log?->status ?? 'pending',
-                'started_at'       => $log?->started_at,
-                'completed_at'     => $log?->completed_at,
-                'duration_minutes' => $log?->duration_minutes,
-                'notes'            => $log?->notes,
+                'stage_id'          => $stage->id,
+                'stage_name'        => $stage->name,
+                'requires_approval' => (bool) $stage->requires_approval,
+                'status'            => $log?->status ?? 'pending',
+                'started_at'        => $log?->started_at,
+                'completed_at'      => $log?->completed_at,
+                'duration_minutes'  => $log?->duration_minutes,
+                'notes'             => $log?->notes,
+                'logged_by'         => $log?->user?->name,
+                'approved_by'       => $log?->approvedByUser?->name,
+                'approved_at'       => $log?->approved_at,
+                'rejected_at'       => $log?->rejected_at,
+                'rejection_reason'  => $log?->rejection_reason,
             ];
         }
 

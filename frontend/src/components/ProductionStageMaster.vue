@@ -14,14 +14,15 @@
     <div v-if="loading" class="loading-row">Loading…</div>
     <table v-else class="md-table">
       <thead>
-        <tr><th style="width:60px">Seq</th><th>Stage Name</th><th>Description</th><th>Status</th><th></th></tr>
+        <tr><th style="width:60px">Seq</th><th>Stage Name</th><th>Description</th><th>Sign-off</th><th>Status</th><th></th></tr>
       </thead>
       <tbody>
-        <tr v-if="rows.length === 0"><td colspan="5" class="empty-row">No production stages.</td></tr>
+        <tr v-if="rows.length === 0"><td colspan="6" class="empty-row">No production stages.</td></tr>
         <tr v-for="r in rows" :key="r.id" :class="{ inactive: !r.is_active }">
           <td><span class="seq-badge">{{ r.sequence }}</span></td>
           <td class="bold">{{ r.name }}</td>
           <td class="muted">{{ r.description || '—' }}</td>
+          <td><span v-if="r.requires_approval" class="approval-tag" title="A supervisor must sign this stage off before the next one starts">🖊 Required</span><span v-else class="muted">—</span></td>
           <td><span :class="['status-dot', r.is_active ? 'on' : 'off']">{{ r.is_active ? 'Active' : 'Inactive' }}</span></td>
           <td class="actions">
             <button class="btn-icon edit" @click="openEdit(r)">Edit</button>
@@ -41,6 +42,13 @@
           <div class="form-group"><label>Name *</label><input v-model="form.name" placeholder="Foam Injection" /></div>
           <div class="form-group"><label>Sequence</label><input v-model.number="form.sequence" type="number" min="1" /></div>
           <div class="form-group full"><label>Description</label><input v-model="form.description" /></div>
+          <div class="form-group full">
+            <label class="chk-label">
+              <input type="checkbox" v-model="form.requires_approval" />
+              Requires supervisor sign-off
+            </label>
+            <div class="chk-hint">The next stage stays locked until someone with sign-off rights approves this one.</div>
+          </div>
           <div class="form-group" v-if="editing">
             <label>Status</label>
             <select v-model="form.is_active"><option :value="true">Active</option><option :value="false">Inactive</option></select>
@@ -82,7 +90,7 @@ const saving = ref(false)
 const modalError = ref(null)
 const deleteTarget = ref(null)
 
-const form = reactive({ name: '', sequence: null, description: '', is_active: true })
+const form = reactive({ name: '', sequence: null, description: '', is_active: true, requires_approval: false })
 
 async function load() {
   loading.value = true; error.value = null
@@ -97,12 +105,12 @@ async function load() {
 function openCreate() {
   editing.value = false; editId.value = null; modalError.value = null
   const nextSeq = rows.value.length ? Math.max(...rows.value.map(r => r.sequence ?? 0)) + 1 : 1
-  Object.assign(form, { name: '', sequence: nextSeq, description: '', is_active: true })
+  Object.assign(form, { name: '', sequence: nextSeq, description: '', is_active: true, requires_approval: false })
   showModal.value = true
 }
 function openEdit(r) {
   editing.value = true; editId.value = r.id; modalError.value = null
-  Object.assign(form, { name: r.name, sequence: r.sequence, description: r.description ?? '', is_active: !!r.is_active })
+  Object.assign(form, { name: r.name, sequence: r.sequence, description: r.description ?? '', is_active: !!r.is_active, requires_approval: !!r.requires_approval })
   showModal.value = true
 }
 
@@ -175,4 +183,7 @@ onMounted(load)
 .form-group input, .form-group select { padding: 8px 11px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; }
 .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-tint); }
 .error-msg { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
+.approval-tag { background: #fff3e0; color: #b5740a; border-radius: 10px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+.chk-label { display: flex; align-items: center; gap: 7px; font-weight: 600; cursor: pointer; }
+.chk-hint { font-size: 11px; color: #888; margin-top: 3px; }
 </style>

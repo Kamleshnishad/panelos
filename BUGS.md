@@ -74,14 +74,14 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
-| **PB-031** | `High` | Open | Production | **Stage tracking is decorative.** `BatchStageLogService::areAllStagesCompleted()` and `getNextStage()` are defined but **never called** — `completeBatch()` only checks `status === 'in_progress'`. A batch can be completed, QC'd and dispatched with **zero stage logs**. Sequence is enforced *if* you use stages; using them at all is optional. |
-| **PB-032** | `Medium` | Open | Production | **No sign-off on any production step.** `batch_stage_logs` records only `logged_by_user_id` — the same operator starts and completes a stage. QC is the only approved artefact in the whole system (`approved_by_user_id` + `approved_at`). No rejection/rework path on a stage. |
+| **PB-031** | `High` | Fixed – not deployed | Production | **Stage tracking is decorative.** `BatchStageLogService::areAllStagesCompleted()` and `getNextStage()` are defined but **never called** — `completeBatch()` only checks `status === 'in_progress'`. A batch can be completed, QC'd and dispatched with **zero stage logs**. Sequence is enforced *if* you use stages; using them at all is optional. |
+| **PB-032** | `Medium` | Fixed – not deployed | Production | **No sign-off on any production step.** `batch_stage_logs` records only `logged_by_user_id` — the same operator starts and completes a stage. QC is the only approved artefact in the whole system (`approved_by_user_id` + `approved_at`). No rejection/rework path on a stage. |
 
 ### Feature requests
 
 | ID | Priority | Status | Area | Title |
 |---|---|---|---|---|
-| **FR-001** | `High` | Proposed | Production | **Per-stage approval gate.** Client wants every production step signed off before the next begins. Depends on PB-031 (enforcement) and PB-032 (approver fields). Design in §5. |
+| **FR-001** | `High` | Fixed – not deployed | Production | **Per-stage approval gate.** Client wants every production step signed off before the next begins. Depends on PB-031 (enforcement) and PB-032 (approver fields). Design in §5. |
 
 ### Production data — not code
 

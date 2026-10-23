@@ -27,6 +27,8 @@ export default {
   getProgress(id)           { return api('get',  `/api/batches/${id}/progress`) },
   startStage(batchId, stageId, data)    { return api('post', `/api/batches/${batchId}/stages/${stageId}/start`,    data) },
   completeStage(batchId, stageId, data) { return api('post', `/api/batches/${batchId}/stages/${stageId}/complete`, data) },
+  approveStage(batchId, stageId, data)  { return api('post', `/api/batches/${batchId}/stages/${stageId}/approve`,  data) },
+  rejectStage(batchId, stageId, data)   { return api('post', `/api/batches/${batchId}/stages/${stageId}/reject`,   data) },
 
   // QC
   createQc(id, data)        { return api('post', `/api/batches/${id}/qc`, data) },

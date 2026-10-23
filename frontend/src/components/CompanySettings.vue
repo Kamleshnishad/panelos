@@ -84,6 +84,28 @@
         </div>
       </section>
 
+      <!-- Production control -->
+      <section class="card">
+        <h3>Production Control</h3>
+        <p class="section-hint">
+          Controls how tightly the shop floor is gated. Both are off by default — turn enforcement on only
+          once your production stages are set up and any batches already running have been finished,
+          otherwise those batches cannot be completed.
+        </p>
+        <div class="form-grid">
+          <div class="form-group toggles full">
+            <label class="toggle">
+              <input type="checkbox" v-model="form.enforce_production_stages" :disabled="!canEdit" />
+              Require every production stage to be completed before a batch can be closed
+            </label>
+            <label class="toggle">
+              <input type="checkbox" v-model="form.stage_approval_four_eyes" :disabled="!canEdit" />
+              Require a second person to sign off (the operator cannot approve their own step)
+            </label>
+          </div>
+        </div>
+      </section>
+
       <!-- Bank -->
       <section class="card">
         <h3>Bank Details</h3>
@@ -135,6 +157,7 @@ const fields = [
   'bank_name','bank_account_no','bank_ifsc','bank_branch','authorized_signatory','signatory_phone',
   'primary_color','secondary_color','quotation_prefix','invoice_prefix','order_prefix','challan_prefix',
   'financial_year_start','e_invoice_applicable','tcs_applicable',
+  'enforce_production_stages','stage_approval_four_eyes',
 ]
 
 async function load() {
@@ -147,6 +170,8 @@ async function load() {
     fields.forEach(k => { f[k] = c[k] ?? (k === 'financial_year_start' ? 4 : '') })
     f.e_invoice_applicable = !!c.e_invoice_applicable
     f.tcs_applicable       = !!c.tcs_applicable
+    f.enforce_production_stages = !!c.enforce_production_stages
+    f.stage_approval_four_eyes  = !!c.stage_approval_four_eyes
     f.primary_color        = c.primary_color || '#2B50E0'
     f.secondary_color      = c.secondary_color || '#2140C0'
     form.value  = f
@@ -239,4 +264,6 @@ onMounted(load)
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-secondary { background: var(--primary-tint); color: var(--primary); display: inline-block; }
 .btn-secondary.disabled { opacity: 0.5; cursor: not-allowed; }
+.section-hint { font-size: 12px; color: #777; margin: -4px 0 12px; line-height: 1.5; max-width: 760px; }
+.toggles.full { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
 </style>
