@@ -31,7 +31,7 @@ jobs:
           ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Inspect symlink and try serving the file inside the container
+      - name: Check the new /api/storage route from inside and outside the container
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -39,4 +39,4 @@ jobs:
           ssh -i ~/.ssh/panelos_deploy \
               -o StrictHostKeyChecking=accept-new \
               "$DEPLOY_USER@$DEPLOY_HOST" \
-              "docker exec panelos_backend sh -c 'ls -la /var/www/html/public/storage; echo ---perms---; ls -la /var/www/html/storage/app/public/logos/6/; echo ---curl-localhost---; curl -s -o /dev/null -w \"status=%{http_code}\n\" http://localhost:8080/storage/logos/6/1USRq1e8UFwgnMkAMsyV3Z5hSeCJqVTR3vyh6zps.png; echo ---nginx-error-log---; tail -n 20 /var/log/nginx/error.log'; echo ---docker-ps---; docker ps --format \"{{.Names}}: {{.Ports}}\"; echo ---outer-nginx---; if command -v nginx >/dev/null 2>&1; then nginx -T 2>/dev/null | grep -A5 server_name; fi"
+              "echo ---image-deployed-at---; docker inspect panelos_backend --format '{{.Created}}'; echo ---route-list---; docker exec panelos_backend php artisan route:list --path=storage; echo ---curl-localhost-api-storage---; docker exec panelos_backend curl -s -o /dev/null -w 'status=%{http_code}\n' http://localhost:8080/api/storage/logos/6/1USRq1e8UFwgnMkAMsyV3Z5hSeCJqVTR3vyh6zps.png; echo ---curl-localhost-api-storage-verbose---; docker exec panelos_backend curl -s http://localhost:8080/api/storage/logos/6/1USRq1e8UFwgnMkAMsyV3Z5hSeCJqVTR3vyh6zps.png -o /dev/null -D -; echo ---host-curl-domain---; curl -s -o /dev/null -w 'status=%{http_code}\n' https://pufpanel.digitalwebweaver.com/api/storage/logos/6/1USRq1e8UFwgnMkAMsyV3Z5hSeCJqVTR3vyh6zps.png"
