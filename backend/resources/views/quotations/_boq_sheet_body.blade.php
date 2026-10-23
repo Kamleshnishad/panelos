@@ -9,8 +9,8 @@
   </div>
 </div>
 
+{{-- Worker copy: no customer name — this sheet goes to the shop floor. --}}
 <div class="boq-spec-bar">
-  <strong>CUSTOMER:</strong> {{ $customer->name ?? '—' }} &nbsp;&nbsp;|&nbsp;&nbsp;
   <strong>PROJECT:</strong> {{ $quotation->project_name ?: '—' }} &nbsp;&nbsp;|&nbsp;&nbsp;
   <strong>LOCATION:</strong> {{ $quotation->project_location ?: '—' }}
   &nbsp;&nbsp;|&nbsp;&nbsp; <strong>GUARD FILM:</strong> {{ $items->contains(fn($it) => $it->guard_film) ? 'YES' : 'NO' }}
