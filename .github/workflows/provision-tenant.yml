@@ -1,0 +1,80 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — one-time manual tenant provisioning (manual only)
+#  Runs `php artisan tenant:provision` on the production container via the
+#  same SSH path deploy.yml uses. Never triggers automatically. Business
+#  details are passed as plain (non-secret) workflow inputs; the password
+#  comes from a secret so it's masked in run logs.
+# ═══════════════════════════════════════════════════════════════
+
+name: Provision Tenant
+
+on:
+  workflow_dispatch:
+    inputs:
+      company_name:
+        required: true
+      email:
+        required: true
+      admin_name:
+        default: 'Admin'
+      phone:
+        required: false
+      address:
+        required: false
+      city:
+        required: false
+      state:
+        required: false
+      state_code:
+        required: false
+      pincode:
+        required: false
+      plan:
+        default: 'enterprise'
+
+jobs:
+  provision:
+    name: Provision a tenant company
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment:
+      name: production
+    steps:
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          name: panelos_deploy
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Run tenant:provision on the server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          TENANT_PASSWORD: ${{ secrets.TENANT_ADMIN_PASSWORD }}
+          COMPANY_NAME: ${{ inputs.company_name }}
+          EMAIL: ${{ inputs.email }}
+          ADMIN_NAME: ${{ inputs.admin_name }}
+          PHONE: ${{ inputs.phone }}
+          ADDRESS: ${{ inputs.address }}
+          CITY: ${{ inputs.city }}
+          STATE: ${{ inputs.state }}
+          STATE_CODE: ${{ inputs.state_code }}
+          PINCODE: ${{ inputs.pincode }}
+          PLAN: ${{ inputs.plan }}
+        run: |
+          ssh -i ~/.ssh/panelos_deploy \
+              -o StrictHostKeyChecking=accept-new \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "docker exec panelos_backend php artisan tenant:provision \
+                --company='$COMPANY_NAME' --email='$EMAIL' --admin-name='$ADMIN_NAME' \
+                --password='$TENANT_PASSWORD' --phone='$PHONE' --address='$ADDRESS' \
+                --city='$CITY' --state='$STATE' --state-code='$STATE_CODE' \
+                --pincode='$PINCODE' --plan='$PLAN'"
