@@ -41,7 +41,9 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            // /api/storage, not /storage — the host reverse proxy only
+            // forwards /api/* to this container (see PublicFileController).
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/api/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

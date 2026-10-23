@@ -57,6 +57,13 @@ RateLimiter::for('signup', function (Request $request) {
     ];
 });
 
+// Publicly-readable uploaded files (logos, product images), served under
+// /api because the host's reverse proxy only forwards /api/* to this
+// container — a direct /storage/{path} request never reaches us.
+Route::get('/storage/{path}', [\App\Http\Controllers\Api\PublicFileController::class, 'show'])
+    ->where('path', '.*')
+    ->name('storage.show');
+
 Route::prefix('auth')->group(function () {
     // Public routes — rate-limited per-IP AND per-email (see RateLimiter::for('login') above)
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login')->name('login');
