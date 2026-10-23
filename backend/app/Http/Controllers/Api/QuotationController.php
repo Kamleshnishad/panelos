@@ -344,7 +344,7 @@ class QuotationController extends Controller
             // saw them (QB2): description/unit always lost, door dimensions always null.
             'accessories.*.description'             => 'nullable|string|max:255',
             'accessories.*.unit'                    => 'nullable|string|max:20',
-            'accessories.*.door_type'                => 'nullable|string|max:50',
+            'accessories.*.door_type'                => 'nullable|in:sliding_door,hinged_door,window,pass_through',
             'accessories.*.door_width'               => 'nullable|numeric|min:0',
             'accessories.*.door_height'              => 'nullable|numeric|min:0',
         ];

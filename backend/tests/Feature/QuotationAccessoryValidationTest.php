@@ -110,4 +110,37 @@ class QuotationAccessoryValidationTest extends TestCase
         $response->assertStatus(200);
         $this->assertSame(5000.0, (float) $quotation->fresh()->installation_amount);
     }
+
+    /**
+     * PB-044. door_type is a DB enum, but validation accepted any string, so a bad
+     * value ("Single") got as far as the INSERT and came back as a 500 carrying the
+     * raw SQL error. It must be a clean 422 instead.
+     */
+    public function test_an_unknown_door_type_is_rejected_with_a_422_not_a_sql_error(): void
+    {
+        $admin = $this->createAdminUser();
+        $customer = Customer::factory()->create(['company_id' => $admin->company_id]);
+        $panelType = PanelType::factory()->create(['company_id' => $admin->company_id]);
+        $quotation = Quotation::create([
+            'company_id' => $admin->company_id, 'customer_id' => $customer->id,
+            'quotation_no' => 'SCP-TEST-' . uniqid(), 'status' => 'draft',
+        ]);
+
+        $payload = fn (string $doorType) => [
+            'customer_id' => $customer->id,
+            'panel_rows' => [[
+                'panel_type_id' => $panelType->id, 'thickness' => 50, 'density_type' => 'PUF', 'density_kgm3' => 40,
+                'top_skin_material' => 'PPGI', 'top_skin_thickness' => '0.40', 'top_surface' => 'PLAIN',
+                'bottom_skin_material' => 'PPGI', 'bottom_skin_thickness' => '0.40',
+                'sizes' => [['length_mm' => 3000, 'nos' => 2, 'rate_per_sqm' => 500]],
+            ]],
+            'accessories' => [['type' => 'door', 'qty' => 1, 'rate' => 17500, 'door_type' => $doorType, 'door_width' => 1000, 'door_height' => 2100]],
+        ];
+
+        $this->actingAs($admin, 'sanctum')->putJson("/api/quotations/{$quotation->id}", $payload('Single'))
+            ->assertStatus(422)->assertJsonValidationErrors(['accessories.0.door_type']);
+
+        $this->actingAs($admin, 'sanctum')->putJson("/api/quotations/{$quotation->id}", $payload('hinged_door'))
+            ->assertStatus(200);
+    }
 }
