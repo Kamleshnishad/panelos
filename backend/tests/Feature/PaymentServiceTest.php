@@ -30,7 +30,10 @@ class PaymentServiceTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            // These suites exercise tax/invoice/payment behaviour, not RBAC — without
+            // a role the bare user has no permissions and every write 403s.
+            'is_company_admin' => true,
         ]);
 
         $this->actingAs($this->user);

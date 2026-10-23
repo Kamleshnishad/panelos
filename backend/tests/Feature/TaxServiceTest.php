@@ -31,7 +31,10 @@ class TaxServiceTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            // These suites exercise tax/invoice/payment behaviour, not RBAC — without
+            // a role the bare user has no permissions and every write 403s.
+            'is_company_admin' => true,
         ]);
 
         $this->actingAs($this->user);
@@ -81,7 +84,9 @@ class TaxServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid GST number format');
 
-        $this->taxService->validateGSTNumber('INVALID123');
+        // 15 characters, so it gets past the length check and exercises the
+        // format branch this test is actually about.
+        $this->taxService->validateGSTNumber('27AABUT1234K1Z!');
     }
 
     public function test_apply_tax_to_invoice_exclusive()

@@ -65,7 +65,11 @@ class TaxService
         // implementation looked for the literal substring "GST" inside the GSTIN
         // (e.g. "27AAA…1Z5"), which never matches, so EVERY invoice was being
         // taxed as inter-state (IGST only). This is the canonical India-GST rule.
-        $isIntraState = false;
+        // Unknown state pair defaults to INTRA-state, matching GstState::isInterState()
+        // and the quotation engine, so a quotation and its invoice cannot disagree.
+        // Only reachable without an invoice via a direct call; applyTaxToInvoice
+        // always passes one, so this changes no live behaviour.
+        $isIntraState = true;
         if ($invoice) {
             $customer = $invoice->order?->customer ?? $invoice->dispatch?->batch?->order?->customer;
             // Compared raw state_code strings, so "24" vs "GJ" (the same state,

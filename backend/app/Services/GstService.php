@@ -126,9 +126,17 @@ class GstService
                 return $this->calculateSimpleGst($invoice, $gstRate);
             }
 
-            $supplierState = $supplier->state_code;
-            $customerState = $customer;
-            $isIntraState = strtoupper($supplierState) === strtoupper($customerState);
+            // PB-005 was fixed in TaxService and QuotationService but this third
+            // path was missed: a raw string compare makes 'MH' and '27' — the same
+            // state written two ways — read as inter-state, so /calculate-gst could
+            // charge IGST where the invoice itself charged CGST+SGST. One helper,
+            // one answer, everywhere.
+            $supplierState = \App\Support\GstState::normalize($supplier->state_code)
+                ?? \App\Support\GstState::normalize($supplier->gstin ?? null);
+            $customerState = \App\Support\GstState::normalize($customer);
+            $isIntraState = $supplierState === null || $customerState === null
+                ? true                                   // unknown -> intra-state, as everywhere else
+                : $supplierState === $customerState;
             $subtotal = $invoice->subtotal;
 
             // Determine GST rate
@@ -322,17 +330,17 @@ class GstService
             return ['valid' => false, 'message' => 'Invalid GSTIN format'];
         }
 
-        $stateFromGstin = substr($gstin, 0, 2);
-        $stateFound = false;
-
-        foreach ($this->stateMap as $code => $name) {
-            if (str_pad(array_search($code, array_flip($this->stateMap)), 2, '0', STR_PAD_LEFT) === $stateFromGstin) {
-                $stateFound = true;
-                break;
-            }
+        // Same PB-005 root cause again: this compared the GSTIN's numeric prefix
+        // ('27') against whatever the caller passed as a state code, which is
+        // often alpha ('MH'), so a perfectly valid GSTIN was rejected as
+        // mismatched. Normalise both sides first. (The old loop that computed
+        // $stateFound was dead — nothing ever read it.)
+        $stateFromGstin = \App\Support\GstState::normalize(substr($gstin, 0, 2));
+        if ($stateFromGstin === null) {
+            return ['valid' => false, 'message' => 'GSTIN does not start with a known state code'];
         }
 
-        if ($stateCode && $stateFromGstin !== $stateCode) {
+        if ($stateCode && \App\Support\GstState::normalize($stateCode) !== $stateFromGstin) {
             return ['valid' => false, 'message' => 'State code in GSTIN does not match provided state'];
         }
 
@@ -364,7 +372,12 @@ class GstService
 
     protected function getCustomerState(Invoice $invoice)
     {
-        return $invoice->dispatch?->batch?->order?->customer?->state ?? null;
+        $customer = $invoice->dispatch?->batch?->order?->customer
+            ?? $invoice->order?->customer;
+
+        // state_code first (canonical 2-digit), then the free-text state name,
+        // then the GSTIN prefix — GstState::normalize handles all three.
+        return $customer?->state_code ?: ($customer?->state ?: $customer?->gstin);
     }
 
     protected function getDefaultGstRate($companyId)

@@ -7,7 +7,7 @@ Sequenced delivery plan: [PRODUCTION_READINESS_PLAN.md](PRODUCTION_READINESS_PLA
 See [SYSTEM.md](SYSTEM.md) for how the system works and [CLAUDE.md](CLAUDE.md) for how to test.
 
 **ID scheme:** `PB-###`, assigned once and never reused — even if a bug is rejected or turns out to be a
-duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-035**. Feature requests use `FR-###` (next: **FR-002**).
+duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-036**. Feature requests use `FR-###` (next: **FR-002**).
 
 **Severity** — what it costs if left alone:
 
@@ -63,6 +63,7 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
+| **PB-035** | `Medium` | Fixed – not deployed | GST | **PB-005 was fixed in two places out of four.** `GstService::calculateGst()` still compared supplier and customer state as raw strings, so `/api/invoices/{id}/calculate-gst` read 'MH' vs '27' — the same state written two ways — as inter-state and reported IGST where the invoice itself charged CGST+SGST. `GstService::validateGstin()` had it too: it compared the GSTIN's numeric prefix against a caller-supplied alpha code, rejecting valid GSTINs as mismatched. Both now go through `App\Support\GstState`. Found by the Phase 6 tests, which is exactly what they are for. |
 | **PB-033** | `Medium` | Fixed – not deployed | Inventory | **Opening stock is silently discarded on create.** `POST /api/stock/coils|chemicals|consumables` hard-codes `quantity_in_stock => 0` and does not even validate a supplied quantity, yet returns 201. A tenant entering opening stock sees success and gets zero — then every production start fails with *Insufficient stock* and no clue why. Found during Phase 1 on production. Arguably deliberate (stock should be booked in via `/add` so it writes a `stock_transactions` ledger row) but the silent discard is the trap. Fix: accept an optional opening quantity and book it **through `StockService`** so the ledger stays honest. |
 | **PB-034** | `Low` | Cannot reproduce | Auth | `POST /api/auth/register` returned a bare **502** once, ~4 minutes after the Phase 0 container recreate, while `/api/health`, `/` and `/api/auth/login` were all healthy. A retry 12 minutes later succeeded (201 in 1.7s). Most likely a cold php-fpm worker right after the restart. Logged for pattern-matching; re-open if it recurs after a deploy. |
 | **PB-030** | `Critical` | Deployed | Operations | **Nothing is scheduled.** `app/Console/Kernel.php` defines four jobs (nightly `db:backup --keep=14`, daily `reminders:send` 09:00, daily `sms:send-reminders` 10:00, weekly `reminders:cleanup`) but it is a Laravel 10 artifact — Laravel 11 does not load it, and `php artisan schedule:list` confirms *"No scheduled tasks have been defined."* Supervisord dutifully runs `schedule:run` every 60s and does nothing. **Consequence: there is no routine database backup** (dumps only happen at deploy time), and no automated payment or SMS reminders at all. Fix: port the four definitions into `routes/console.php` using Laravel 11's `Schedule` facade, then verify with `schedule:list`. |
@@ -108,8 +109,8 @@ Baseline on MySQL: 418 tests, 152 passing, 266 failing/erroring.
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
 | **PB-026** | `Medium` | Fixed – not deployed | Tests | 19 test files call `Company::create(['name' => 'Test Company'])` in `setUp()` without `subdomain` (`NOT NULL`), killing **all 184 tests** in those classes before any of them runs. Fails identically on MySQL *and* SQLite — this was never an engine difference. The other 82 failures are unrelated (PB-027/028/029). **Fixed** by dropping the NOT NULL on `companies.subdomain` — the subdomain concept is unused (tenancy resolves from `auth()->user()->company_id`, never the host), so the constraint bought nothing. **Measured yield: +3 passing, not +184.** It was the first of a stack of blockers in the same `setUp()` chains; the 184 now run and immediately hit the next one (see PB-027). |
-| **PB-027** | `Low` | Open | Tests | Missing factories, now the largest blocker: `Dispatch::factory()` undefined (**129 tests** — the model lacks `HasFactory` and there is no factory), `ProductionBatchFactory` missing (25), plus bare creates hitting NOT NULL `company_id` (25) and `name` (22). Expect the same pattern: each fix exposes the next layer. |
-| **PB-028** | `Low` | Open | Tests | Tests call `Coil::factory()` / `Chemical::factory()` — models renamed to `CoilStock` / `ChemicalStock` → 19 errors. |
+| **PB-027** | `Low` | Fixed – not deployed | Tests | Missing factories, now the largest blocker: `Dispatch::factory()` undefined (**129 tests** — the model lacks `HasFactory` and there is no factory), `ProductionBatchFactory` missing (25), plus bare creates hitting NOT NULL `company_id` (25) and `name` (22). Expect the same pattern: each fix exposes the next layer. |
+| **PB-028** | `Low` | Fixed – not deployed | Tests | Tests call `Coil::factory()` / `Chemical::factory()` — models renamed to `CoilStock` / `ChemicalStock` → 19 errors. |
 | **PB-029** | `Low` | **Needs triage** | Tests | Stale payloads (`items` instead of `panel_rows`) and tests asserting **deliberately removed** behaviour — e.g. `DispatchTest` still tests coil allocation at dispatch, which was replaced by consumption at production start. Those should be **deleted, not fixed**; making them pass would mean re-implementing removed behaviour. |
 
 ---

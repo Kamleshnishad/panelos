@@ -89,6 +89,22 @@ class Company extends Model
     /**
      * Get roles relationship
      */
+    /** A tenant's own records. Handy for reporting and for tests asserting isolation. */
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    public function customers()
+    {
+        return $this->hasMany(Customer::class);
+    }
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+
     public function roles()
     {
         return $this->hasMany(Role::class);

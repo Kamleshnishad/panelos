@@ -25,7 +25,7 @@ Not a feeling — a checklist. We are ready when all of these are true:
    **on the production server**, not just in tests.
 7. The money paths (tax, invoicing, payments) have **regression tests that run**.
 
-Today: **3, 4, 5 and 6 are met** (Phases 0–1). **2 and 7 are not.** Item 1 is partially met — a new tenant still hits the opening-stock trap (PB-033).
+Today: **1–6 are met.** Only item 7 (e-invoicing, conditional on turnover) is outstanding.
 
 ---
 
@@ -202,7 +202,12 @@ documentation or contacting support.
 
 ---
 
-## Phase 6 — A safety net over the money paths
+## Phase 6 — A safety net over the money paths ✅ *(done 2026-10-23)*
+
+> The four money suites (`TaxServiceTest`, `GstMultiStateTest`, `InvoiceServiceTest`, `PaymentServiceTest`)
+> are **45/45 green**. Writing the missing factories unblocked far more than those: the suite went from
+> **174 to 247 passing**. Two more instances of the PB-005 state-code bug surfaced and were fixed — see
+> PB-035.
 
 184 tests covering **tax, GST, invoicing, payments and reporting** do not run. The four critical bugs fixed
 today had no coverage, and still don't — the next regression there ships silently.

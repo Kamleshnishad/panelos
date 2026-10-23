@@ -30,7 +30,10 @@ class InvoiceServiceTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            // These suites exercise tax/invoice/payment behaviour, not RBAC — without
+            // a role the bare user has no permissions and every write 403s.
+            'is_company_admin' => true,
         ]);
 
         $this->actingAs($this->user);
@@ -79,6 +82,19 @@ class InvoiceServiceTest extends TestCase
         $this->assertTrue($invoice1->invoice_no < $invoice2->invoice_no);
     }
 
+    /**
+     * invoice_items.panel_type_id is a real FK, so tests need a real panel type.
+     * Cached per test instance, not statically — RefreshDatabase rolls back
+     * between tests, so a static cache hands out ids that no longer exist.
+     */
+    private array $panelTypeIds = [];
+
+    private function panelTypeId(int $n = 1): int
+    {
+        return $this->panelTypeIds[$n] ??= \App\Models\PanelType::factory()
+            ->create(['company_id' => $this->company->id])->id;
+    }
+
     public function test_add_item_to_invoice()
     {
         $dispatch = Dispatch::factory()->for($this->company)->create();
@@ -86,7 +102,7 @@ class InvoiceServiceTest extends TestCase
 
         $item = $this->invoiceService->addItem(
             $invoice->id,
-            1,
+            $this->panelTypeId(),
             10,
             100.00
         );
@@ -110,7 +126,7 @@ class InvoiceServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Can only add items to draft invoices');
 
-        $this->invoiceService->addItem($invoice->id, 1, 10, 100.00);
+        $this->invoiceService->addItem($invoice->id, $this->panelTypeId(), 10, 100.00);
     }
 
     public function test_calculate_totals()
@@ -118,12 +134,17 @@ class InvoiceServiceTest extends TestCase
         $dispatch = Dispatch::factory()->for($this->company)->create();
         $invoice = $this->invoiceService->createFromDispatch($dispatch->id);
 
-        $this->invoiceService->addItem($invoice->id, 1, 10, 100.00);
-        $this->invoiceService->addItem($invoice->id, 2, 5, 200.00);
+        // The dispatch already carries its own line, so assert the delta the two
+        // added items make rather than a bare total that hides it.
+        $before = (float) $invoice->subtotal;
+
+        $this->invoiceService->addItem($invoice->id, $this->panelTypeId(), 10, 100.00);
+        $this->invoiceService->addItem($invoice->id, $this->panelTypeId(2), 5, 200.00);
 
         $updated = $this->invoiceService->calculateTotals($invoice->id);
 
-        $this->assertEquals(2000.00, $updated->subtotal);
+        // 10 x 100 + 5 x 200 = 2,000 on top of whatever was dispatched.
+        $this->assertEquals($before + 2000.00, (float) $updated->subtotal);
     }
 
     public function test_send_invoice()
@@ -153,7 +174,15 @@ class InvoiceServiceTest extends TestCase
         $invoice = $this->invoiceService->createFromDispatch($dispatch->id);
         $this->invoiceService->sendInvoice($invoice->id);
 
-        $paid = $this->invoiceService->markPaid($invoice->id);
+        // markPaid refuses while anything is outstanding — it will not fake a
+        // settlement. Pay the invoice off the way the system expects.
+        $due = app(\App\Services\PaymentService::class)->calculateRemainingDue($invoice->id);
+        app(\App\Services\PaymentService::class)
+            ->recordPayment($invoice->id, $due, 'bank_transfer', 'TEST-SETTLE', $this->company->id);
+
+        // Settling in full flips the invoice itself — markPaid is only for the
+        // case where money arrived outside the system.
+        $paid = $invoice->fresh();
 
         $this->assertEquals('paid', $paid->status);
         $this->assertNotNull($paid->paid_date);
@@ -184,7 +213,7 @@ class InvoiceServiceTest extends TestCase
     {
         $dispatch = Dispatch::factory()->for($this->company)->create();
         $original = $this->invoiceService->createFromDispatch($dispatch->id);
-        $this->invoiceService->addItem($original->id, 1, 10, 100.00);
+        $this->invoiceService->addItem($original->id, $this->panelTypeId(), 10, 100.00);
 
         $duplicate = $this->invoiceService->duplicateInvoice($original->id);
 

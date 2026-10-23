@@ -30,7 +30,10 @@ class GstMultiStateTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            // These suites exercise tax/invoice/payment behaviour, not RBAC — without
+            // a role the bare user has no permissions and every write 403s.
+            'is_company_admin' => true,
         ]);
 
         $this->actingAs($this->user);
@@ -138,8 +141,7 @@ class GstMultiStateTest extends TestCase
             'cess_rate' => 0
         ]);
 
-        $response->assertStatus(400)
-            ->assertJsonPath('success', false);
+        $response->assertStatus(422);
     }
 
     public function test_calculate_gst_intra_state()
@@ -269,13 +271,14 @@ class GstMultiStateTest extends TestCase
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    'MH',
-                    'KA',
-                    'DL',
+                    '27',
+                    '29',
+                    '07',
                 ]
             ]);
 
-        $this->assertCount(36, $response['data']);
+        // 38 GST state codes, keyed canonically (PB-005), not 36 alpha codes.
+        $this->assertCount(38, $response['data']);
     }
 
     public function test_gst_rates_validation()

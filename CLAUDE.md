@@ -20,9 +20,13 @@ set to `DB_CONNECTION=mysql`, `DB_DATABASE=panelos_test` (both `force="true"`).
 
 ```bash
 cd backend
-php vendor/bin/phpunit --no-coverage                 # whole suite
-php vendor/bin/phpunit --filter SomeTest --no-coverage
+php -d memory_limit=1G vendor/bin/phpunit --no-coverage   # whole suite
+php vendor/bin/phpunit --filter SomeTest --no-coverage    # one file
 ```
+
+The `memory_limit` bump is needed for the full run: the factories build a whole
+chain (dispatch → batch → order → quotation → customer → company), and PHP's
+default 128M runs out partway through. A single filtered file is fine without it.
 
 One-time setup (host, port and credentials come from `backend/.env`):
 
