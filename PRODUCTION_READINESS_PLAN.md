@@ -25,13 +25,15 @@ Not a feeling — a checklist. We are ready when all of these are true:
    **on the production server**, not just in tests.
 7. The money paths (tax, invoicing, payments) have **regression tests that run**.
 
-Today: 0, 2, 4, 5, 6 and 7 are not met. Items 1 and 3 are partially met.
+Today: **4 and 5 are met** (Phase 0). 2, 6 and 7 are not. Items 1 and 3 are partially met.
 
 ---
 
-## Phase 0 — Operational safety *(do first, today)*
+## Phase 0 — Operational safety ✅ *(done 2026-10-23, commit `c6a05c5`)*
 
-> You currently have **no routine database backup**. Everything else can wait; this cannot.
+> Was: no routine database backup at all. Now fixed, deployed and verified on the live container —
+> all four tasks registered, scheduler loop running, and a restore rehearsed successfully
+> (773 statements, 0 failures, 65 tables). First unattended nightly backup is due at 01:30.
 
 | Item | What |
 |---|---|

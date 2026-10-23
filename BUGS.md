@@ -63,7 +63,7 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
-| **PB-030** | `Critical` | Open | Operations | **Nothing is scheduled.** `app/Console/Kernel.php` defines four jobs (nightly `db:backup --keep=14`, daily `reminders:send` 09:00, daily `sms:send-reminders` 10:00, weekly `reminders:cleanup`) but it is a Laravel 10 artifact — Laravel 11 does not load it, and `php artisan schedule:list` confirms *"No scheduled tasks have been defined."* Supervisord dutifully runs `schedule:run` every 60s and does nothing. **Consequence: there is no routine database backup** (dumps only happen at deploy time), and no automated payment or SMS reminders at all. Fix: port the four definitions into `routes/console.php` using Laravel 11's `Schedule` facade, then verify with `schedule:list`. |
+| **PB-030** | `Critical` | Deployed | Operations | **Nothing is scheduled.** `app/Console/Kernel.php` defines four jobs (nightly `db:backup --keep=14`, daily `reminders:send` 09:00, daily `sms:send-reminders` 10:00, weekly `reminders:cleanup`) but it is a Laravel 10 artifact — Laravel 11 does not load it, and `php artisan schedule:list` confirms *"No scheduled tasks have been defined."* Supervisord dutifully runs `schedule:run` every 60s and does nothing. **Consequence: there is no routine database backup** (dumps only happen at deploy time), and no automated payment or SMS reminders at all. Fix: port the four definitions into `routes/console.php` using Laravel 11's `Schedule` facade, then verify with `schedule:list`. |
 | **PB-021** | `Medium` | **Needs decision** | Invoicing | Fixed transport is never invoiced. The quotation adds it *after* tax and untaxed; a per-line invoice can't express an untaxed line, so billing it would silently change its tax treatment. **Decide whether transport should be taxed** — then it's a one-line change on both sides. |
 | **PB-022** | `Low` | Deferred | PDF | Generated PDFs are ~1 MB each, dominated by the company logo embedded as a full-size base64 data-URI. Correct, just heavy. |
 | **PB-023** | `Low` | Deferred | Tax | Quotations hard-code 18% while invoices read `TaxConfiguration`. They agree out of the box; they diverge the moment someone changes the invoice rate. |
@@ -88,10 +88,10 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 | **PB-024** | ~~`Critical`~~ | **Not a bug** | Data | `INV-2026-000001` — ₹3,77,100 part-paid, ₹0 GST, ~₹29,250 accessories unbilled. Owner confirmed 2026-10-23 that the Signature PUF Panel tenant holds **dummy data only**, so no credit note or reissue is needed. The audit report labelled this order "real"; that label was wrong. |
 | **PB-025** | ~~`High`~~ | **Not a bug** | Data | `ORD-2027-001` stuck `pending`. Same reason — dummy data. PB-003 stops it recurring. |
 
-> **Open question, not yet answered:** PB-001 zero-rated the GST on *every* invoice for *every* tenant, not
-> just this one. If any other tenant issued invoices before 2026-10-23, those are still wrong in the
-> database and a deploy cannot fix them. Worth one query against production before considering PB-001 fully
-> closed.
+> **Answered 2026-10-23.** PB-001 zero-rated GST on every invoice for every tenant, so the worry was that
+> other tenants held wrong historical invoices. Measured from the production backup during the Phase 0
+> restore rehearsal: **6 companies, 2 invoices in total across the whole platform**, both in the dummy
+> tenant. There is no historical GST exposure to clean up. PB-001 is fully closed.
 
 ---
 
@@ -116,6 +116,7 @@ Baseline on MySQL: 418 tests, 152 passing, 266 failing/erroring.
 
 | When | Commit | Carried | Outcome |
 |---|---|---|---|
+| 2026-10-23 12:16 UTC | [`c6a05c5`](https://github.com/Kamleshnishad/panelos/commit/c6a05c5) | PB-030 (+ PB-026 migration) | ✅ Deployed. Verified on the live container: `schedule:list` shows all four tasks with next-due times, and the supervisord `schedule:run` loop is running. **Restore rehearsed**: the deploy's own backup artifact was loaded into a scratch database — 773 statements, 0 failures, 65 tables, data intact. |
 | 2026-10-23 11:42 UTC | [`7409193`](https://github.com/Kamleshnishad/panelos/commit/7409193) | PB-001 → PB-020 | ✅ Deployed. Pre-migration backup taken (221.9 KB, archived as GH artifact `db-backup-7409193`). Migration `2026_10_23_000001_fix_invoice_dispatch_item_precision_and_non_panel_lines` applied. `schema:check` → *Schema matches baseline*. `/api/health` → `{"status":"OK","database":"OK"}`. |
 
 **Rollback**, if ever needed: run the *Rollback* workflow with SHA `9f89154` and a reason. Note it does
