@@ -48,4 +48,32 @@ class SuperAdminTenantMutationTest extends TestCase
         $response->assertStatus(200);
         $this->assertFalse($tenant->fresh()->is_active);
     }
+
+    /**
+     * activate()'s idempotency check matches on $reference alone, with no
+     * company scoping (by design — a Razorpay webhook and the client's own
+     * verify() call for the SAME payment must dedupe across both paths).
+     * SuperAdminController::activate() passed a fixed string ("Manual
+     * activation by <admin name>") as that reference — not a unique payment
+     * id — so after the first manual activation by a given admin, every
+     * later one (for ANY company) silently matched that same row and
+     * no-op'd. Reported directly by the user: clicking "Activate" on a
+     * second company in the Super Admin panel did nothing.
+     */
+    public function test_activating_two_different_companies_in_a_row_both_take_effect(): void
+    {
+        $superAdmin = $this->createAdminUser(['name' => 'Super Admin']);
+        $companyA = Company::factory()->create(['subscription_status' => 'trial']);
+        $companyB = Company::factory()->create(['subscription_status' => 'trial']);
+
+        $this->actingAs($superAdmin, 'sanctum')
+            ->postJson("/api/admin/companies/{$companyA->id}/activate", ['plan' => 'growth', 'months' => 1])
+            ->assertStatus(200);
+        $this->actingAs($superAdmin, 'sanctum')
+            ->postJson("/api/admin/companies/{$companyB->id}/activate", ['plan' => 'growth', 'months' => 1])
+            ->assertStatus(200);
+
+        $this->assertSame('active', $companyA->fresh()->subscription_status);
+        $this->assertSame('active', $companyB->fresh()->subscription_status);
+    }
 }

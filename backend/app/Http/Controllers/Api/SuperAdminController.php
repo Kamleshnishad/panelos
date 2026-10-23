@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 /**
  * Platform-owner panel: manage ALL tenants across the SaaS.
@@ -140,8 +141,16 @@ class SuperAdminController extends Controller
         $c = Company::withoutGlobalScope('tenant')->findOrFail($id);
         $months = $data['months'] ?? 1;
 
+        // activate()'s idempotency check matches on $reference alone (no
+        // company scoping — by design, so a Razorpay/Stripe webhook and the
+        // client's own verify() call for the SAME payment dedupe correctly
+        // across both paths). A fixed string like "Manual activation by
+        // <admin name>" is NOT a unique reference — after the first manual
+        // activation by a given admin, every later one (for ANY company)
+        // silently matched that same row and no-op'd. Must be unique per call.
+        $reference = 'manual-' . (string) Str::uuid();
         $c = app(\App\Services\SubscriptionService::class)
-            ->activate($c, $data['plan'], $months, 'manual', 'Manual activation by ' . $r->user()->name, true, $r->user()->id);
+            ->activate($c, $data['plan'], $months, 'manual', $reference, true, $r->user()->id);
 
         $this->audit($r, $c->id, 'subscription_activated', "Activated {$data['plan']} for {$months} month(s)", ['plan' => $data['plan'], 'months' => $months]);
         return $this->successResponse($c, "Activated {$data['plan']} for {$months} month(s)");
