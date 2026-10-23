@@ -132,7 +132,39 @@ import leadService from '../services/leadService.js'
 // Each screen is its own chunk, fetched on first visit (keeps the initial bundle small);
 // a spinner shows if the chunk takes more than 150ms.
 const ScreenLoader = { render: () => h('div', { class: 'screen-loader' }, [h('span', { class: 'screen-spinner' }), 'Loading…']) }
-const lazy = loader => defineAsyncComponent({ loader, loadingComponent: ScreenLoader, delay: 150 })
+
+/**
+ * Every deploy rebuilds these chunks with new content hashes and deletes the old
+ * files. A tab that was already open still holds the PREVIOUS index chunk, so the
+ * first screen it opens after a deploy requests a filename that no longer exists:
+ *
+ *   GET /assets/BoqManager-DzJRoNjk.js  ->  404
+ *   TypeError: Failed to fetch dynamically imported module
+ *
+ * The screen then just never appears. Reloading once pulls the new index.html and
+ * the correct hashes. The sessionStorage stamp stops a genuinely missing chunk
+ * (or an offline user) from turning this into a reload loop — we retry at most
+ * once per 10 seconds, and otherwise let the error surface.
+ */
+function reloadOnceForStaleChunk(err) {
+  const msg = String(err?.message || err)
+  const isChunkMiss = /dynamically imported module|Importing a module script failed|Failed to fetch/i.test(msg)
+  if (!isChunkMiss) throw err
+
+  const last = Number(sessionStorage.getItem('chunk_reload_at') || 0)
+  if (Date.now() - last < 10000) throw err
+
+  sessionStorage.setItem('chunk_reload_at', String(Date.now()))
+  window.location.reload()
+  // Keep the async component pending while the reload happens.
+  return new Promise(() => {})
+}
+
+const lazy = loader => defineAsyncComponent({
+  loader: () => loader().catch(reloadOnceForStaleChunk),
+  loadingComponent: ScreenLoader,
+  delay: 150,
+})
 
 const HomeDashboard = lazy(() => import('./HomeDashboard.vue'))
 const LeadManager = lazy(() => import('./LeadManager.vue'))

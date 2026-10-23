@@ -22,7 +22,7 @@
         <button v-if="quotation.status === 'accepted'" class="btn btn-primary" :disabled="actionLoading" @click="action('create-order')">Create Order</button>
         <!-- Secondary actions -->
         <button v-if="['draft','sent'].includes(quotation.status)" class="btn btn-ghost" :disabled="actionLoading" @click="action('reject')">Reject</button>
-        <button v-if="['sent','accepted'].includes(quotation.status)" class="btn btn-ghost" :disabled="actionLoading" @click="action('revise')">Revise</button>
+        <button v-if="['sent','accepted'].includes(quotation.status) && !quotation.orders_count" class="btn btn-ghost" :disabled="actionLoading" @click="action('revise')" title="Create a new version of this quotation">Revise</button>
         <button class="btn btn-ghost" :disabled="actionLoading" title="Copy as new draft" @click="action('duplicate')">Duplicate</button>
         <!-- Destructive (pushed right) -->
         <span class="ab-spacer"></span>

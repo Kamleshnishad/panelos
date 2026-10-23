@@ -617,7 +617,8 @@ class QuotationService
 
     public function getDetails(Quotation $quotation): array
     {
-        $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer', 'parent', 'revisions');
+        $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer', 'parent', 'revisions')
+            ->loadCount('orders');   // lets the UI hide Revise once an order exists (PB-012)
 
         return array_merge($quotation->toArray(), [
             'items' => $quotation->items->map(function ($item) {

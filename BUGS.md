@@ -7,7 +7,7 @@ Sequenced delivery plan: [PRODUCTION_READINESS_PLAN.md](PRODUCTION_READINESS_PLA
 See [SYSTEM.md](SYSTEM.md) for how the system works and [CLAUDE.md](CLAUDE.md) for how to test.
 
 **ID scheme:** `PB-###`, assigned once and never reused — even if a bug is rejected or turns out to be a
-duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-036**. Feature requests use `FR-###` (next: **FR-002**).
+duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-037**. Feature requests use `FR-###` (next: **FR-002**).
 
 **Severity** — what it costs if left alone:
 
@@ -63,6 +63,7 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
+| **PB-036** | `High` | Fixed – not deployed | Frontend | **Every deploy breaks already-open tabs.** Screens are lazy chunks with content-hashed filenames; a deploy writes new hashes and deletes the old files. A tab opened before the deploy still holds the previous index chunk, so the first screen it opens afterwards requests a filename that 404s — `Failed to fetch dynamically imported module` — and the screen simply never renders. Reported live as "BOQ Register is not working"; the API was fine (200, 5 rows). Hits every user on every deploy, on whichever screen they open next. Fixed in the shared `lazy()` helper in AppShell: a chunk-fetch failure reloads the page once, stamped in sessionStorage so a genuinely missing chunk or an offline user cannot cause a reload loop. |
 | **PB-035** | `Medium` | Fixed – not deployed | GST | **PB-005 was fixed in two places out of four.** `GstService::calculateGst()` still compared supplier and customer state as raw strings, so `/api/invoices/{id}/calculate-gst` read 'MH' vs '27' — the same state written two ways — as inter-state and reported IGST where the invoice itself charged CGST+SGST. `GstService::validateGstin()` had it too: it compared the GSTIN's numeric prefix against a caller-supplied alpha code, rejecting valid GSTINs as mismatched. Both now go through `App\Support\GstState`. Found by the Phase 6 tests, which is exactly what they are for. |
 | **PB-033** | `Medium` | Fixed – not deployed | Inventory | **Opening stock is silently discarded on create.** `POST /api/stock/coils|chemicals|consumables` hard-codes `quantity_in_stock => 0` and does not even validate a supplied quantity, yet returns 201. A tenant entering opening stock sees success and gets zero — then every production start fails with *Insufficient stock* and no clue why. Found during Phase 1 on production. Arguably deliberate (stock should be booked in via `/add` so it writes a `stock_transactions` ledger row) but the silent discard is the trap. Fix: accept an optional opening quantity and book it **through `StockService`** so the ledger stays honest. |
 | **PB-034** | `Low` | Cannot reproduce | Auth | `POST /api/auth/register` returned a bare **502** once, ~4 minutes after the Phase 0 container recreate, while `/api/health`, `/` and `/api/auth/login` were all healthy. A retry 12 minutes later succeeded (201 in 1.7s). Most likely a cold php-fpm worker right after the restart. Logged for pattern-matching; re-open if it recurs after a deploy. |
