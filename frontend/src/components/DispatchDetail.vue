@@ -52,6 +52,14 @@
         <div class="info-value">{{ dispatch.tracking_number ?? '—' }}</div>
         <div class="info-sub">Allocation: <strong :class="isAllocated ? 'ok' : 'pend'">{{ isAllocated ? 'Allocated' : 'Not allocated' }}</strong></div>
       </div>
+      <div class="info-cell">
+        <div class="info-label">Transport</div>
+        <div class="info-value">₹ {{ Number(dispatch.transport_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }) }}</div>
+        <div class="info-sub" v-if="dispatch.transporter_name">
+          {{ dispatch.transporter_name }}<span v-if="dispatch.vehicle_no"> · {{ dispatch.vehicle_no }}</span>
+        </div>
+        <div class="info-sub" v-else>Billed on the invoice</div>
+      </div>
     </div>
 
     <!-- Delivery address + editable fields -->
@@ -68,6 +76,19 @@
         <div class="form-group">
           <label>Tracking Number</label>
           <input v-model="editForm.tracking_number" />
+        </div>
+        <div class="form-group">
+          <label>Transporter</label>
+          <input v-model="editForm.transporter_name" placeholder="e.g. Gujarat Roadlines" />
+        </div>
+        <div class="form-group">
+          <label>Vehicle No.</label>
+          <input v-model="editForm.vehicle_no" placeholder="e.g. GJ01AB1234" />
+        </div>
+        <div class="form-group">
+          <label>Transport Charges (₹)</label>
+          <input v-model.number="editForm.transport_amount" type="number" min="0" step="0.01" />
+          <small class="field-hint">Actual freight — update it until the vehicle is confirmed; this is what gets invoiced.</small>
         </div>
         <div class="form-group full">
           <label>Notes</label>
@@ -184,7 +205,8 @@ const showComplete  = ref(false)
 const showCancel    = ref(false)
 const completeDate  = ref(new Date().toISOString().slice(0, 10))
 
-const editForm = reactive({ customer_address: '', expected_delivery_date: '', tracking_number: '', notes: '' })
+const editForm = reactive({ customer_address: '', expected_delivery_date: '', tracking_number: '',
+  transporter_name: '', vehicle_no: '', transport_amount: null, notes: '' })
 
 const isAllocated = computed(() => {
   const items  = dispatch.value?.items?.length ?? 0
@@ -203,6 +225,9 @@ async function load() {
     editForm.customer_address       = dispatch.value.customer_address ?? ''
     editForm.expected_delivery_date = dispatch.value.expected_delivery_date?.slice(0, 10) ?? ''
     editForm.tracking_number        = dispatch.value.tracking_number ?? ''
+    editForm.transporter_name       = dispatch.value.transporter_name ?? ''
+    editForm.vehicle_no             = dispatch.value.vehicle_no ?? ''
+    editForm.transport_amount       = Number(dispatch.value.transport_amount ?? 0)
     editForm.notes                  = dispatch.value.notes ?? ''
   } catch (e) {
     loadError.value = e?.response?.data?.message ?? 'Failed to load dispatch.'
@@ -218,6 +243,9 @@ async function saveEdits() {
       customer_address:       editForm.customer_address || null,
       expected_delivery_date: editForm.expected_delivery_date || null,
       tracking_number:        editForm.tracking_number || null,
+      transporter_name:       editForm.transporter_name || null,
+      vehicle_no:             editForm.vehicle_no || null,
+      transport_amount:       editForm.transport_amount || 0,
       notes:                  editForm.notes || null,
     })
     actionSuccess.value = 'Dispatch updated.'
@@ -359,4 +387,5 @@ onMounted(load)
 .modal-box h3 { margin: 0 0 10px; color: var(--primary); }
 .modal-box p { color: #555; font-size: 14px; margin-bottom: 14px; line-height: 1.5; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.field-hint { display: block; font-size: 11px; color: #888; margin-top: 3px; }
 </style>

@@ -51,6 +51,10 @@ class DispatchService
                 'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
                 'customer_address' => $data['customer_address'] ?? null,
                 'tracking_number' => $data['tracking_number'] ?? null,
+                // Actual freight, settled now rather than quoted months ago (PB-021).
+                'transport_amount' => $data['transport_amount'] ?? 0,
+                'transporter_name' => $data['transporter_name'] ?? null,
+                'vehicle_no' => $data['vehicle_no'] ?? null,
                 'notes' => $data['notes'] ?? null
             ]);
 
@@ -194,7 +198,10 @@ class DispatchService
         $dispatch = Dispatch::where('company_id', $companyId)
             ->findOrFail($dispatchId);
 
-        $allowedFields = ['customer_address', 'expected_delivery_date', 'tracking_number', 'notes'];
+        $allowedFields = ['customer_address', 'expected_delivery_date', 'tracking_number', 'notes',
+            // Freight is renegotiated until the vehicle is confirmed, so it stays
+            // editable on the dispatch right up to the point of invoicing.
+            'transport_amount', 'transporter_name', 'vehicle_no'];
         $updateData = collect($data)->only($allowedFields)->toArray();
 
         if (empty($updateData)) {
@@ -219,6 +226,9 @@ class DispatchService
             'customer' => $dispatch->batch?->order?->customer?->name,
             'address' => $dispatch->customer_address,
             'tracking' => $dispatch->tracking_number,
+            'transporter' => $dispatch->transporter_name,
+            'vehicle_no' => $dispatch->vehicle_no,
+            'transport_amount' => (float) $dispatch->transport_amount,
             'items' => $dispatch->items->map(function ($item) {
                 return [
                     'panel_type' => $item->panelType?->name,

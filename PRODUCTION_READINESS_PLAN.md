@@ -138,7 +138,12 @@ supervisor rejects + reason  → rejected   → operator redoes that stage
 
 ---
 
-## Phase 3 — Close the money leaks
+## Phase 3 — Close the money leaks ✅ *(PB-021 done 2026-10-23; PB-023 still open)*
+
+> The original framing — "is transport taxed?" — was the wrong question. Freight is not agreed at
+> quotation: it depends on the vehicle available on the day and changes repeatedly, so it is settled at
+> **dispatch**. There were no transport fields on `dispatches` at all, which is why it could never reach an
+> invoice. Now captured there and billed, with the quoted figure as a fallback.
 
 | Item | What | Blocked on |
 |---|---|---|

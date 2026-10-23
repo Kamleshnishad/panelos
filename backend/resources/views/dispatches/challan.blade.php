@@ -121,6 +121,12 @@
       @endif
       <div class="party-detail"><span class="bold">Expected Delivery:</span> {{ $dispatch->expected_delivery_date?->format('d/m/Y') ?? '—' }}</div>
       <div class="party-detail"><span class="bold">Tracking / LR No:</span> {{ $dispatch->tracking_number ?? '—' }}</div>
+      @if($dispatch->transporter_name)
+      <div class="party-detail"><span class="bold">Transporter:</span> {{ $dispatch->transporter_name }}</div>
+      @endif
+      @if($dispatch->vehicle_no)
+      <div class="party-detail"><span class="bold">Vehicle No:</span> {{ $dispatch->vehicle_no }}</div>
+      @endif
       @if($dispatch->actual_delivery_date)
         <div class="party-detail"><span class="bold">Delivered On:</span> {{ $dispatch->actual_delivery_date->format('d/m/Y') }}</div>
       @endif

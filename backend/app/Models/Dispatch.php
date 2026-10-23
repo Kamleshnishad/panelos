@@ -22,6 +22,9 @@ class Dispatch extends BaseModel
         'actual_delivery_date',
         'customer_address',
         'tracking_number',
+        'transport_amount',
+        'transporter_name',
+        'vehicle_no',
         'notes'
     ];
 

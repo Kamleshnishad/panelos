@@ -58,6 +58,24 @@
           </div>
         </div>
 
+        <!-- Freight is settled here, not at quotation: the real cost depends on
+             which vehicle is available and changes until the goods move. -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Transporter</label>
+            <input v-model="form.transporter_name" placeholder="e.g. Gujarat Roadlines" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Vehicle No.</label>
+            <input v-model="form.vehicle_no" placeholder="e.g. GJ01AB1234" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Transport Charges (₹)</label>
+            <input v-model.number="form.transport_amount" type="number" min="0" step="0.01" placeholder="0.00" />
+            <small class="field-hint">Actual freight for this trip — billed on the invoice.</small>
+          </div>
+        </div>
+
         <div class="form-group">
           <label>Notes</label>
           <input v-model="form.notes" placeholder="Special handling instructions…" />
@@ -97,6 +115,9 @@ const form = reactive({
   customer_address: '',
   expected_delivery_date: '',
   tracking_number: '',
+  transporter_name: '',
+  vehicle_no: '',
+  transport_amount: null,
   notes: '',
   auto_allocate: false,
 })
@@ -120,6 +141,9 @@ async function submit() {
       customer_address:       form.customer_address || null,
       expected_delivery_date: form.expected_delivery_date || null,
       tracking_number:        form.tracking_number || null,
+      transporter_name:       form.transporter_name || null,
+      vehicle_no:             form.vehicle_no || null,
+      transport_amount:       form.transport_amount || 0,
       notes:                  form.notes || null,
       auto_allocate:          form.auto_allocate,
     })
@@ -191,4 +215,5 @@ onMounted(loadBatches)
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-ghost { background: transparent; border: 1px solid #ddd; color: #555; }
 .loading-state { text-align: center; padding: 30px; color: #888; }
+.field-hint { display: block; font-size: 11px; color: #888; margin-top: 3px; }
 </style>

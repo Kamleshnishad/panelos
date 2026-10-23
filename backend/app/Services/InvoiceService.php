@@ -83,6 +83,7 @@ class InvoiceService
             }
 
             $subtotal += $this->addNonPanelLines($invoice, $dispatch->batch?->order);
+            $subtotal += $this->addTransportLine($invoice, $dispatch, $dispatch->batch?->order);
 
             $invoice->update(['subtotal' => $subtotal]);
 
@@ -137,6 +138,7 @@ class InvoiceService
             }
 
             $subtotal += $this->addNonPanelLines($invoice, $order);
+            $subtotal += $this->addTransportLine($invoice, null, $order);
 
             $invoice->update(['subtotal' => $subtotal]);
 
@@ -232,6 +234,67 @@ class InvoiceService
         }
 
         return $added;
+    }
+
+    /**
+     * Bill freight (PB-021).
+     *
+     * Transport is settled at dispatch, not at quotation: the real cost depends
+     * on which vehicle is available that day and is renegotiated several times
+     * before the goods move. So the dispatch's actual amount wins; the order's
+     * quoted figure is only a fallback for the case where it was agreed up front
+     * and no actual was entered. Either way it now gets billed — previously
+     * neither did, and the money was simply lost.
+     *
+     * It goes into the subtotal, so it carries the same GST rate as the goods.
+     * That matches the usual treatment of freight as part of a composite supply,
+     * but it is a tax question — worth confirming with the client's accountant.
+     */
+    private function addTransportLine(Invoice $invoice, ?Dispatch $dispatch, ?Order $order): float
+    {
+        $amount = (float) ($dispatch?->transport_amount ?: 0);
+        $source = 'actual';
+
+        if ($amount <= 0) {
+            $amount = (float) ($order?->transport_fixed ? $order->transport_amount : 0);
+            $source = 'quoted';
+        }
+
+        if ($amount <= 0) {
+            return 0.0;
+        }
+
+        // Never bill freight twice across a multi-dispatch order.
+        $already = InvoiceItem::whereIn('invoice_id',
+                Invoice::where('order_id', $order?->id)
+                    ->where('id', '!=', $invoice->id)
+                    ->where('status', '!=', 'cancelled')
+                    ->pluck('id'))
+            ->where('description', 'like', 'Transport%')
+            ->exists();
+        if ($already && $source === 'quoted') {
+            return 0.0;
+        }
+
+        $label = 'Transport / freight';
+        if ($dispatch?->transporter_name) {
+            $label .= ' — ' . $dispatch->transporter_name
+                . ($dispatch->vehicle_no ? ' (' . $dispatch->vehicle_no . ')' : '');
+        }
+
+        InvoiceItem::create([
+            'invoice_id'     => $invoice->id,
+            'panel_type_id'  => null,
+            'description'    => $label,
+            'quantity'       => 1,
+            'unit_price'     => $amount,
+            'amount'         => $amount,
+            'tax_rate'       => 0,
+            'tax_amount'     => 0,
+            'total_with_tax' => $amount,
+        ]);
+
+        return $amount;
     }
 
     public function addItem($invoiceId, $panelTypeId, $quantity, $unitPrice, $companyId = null)

@@ -45,7 +45,10 @@ class DispatchController extends Controller
                 'expected_delivery_date' => 'nullable|date',
                 'tracking_number' => 'nullable|string',
                 'auto_allocate' => 'boolean',
-                'notes' => 'nullable|string'
+                'notes' => 'nullable|string',
+                'transport_amount' => 'nullable|numeric|min:0',
+                'transporter_name' => 'nullable|string|max:150',
+                'vehicle_no' => 'nullable|string|max:30',
             ]);
 
             $companyId = auth()->user()->company_id;
@@ -82,7 +85,10 @@ class DispatchController extends Controller
                 'customer_address' => 'string',
                 'expected_delivery_date' => 'nullable|date',
                 'tracking_number' => 'nullable|string',
-                'notes' => 'nullable|string'
+                'notes' => 'nullable|string',
+                'transport_amount' => 'nullable|numeric|min:0',
+                'transporter_name' => 'nullable|string|max:150',
+                'vehicle_no' => 'nullable|string|max:30',
             ]);
 
             $companyId = auth()->user()->company_id;

@@ -204,4 +204,89 @@ class InvoiceTaxAndNonPanelLinesTest extends TestCase
         $this->assertEquals(312.93, round((float) $panelLine->quantity, 2));
         $this->assertEquals(328576.50, round((float) $panelLine->amount, 2));
     }
+
+    /**
+     * PB-021. Transport is settled at dispatch, not quotation — the real cost
+     * depends on the vehicle available that day and is renegotiated repeatedly.
+     * Before this, freight was never billed at all, from either source.
+     */
+    public function test_actual_transport_entered_at_dispatch_is_billed(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');
+
+        $order = $this->orderWithAccessories($admin->company_id);
+        $dispatch = $this->dispatchFor($order);
+        $dispatch->update([
+            'transport_amount' => 7500,
+            'transporter_name' => 'Gujarat Roadlines',
+            'vehicle_no'       => 'GJ01AB1234',
+        ]);
+
+        $invoice = app(InvoiceService::class)->createFromDispatch($dispatch->id, [], $admin->company_id);
+
+        $line = InvoiceItem::where('invoice_id', $invoice->id)
+            ->where('description', 'like', 'Transport%')->first();
+
+        $this->assertNotNull($line, 'Freight entered at dispatch was not billed.');
+        $this->assertEquals(7500, (float) $line->amount);
+        $this->assertStringContainsString('Gujarat Roadlines', $line->description);
+        $this->assertStringContainsString('GJ01AB1234', $line->description);
+
+        // 114000 panels + 4000 accessory + 5000 installation + 7500 freight
+        $this->assertEquals(130500.00, round((float) $invoice->subtotal, 2));
+        // Freight rides in the subtotal, so it carries the same GST as the goods.
+        $this->assertEquals(round(130500 * 0.18, 2), round((float) $invoice->tax_amount, 2));
+    }
+
+    /** With no actual entered, a transport figure agreed up front is still billed. */
+    public function test_quoted_transport_is_billed_when_no_actual_was_entered(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');
+
+        $order = $this->orderWithAccessories($admin->company_id);
+        $order->update(['transport_fixed' => true, 'transport_amount' => 3000]);
+
+        $invoice = app(InvoiceService::class)->createFromOrder($order->id, [], $admin->company_id);
+
+        $line = InvoiceItem::where('invoice_id', $invoice->id)
+            ->where('description', 'like', 'Transport%')->first();
+        $this->assertNotNull($line);
+        $this->assertEquals(3000, (float) $line->amount);
+    }
+
+    /** The day's actual beats the estimate — it must not bill both. */
+    public function test_actual_transport_replaces_the_quoted_estimate(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');
+
+        $order = $this->orderWithAccessories($admin->company_id);
+        $order->update(['transport_fixed' => true, 'transport_amount' => 3000]);
+
+        $dispatch = $this->dispatchFor($order);
+        $dispatch->update(['transport_amount' => 9200]);
+
+        $invoice = app(InvoiceService::class)->createFromDispatch($dispatch->id, [], $admin->company_id);
+
+        $lines = InvoiceItem::where('invoice_id', $invoice->id)
+            ->where('description', 'like', 'Transport%')->get();
+
+        $this->assertCount(1, $lines, 'Freight was billed twice - estimate and actual.');
+        $this->assertEquals(9200, (float) $lines->first()->amount);
+    }
+
+    /** No freight agreed and none incurred: no phantom zero-value line. */
+    public function test_no_transport_line_when_there_is_no_freight(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');
+
+        $order = $this->orderWithAccessories($admin->company_id);
+        $invoice = app(InvoiceService::class)->createFromOrder($order->id, [], $admin->company_id);
+
+        $this->assertSame(0, InvoiceItem::where('invoice_id', $invoice->id)
+            ->where('description', 'like', 'Transport%')->count());
+    }
 }
