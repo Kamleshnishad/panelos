@@ -142,7 +142,7 @@
       @forelse($items as $i => $item)
         @php $spec = $item->spec ?? null; @endphp
         <tr>
-          <td class="text-center">{{ $i + 1 }}</td>
+          <td class="text-center"><div>{{ $i + 1 }}</div></td>
           <td>
             <div class="desc-main">{{ strtoupper($item->panelType->name ?? 'PUF Panel') }}</div>
             @if($spec)
@@ -155,9 +155,9 @@
               </div>
             @endif
           </td>
-          <td>{{ $spec->hsn_code ?? '39259010' }}</td>
-          <td class="text-right bold">{{ number_format($item->quantity, 2) }}</td>
-          <td>SQM</td>
+          <td><div>{{ $spec->hsn_code ?? '39259010' }}</div></td>
+          <td class="text-right bold"><div>{{ number_format($item->quantity, 2) }}</div></td>
+          <td><div>SQM</div></td>
         </tr>
       @empty
         <tr><td colspan="5" class="text-center" style="padding:18px;color:#999">No items recorded on this dispatch.</td></tr>

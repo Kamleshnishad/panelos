@@ -176,7 +176,7 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
       @foreach($items as $i => $item)
         @php $pt = $item->panelType; @endphp
         <tr class="item-row">
-          <td>{{ $i + 1 }}</td>
+          <td><div>{{ $i + 1 }}</div></td>
           <td>
             <div class="desc-text">SUPPLY OF {{ strtoupper($company->name) }} MAKE
               @if(in_array($item->density_type, ['PUF','PIR']))CONTINUOUS LINE @endif{{ strtoupper($item->density_type) }} PANEL
@@ -195,11 +195,11 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
           <td class="text-center">
             @if($pt && $pt->image_data_uri)<img src="{{ $pt->image_data_uri }}" class="prod-img" alt="">@else<span class="no-img">—</span>@endif
           </td>
-          <td class="text-right bold">{{ number_format($item->total_sqm, 2) }}</td>
-          <td>SQM</td>
-          <td class="text-right">₹ {{ number_format($item->rate_per_sqm, 2) }}</td>
-          <td class="text-right bold">₹ {{ number_format($item->amount, 2) }}</td>
-          <td>{{ $item->hsn_code }}</td>
+          <td class="text-right bold"><div>{{ number_format($item->total_sqm, 2) }}</div></td>
+          <td><div>SQM</div></td>
+          <td class="text-right"><div>₹ {{ number_format($item->rate_per_sqm, 2) }}</div></td>
+          <td class="text-right bold"><div>₹ {{ number_format($item->amount, 2) }}</div></td>
+          <td><div>{{ $item->hsn_code }}</div></td>
         </tr>
         @if($item->sizes->count() > 0)
         <tr class="size-row">

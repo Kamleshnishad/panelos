@@ -182,16 +182,16 @@ table { width: 100%; border-collapse: collapse; }
     <tbody>
       @foreach($invoice->items as $i => $item)
       <tr>
-        <td class="text-center">{{ $i + 1 }}</td>
+        <td class="text-center"><div>{{ $i + 1 }}</div></td>
         <td>
           <div class="desc-text">{{ $item->panelType->name ?? 'Item' }}@if($item->panelType && $item->panelType->thickness) — {{ rtrim(rtrim(number_format($item->panelType->thickness,2),'0'),'.') }}mm @endif</div>
           @if($item->panelType && $item->panelType->category)<div class="desc-detail">{{ ucfirst(str_replace('_',' ',$item->panelType->category)) }} panel</div>@endif
         </td>
-        <td class="text-center">{{ $item->panelType->hsn_code ?? '—' }}</td>
-        <td class="text-center">{{ rtrim(rtrim(number_format($item->quantity,2),'0'),'.') }}</td>
-        <td class="text-right">₹ {{ number_format($item->unit_price, 2) }}</td>
-        <td class="text-right">₹ {{ number_format($item->amount, 2) }}</td>
-        <td class="text-right bold">₹ {{ number_format($item->total_with_tax, 2) }}</td>
+        <td class="text-center"><div>{{ $item->panelType->hsn_code ?? '—' }}</div></td>
+        <td class="text-center"><div>{{ rtrim(rtrim(number_format($item->quantity,2),'0'),'.') }}</div></td>
+        <td class="text-right"><div>₹ {{ number_format($item->unit_price, 2) }}</div></td>
+        <td class="text-right"><div>₹ {{ number_format($item->amount, 2) }}</div></td>
+        <td class="text-right bold"><div>₹ {{ number_format($item->total_with_tax, 2) }}</div></td>
       </tr>
       @endforeach
     </tbody>
