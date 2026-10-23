@@ -56,6 +56,10 @@ class SeedSignatureDemoDataTest extends TestCase
 
         $this->assertSame(8, PanelType::withoutGlobalScope('tenant')->where('company_id', $company->id)->count());
 
+        $wallPanel = PanelType::withoutGlobalScope('tenant')->where('company_id', $company->id)->where('name', 'Signature Wall Pro™')->first();
+        $this->assertNotNull($wallPanel->image);
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($wallPanel->image));
+
         $quotation = Quotation::withoutGlobalScope('tenant')->where('company_id', $company->id)->first();
         $this->assertSame('accepted', $quotation->status);
         // Gujarat seller (via the company's now-set GSTIN) + Rajasthan buyer
@@ -63,7 +67,10 @@ class SeedSignatureDemoDataTest extends TestCase
         $this->assertTrue((bool) $quotation->is_inter_state);
         $this->assertGreaterThan(0, (float) $quotation->igst_amount);
         $this->assertSame(0.0, (float) $quotation->cgst_amount);
-        $this->assertEqualsWithDelta(422235.0, (float) $quotation->total_amount, 1.0);
+        // 422235 (the real PFI's roof panel + accessories) plus a second,
+        // not-from-the-PFI Wall Pro line item added so the PDF's Image
+        // column has a row with a real product photo to show.
+        $this->assertEqualsWithDelta(479406.0, (float) $quotation->total_amount, 1.0);
 
         $lead = Lead::withoutGlobalScope('tenant')->where('company_id', $company->id)->first();
         $this->assertSame('won', $lead->status);
@@ -95,18 +102,15 @@ class SeedSignatureDemoDataTest extends TestCase
         $company = Company::withoutGlobalScope('tenant')->where('email', $email)->first();
         $panelCountBefore = PanelType::withoutGlobalScope('tenant')->where('company_id', $company->id)->count();
 
-        // Second run will throw once it tries to re-create the SAME customer's
-        // quotation/order chain (e.g. duplicate quotation number is fine, but
-        // the catalog/customer/stage upserts must still be idempotent and not
-        // duplicate rows before that point).
-        try {
-            Artisan::call('demo:seed-signature', ['--company-email' => $email]);
-        } catch (\Throwable) {
-            // Expected — the chain isn't idempotent past the catalog/customer
-            // setup (a real second transaction isn't the point of this command).
-        }
+        // Second run wipes the one demo customer's prior chain and rebuilds
+        // it cleanly (resetExistingDemoCustomer) rather than erroring on
+        // duplicate quotation/order numbers — catalog/stock/stages are
+        // untouched (natural-key upserts), so nothing duplicates there either.
+        $exitCode = Artisan::call('demo:seed-signature', ['--company-email' => $email]);
+        $this->assertSame(0, $exitCode, Artisan::output());
 
         $this->assertSame($panelCountBefore, PanelType::withoutGlobalScope('tenant')->where('company_id', $company->id)->count());
         $this->assertSame(1, \App\Models\Customer::withoutGlobalScope('tenant')->where('company_id', $company->id)->where('name', 'Kwality Business Associate LLP')->count());
+        $this->assertSame(1, Quotation::withoutGlobalScope('tenant')->where('company_id', $company->id)->count());
     }
 }

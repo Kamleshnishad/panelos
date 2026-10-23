@@ -89,7 +89,10 @@ class SeedSignatureDemoData extends Command
         $this->info('Catalog ready: ' . count($panelTypes) . ' panel types, ' . count($accessories) . ' accessories.');
 
         $roofPanel = $panelTypes['Signature TopRoof™'];
+        $wallPanel = $panelTypes['Signature Wall Pro™'];
         $this->seedStock($company->id, $roofPanel->id);
+        $this->seedStock($company->id, $wallPanel->id);
+        $this->attachPanelTypeImage($wallPanel, 'signature-wall-pro.jpg');
 
         // Safe to re-run: if a previous run got partway through the
         // transaction chain (e.g. failed on a later step), wipe everything
@@ -155,29 +158,55 @@ class SeedSignatureDemoData extends Command
             // not the usual round 50%.
             'advance_pct' => 35.52,
             'notes' => 'Payment: 50% advance with order, balance before dispatch. Delivery: 14 days from techno-commercial clearance. Warranty: 12 months against manufacturing defects.',
-            'panel_rows' => [[
-                'panel_type_id' => $roofPanel->id,
-                'application' => 'Roof',
-                'thickness' => 30,
-                'density_type' => 'PUF',
-                'density_kgm3' => 40,
-                'top_skin_material' => 'PPGL',
-                'top_skin_thickness' => '0.40',
-                'top_color' => 'Off White',
-                'top_surface' => 'RIBBED',
-                'bottom_skin_material' => 'PPGL',
-                'bottom_skin_thickness' => '0.40',
-                'bottom_color' => 'Off White',
-                'bottom_surface' => 'PLAIN',
-                'guard_film' => true,
-                'cello_tap' => true,
-                'hsn_code' => '39259010',
-                'sizes' => [
-                    ['length_mm' => 3660, 'nos' => 60, 'rate_per_sqm' => 1050],
-                    ['length_mm' => 3355, 'nos' => 24, 'rate_per_sqm' => 1050],
-                    ['length_mm' => 4270, 'nos' => 3, 'rate_per_sqm' => 1050],
+            'panel_rows' => [
+                [
+                    'panel_type_id' => $roofPanel->id,
+                    'application' => 'Roof',
+                    'thickness' => 30,
+                    'density_type' => 'PUF',
+                    'density_kgm3' => 40,
+                    'top_skin_material' => 'PPGL',
+                    'top_skin_thickness' => '0.40',
+                    'top_color' => 'Off White',
+                    'top_surface' => 'RIBBED',
+                    'bottom_skin_material' => 'PPGL',
+                    'bottom_skin_thickness' => '0.40',
+                    'bottom_color' => 'Off White',
+                    'bottom_surface' => 'PLAIN',
+                    'guard_film' => true,
+                    'cello_tap' => true,
+                    'hsn_code' => '39259010',
+                    'sizes' => [
+                        ['length_mm' => 3660, 'nos' => 60, 'rate_per_sqm' => 1050],
+                        ['length_mm' => 3355, 'nos' => 24, 'rate_per_sqm' => 1050],
+                        ['length_mm' => 4270, 'nos' => 3, 'rate_per_sqm' => 1050],
+                    ],
                 ],
-            ]],
+                // Not part of the real PFI — added so the quotation PDF's
+                // Image column has at least one row to show (Wall Pro has a
+                // real product photo attached above; TopRoof doesn't).
+                [
+                    'panel_type_id' => $wallPanel->id,
+                    'application' => 'Wall',
+                    'thickness' => 50,
+                    'density_type' => 'PUF',
+                    'density_kgm3' => 40,
+                    'top_skin_material' => 'PPGL',
+                    'top_skin_thickness' => '0.40',
+                    'top_color' => 'Off White',
+                    'top_surface' => 'PLAIN',
+                    'bottom_skin_material' => 'PPGL',
+                    'bottom_skin_thickness' => '0.40',
+                    'bottom_color' => 'Off White',
+                    'bottom_surface' => 'PLAIN',
+                    'guard_film' => false,
+                    'cello_tap' => false,
+                    'hsn_code' => '39259010',
+                    'sizes' => [
+                        ['length_mm' => 3000, 'nos' => 17, 'rate_per_sqm' => 950],
+                    ],
+                ],
+            ],
             'accessories' => [
                 ['type' => 'standard', 'accessory_id' => $accessories['Roof Side Cap']->id, 'qty' => 55, 'rate' => 150, 'unit' => 'MTR'],
                 ['type' => 'standard', 'accessory_id' => $accessories['Ridges Inner & Outer']->id, 'qty' => 60, 'rate' => 350, 'unit' => 'MTR'],
@@ -293,6 +322,25 @@ class SeedSignatureDemoData extends Command
             );
         }
         return $result;
+    }
+
+    /**
+     * Copies a real product photo (committed under resources/seed-images,
+     * pulled from signaturepufpanel.com's own product page) onto the public
+     * disk and attaches it to the panel type, the same storage convention
+     * PanelTypeController::uploadImage() uses. Idempotent: skips if an image
+     * is already set.
+     */
+    private function attachPanelTypeImage(PanelType $panelType, string $sourceFilename): void
+    {
+        if ($panelType->image) return;
+
+        $source = resource_path("seed-images/{$sourceFilename}");
+        if (!file_exists($source)) return;
+
+        $path = "panel-types/{$panelType->company_id}/{$sourceFilename}";
+        \Illuminate\Support\Facades\Storage::disk('public')->put($path, file_get_contents($source));
+        $panelType->update(['image' => $path]);
     }
 
     /** @return array<string, \App\Models\Accessory> keyed by name */
