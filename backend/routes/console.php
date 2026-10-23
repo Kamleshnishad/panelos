@@ -41,6 +41,11 @@ Schedule::command('reminders:cleanup')
     ->weekly()
     ->withoutOverlapping(10);
 
+// Bell notifications for standing conditions (low stock, overdue invoices).
+Schedule::command('notifications:scan')
+    ->hourly()
+    ->withoutOverlapping(10);
+
 // Nightly database backup, retaining the last 14 dumps.
 Schedule::command('db:backup --keep=14')
     ->dailyAt('01:30')

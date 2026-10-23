@@ -87,10 +87,7 @@
               <input v-model="searchQ" aria-label="Jump to a section" placeholder="Jump to a section…" @keyup.enter="quickJump" />
               <span class="kbd">↵</span>
             </div>
-            <button class="icon-btn" aria-label="View receivables alerts" title="Receivables alerts" @click="go('receivables')">
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              <span v-if="alertCount" class="bell-dot"></span>
-            </button>
+            <notification-bell @navigate="go" />
             <button class="btn-primary" @click="go('quotations')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
               New Quote
@@ -136,6 +133,7 @@ import axios from 'axios'
 import authService from '../services/authService.js'
 import { useSessionGuard } from '../composables/useSessionGuard.js'
 import SessionWarning from './SessionWarning.vue'
+import NotificationBell from './NotificationBell.vue'
 import dashboardService from '../services/dashboardService.js'
 import companyService from '../services/companyService.js'
 import productionService from '../services/productionService.js'
@@ -240,7 +238,6 @@ function exitImpersonation() {
 }
 const companyLogo = ref(null)
 const badges      = ref({})
-const alertCount  = ref(0)
 const quotationOpenId = ref(null)
 const quotationPrefill = ref(null)
 // Cross-module deep-link: when a child fires @view-order/@view-batch/@view-dispatch
@@ -309,7 +306,7 @@ const nav = [
   { label: 'Settings', items: [
     { key: 'company',       label: 'Company',         icon: ic.building },
     { key: 'billing',       label: 'Billing & Plan',  icon: ic.money, admin: true },
-    { key: 'notifications', label: 'Notifications',  icon: ic.bell },
+    { key: 'notifications', label: 'Customer Messaging',  icon: ic.bell },
     { key: 'doctemplates',  label: 'Doc Templates',  icon: ic.quote },
     { key: 'master',      label: 'Master Data',     icon: ic.grid },
     { key: 'users',       label: 'Users & Roles',   icon: ic.users, admin: true },
@@ -402,7 +399,6 @@ onMounted(async () => {
       dispatches:  k.pending_dispatch || 0,
       receivables: k.overdue_invoice_count || 0,
     }
-    alertCount.value = (d?.alerts ?? []).length
   } catch { /* ignore */ }
   try {
     const p = (await productionService.planning())?.data ?? {}
@@ -488,9 +484,6 @@ onMounted(async () => {
 .search input { border: none; background: none; outline: none; font-size: 13.5px; flex: 1; color: var(--text); min-width: 0; }
 .kbd { font-size: 11px; color: var(--text-3); background: var(--surface); border: 1px solid var(--border-2); border-radius: 5px; padding: 1px 6px; font-weight: 600; }
 
-.icon-btn { position: relative; width: 40px; height: 40px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--r); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--t-fast); }
-.icon-btn:hover { background: var(--surface-3); color: var(--text); }
-.bell-dot { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); border: 1.5px solid var(--surface); }
 
 .btn-primary { display: flex; align-items: center; gap: 7px; padding: 10px 16px; border: none; border-radius: var(--r); background: linear-gradient(135deg, var(--accent), var(--accent-600)); color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(61,90,241,0.28); transition: transform var(--t-fast), box-shadow var(--t-fast); white-space: nowrap; }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(61,90,241,0.36); }

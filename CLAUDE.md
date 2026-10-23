@@ -48,7 +48,7 @@ Rules:
   the constraint, change the column, and re-add it (see
   `2026_10_23_000001_fix_invoice_dispatch_item_precision_and_non_panel_lines.php`).
 * When fixing a bug, **capture a baseline first** (`git stash` → run suite → `git stash pop`) and compare
-  the failing *set*, not just the count. ~24 tests in the legacy suite already fail because they post
+  the failing *set*, not just the count. ~190 tests in the legacy suite (191 on 2026-10-24) already fail because they post
   long-superseded payloads (`items` instead of `panel_rows`) or call routes that no longer exist; they are
   unrelated to current work. A fix is clean when it adds zero newly-broken tests.
 

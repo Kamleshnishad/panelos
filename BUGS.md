@@ -7,7 +7,7 @@ Sequenced delivery plan: [PRODUCTION_READINESS_PLAN.md](PRODUCTION_READINESS_PLA
 See [SYSTEM.md](SYSTEM.md) for how the system works and [CLAUDE.md](CLAUDE.md) for how to test.
 
 **ID scheme:** `PB-###`, assigned once and never reused — even if a bug is rejected or turns out to be a
-duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-046**. Feature requests use `FR-###` (next: **FR-003**).
+duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-046**. Feature requests use `FR-###` (next: **FR-004**).
 
 **Severity** — what it costs if left alone:
 
@@ -94,6 +94,7 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 |---|---|---|---|---|
 | **FR-001** | `High` | Deployed | Production | **Per-stage approval gate.** Client wants every production step signed off before the next begins. Depends on PB-031 (enforcement) and PB-032 (approver fields). Design in §5. |
 | **FR-002** | `Low` | Open | Quotations | **Installation does not appear as a line item on the quotation PDF.** It is folded into `installation_amount` and shown only in the totals block ("Installation: ₹109,350"). The client's own proforma lists it as line 9 with quantity (364.5 MTR) and rate (₹300), so customers will notice the difference. Same applies to door/custom rows with no master accessory. Needs the installation rows kept as data (qty/rate/unit), not only a sum. |
+| **FR-003** | `Medium` | Fixed, not deployed | Notifications | **Real in-app notifications (the header bell).** The bell was only a shortcut to Receivables with a dot computed once at page load — nothing stored, no read/unread, a stage awaiting approval told nobody, and the dot led to the wrong page for stock alerts. Now a real notification store with a dropdown, unread count, mark-read, click-through, and a 60 s poll. Phase N1 covers stage awaiting approval / approved / rejected, low coil and chemical stock, and overdue invoices; N2/N3 add the rest. Plan: [NOTIFICATIONS_PLAN.md](NOTIFICATIONS_PLAN.md). Tests: `AppNotificationsTest` (13). |
 
 ### Production data — not code
 

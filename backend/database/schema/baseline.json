@@ -34,6 +34,21 @@
         "created_at": "timestamp",
         "updated_at": "timestamp"
     },
+    "app_notifications": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "user_id": "bigint unsigned",
+        "type": "varchar(40)",
+        "severity": "varchar(10)",
+        "title": "varchar(160)",
+        "body": "text",
+        "link_section": "varchar(40)",
+        "link_id": "bigint unsigned",
+        "dedupe_key": "varchar(80)",
+        "read_at": "timestamp",
+        "created_at": "timestamp",
+        "updated_at": "timestamp"
+    },
     "attachments": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",
@@ -255,6 +270,9 @@
         "actual_delivery_date": "date",
         "customer_address": "text",
         "tracking_number": "varchar(255)",
+        "transport_amount": "decimal(12,2)",
+        "transporter_name": "varchar(150)",
+        "vehicle_no": "varchar(30)",
         "notes": "text",
         "created_at": "timestamp",
         "updated_at": "timestamp",

@@ -57,6 +57,11 @@ class BatchStageLogService
             'logged_by_user_id' => $userId,
         ]);
 
+        if ($needsApproval) {
+            $this->notifyStage($log, 'production.approve', 'stage_pending_approval',
+                'Stage awaiting approval', '{stage} on {batch} is waiting for sign-off.', 'warning');
+        }
+
         return $log->fresh();
     }
 
@@ -85,6 +90,8 @@ class BatchStageLogService
             'rejection_reason'    => null,
         ]);
 
+        $this->notifyOperator($log, $userId, 'stage_approved', 'Stage approved', '{stage} on {batch} was approved.', 'info');
+
         return $log->fresh();
     }
 
@@ -108,7 +115,37 @@ class BatchStageLogService
             'completed_at'        => null,
         ]);
 
+        $this->notifyOperator($log, $userId, 'stage_rejected', 'Stage sent back',
+            '{stage} on {batch} was rejected: ' . $reason, 'danger');
+
         return $log->fresh();
+    }
+
+    /** Tell everyone holding $permission that a stage needs them. */
+    private function notifyStage(BatchStageLog $log, string $permission, string $type, string $title, string $body, string $severity): void
+    {
+        $log->loadMissing('batch', 'stage');
+        if (!$log->batch) return;
+
+        app(AppNotificationService::class)->notify(
+            (int) $log->batch->company_id, $permission, $type, $title,
+            strtr($body, ['{stage}' => $log->stage?->name ?? 'A stage', '{batch}' => $log->batch->batch_no]),
+            'batches', (int) $log->batch_id, $severity);
+    }
+
+    /** Tell the operator who ran the stage what the approver decided (not when they decided it themselves). */
+    private function notifyOperator(BatchStageLog $log, int $actorId, string $type, string $title, string $body, string $severity): void
+    {
+        $operator = (int) $log->logged_by_user_id;
+        if (!$operator || $operator === $actorId) return;
+
+        $log->loadMissing('batch', 'stage');
+        if (!$log->batch) return;
+
+        app(AppNotificationService::class)->notify(
+            (int) $log->batch->company_id, [$operator], $type, $title,
+            strtr($body, ['{stage}' => $log->stage?->name ?? 'A stage', '{batch}' => $log->batch->batch_no]),
+            'batches', (int) $log->batch_id, $severity);
     }
 
     /**

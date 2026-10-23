@@ -455,6 +455,12 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
         Route::post('/companies/{id}/set-active',    [\App\Http\Controllers\Api\SuperAdminController::class, 'setActive'])->name('admin.companies.setactive');
     });
 
+    // In-app notifications (header bell) — each user sees only their own rows.
+    Route::get('/notifications',              [\App\Http\Controllers\Api\AppNotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/unread-count', [\App\Http\Controllers\Api\AppNotificationController::class, 'unreadCount'])->name('notifications.unread');
+    Route::post('/notifications/read-all',    [\App\Http\Controllers\Api\AppNotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::post('/notifications/{id}/read',   [\App\Http\Controllers\Api\AppNotificationController::class, 'markRead'])->name('notifications.read');
+
     // Notification settings (Twilio SMS + WhatsApp credentials + triggers)
     Route::get('/settings/notifications',          [\App\Http\Controllers\Api\NotificationSettingsController::class, 'show'])->name('notif.settings.show');
     Route::put('/settings/notifications',          [\App\Http\Controllers\Api\NotificationSettingsController::class, 'update'])->name('notif.settings.update');

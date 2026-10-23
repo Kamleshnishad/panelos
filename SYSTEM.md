@@ -1081,6 +1081,26 @@ failure can never break an order or a dispatch.
 Settings: `GET|PUT /api/settings/notifications`, `POST /api/settings/notifications/test`,
 `GET /api/settings/notifications/logs`.
 
+#### In-app notifications (the header bell)
+
+Separate from the above (that is outbound SMS/WhatsApp to *customers*; the settings page is labelled
+**Customer Messaging**). Plan and status: [NOTIFICATIONS_PLAN.md](NOTIFICATIONS_PLAN.md).
+
+**Service:** `AppNotificationService` → table `app_notifications` (one row per recipient). Recipients are
+named by permission key (everyone in the company who holds it; admins hold all) or by user ids. Failures are
+swallowed and logged.
+
+| Event | Fired from | Recipients |
+|---|---|---|
+| Stage awaiting approval | `BatchStageLogService::completeStage` (stage has `requires_approval`) | `production.approve` |
+| Stage approved / rejected | `approveStage` / `rejectStage` | the operator who ran it (skipped if they decided it themselves) |
+| Low coil / chemical stock, invoices overdue | `notifications:scan`, hourly | `stock.manage`, `payments.view` |
+
+Standing conditions carry a `dedupe_key` and are refreshed in place; when the condition clears the row is
+deleted. Read rows are pruned after 30 days. API (own rows only): `GET /api/notifications`,
+`GET /api/notifications/unread-count`, `POST /api/notifications/{id}/read`, `POST /api/notifications/read-all`.
+UI: `NotificationBell.vue` in the AppShell header (polls every 60 s while the tab is visible).
+
 ### 19.6 Audit log
 
 `Auditable` trait on **Customer, Invoice, Lead, Order, PanelType, PaymentTransaction, ProductionRun,
