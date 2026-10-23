@@ -41,9 +41,12 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            // /api/storage, not /storage — the host reverse proxy only
-            // forwards /api/* to this container (see PublicFileController).
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/api/storage',
+            // Path in the query string, not the URI: nginx (both the
+            // container vhost and the host VPS proxy) intercepts any URI
+            // ending in an image extension and 404s it before PHP sees it.
+            // Storage::url() appends "/<path>", so values arrive as
+            // "?path=/logos/..." — PublicFileController ltrims that.
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/api/file?path=',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
