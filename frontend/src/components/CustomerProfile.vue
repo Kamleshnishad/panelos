@@ -22,7 +22,15 @@
             <span v-if="c.contact_person" class="chip">👤 {{ c.contact_person }}</span>
           </div>
         </div>
+        <button class="btn btn-ghost edit-btn" @click="editOpen = true">✎ Edit Details</button>
       </div>
+
+      <customer-edit-modal
+        :open="editOpen"
+        :customer="c"
+        @close="editOpen = false"
+        @saved="onEdited"
+      />
 
       <!-- Hero KPIs -->
       <div class="kpi-row">
@@ -157,12 +165,21 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import customerService from '../services/customerService.js'
+import CustomerEditModal from './CustomerEditModal.vue'
 import { toastError } from '../services/ui.js'
 
 const props = defineProps({ customerId: { type: Number, required: true } })
 defineEmits(['back', 'open-quotation', 'view-orders'])
 
 const p = ref(null)
+const editOpen = ref(false)
+
+// Reload the profile after an edit so the header, chips and credit figures
+// reflect what was just saved.
+async function onEdited() {
+  editOpen.value = false
+  await load()
+}
 const loading = ref(false)
 const tab = ref('overview')
 
@@ -196,6 +213,7 @@ onMounted(load)
 <style scoped>
 .cp-wrap { padding: 20px 32px 48px; max-width: 1600px; margin: 0 auto; }
 .back { margin-bottom: 14px; }
+.edit-btn { align-self: flex-start; white-space: nowrap; }
 .cp-loading { text-align: center; padding: 60px; color: #888; }
 
 .cp-head { display: flex; gap: 18px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin-bottom: 16px; }

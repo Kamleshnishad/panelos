@@ -35,7 +35,10 @@
             <td>{{ c.city || '—' }}</td>
             <td class="mono">{{ c.gstin || '—' }}</td>
             <td>{{ c.phone || '—' }}</td>
-            <td class="r"><span class="view-link">View 360 →</span></td>
+            <td class="r" @click.stop>
+              <button class="row-btn" @click="editCustomer(c)">Edit</button>
+              <span class="view-link" @click="open(c)">View 360 →</span>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -47,8 +50,8 @@
 
       <customer-edit-modal
         :open="showAdd"
-        :customer="null"
-        @close="showAdd = false"
+        :customer="editing"
+        @close="closeModal"
         @saved="onSaved"
       />
     </template>
@@ -65,8 +68,12 @@ import CustomerEditModal from './CustomerEditModal.vue'
 defineEmits(['open-quotation', 'view-orders'])
 
 const showAdd = ref(false)
-function addCustomer() { showAdd.value = true }
-function onSaved() { showAdd.value = false; load(pagination.current_page) }
+const editing = ref(null)          // null = creating, a customer = editing
+
+function addCustomer() { editing.value = null; showAdd.value = true }
+function editCustomer(c) { editing.value = c; showAdd.value = true }
+function closeModal() { showAdd.value = false; editing.value = null }
+function onSaved() { closeModal(); load(pagination.current_page) }
 
 const rows = ref([])
 const loading = ref(false)
@@ -123,4 +130,7 @@ onMounted(load)
 .btn { padding: 8px 14px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .btn-ghost { background: transparent; border: 1px solid #ddd; color: #555; }
 .btn-primary { background: var(--primary); color: #fff; }
+.row-btn { background: var(--primary-tint); color: var(--primary); border: none; border-radius: 5px; padding: 4px 11px; font-size: 11.5px; font-weight: 700; cursor: pointer; margin-right: 10px; }
+.row-btn:hover { background: var(--primary); color: #fff; }
+.view-link { cursor: pointer; }
 </style>
