@@ -521,15 +521,21 @@ class SuperAdminController extends Controller
             'password' => ['required', \App\Http\Controllers\Api\AuthController::passwordPolicy()],
         ]);
 
+        // is_super_admin is deliberately excluded from User::$fillable (see the
+        // comment on that property) specifically so this is the only place
+        // allowed to set it — but passing it through create()'s mass-assignment
+        // meant Eloquent silently dropped it with no error. Every "platform
+        // admin" created through this endpoint was actually just a normal
+        // company-admin user; the 201 success response was misleading.
         $admin = User::create([
             'company_id'       => $r->user()->company_id,
             'name'             => $data['name'],
             'email'            => $data['email'],
             'password'         => Hash::make($data['password']),
-            'is_super_admin'   => true,
             'is_company_admin' => true,
             'is_active'        => true,
         ]);
+        $admin->forceFill(['is_super_admin' => true])->save();
 
         $this->audit($r, $r->user()->company_id, 'platform_admin_created', "Created platform admin {$admin->email}", ['new_admin_id' => $admin->id]);
         return $this->successResponse(['id' => $admin->id, 'name' => $admin->name, 'email' => $admin->email], 'Platform admin created', 201);
