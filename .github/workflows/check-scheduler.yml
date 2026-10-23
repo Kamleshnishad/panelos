@@ -1,0 +1,45 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — verify the task scheduler is alive on production (manual only).
+#  Guards PB-030: the schedule lived in app/Console/Kernel.php, which Laravel 11
+#  never loads, so `schedule:run` ran every 60s doing nothing — no nightly DB
+#  backup and no automated reminders, silently.
+#  Run this after any framework upgrade, or whenever "did the backup run?"
+#  needs an answer. Read-only: lists tasks and the newest backup dumps.
+# ═══════════════════════════════════════════════════════════════
+
+name: Check Scheduler
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: List scheduled tasks + recent backups
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment:
+      name: production
+    steps:
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          name: panelos_deploy
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Inspect scheduler state
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/panelos_deploy \
+              -o StrictHostKeyChecking=accept-new \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "echo ---scheduled-tasks---; docker exec panelos_backend php artisan schedule:list; echo; echo ---supervisord-scheduler-process---; docker exec panelos_backend ps aux | grep -c '[s]chedule:run' || true; echo ---existing-backups---; docker exec panelos_backend sh -c 'ls -lt /var/www/html/storage/app/backups/*.sql 2>/dev/null | head -5' || echo 'no dumps yet'"
