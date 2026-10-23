@@ -1,11 +1,13 @@
 # PanelOS — Bug Register
 
 Running log of defects found, their severity, and where each one stands.
-Newest batch at the top of each table. See [SYSTEM.md](SYSTEM.md) for how the system works and
-[CLAUDE.md](CLAUDE.md) for how to test.
+Newest batch at the top of each table.
+
+Sequenced delivery plan: [PRODUCTION_READINESS_PLAN.md](PRODUCTION_READINESS_PLAN.md).
+See [SYSTEM.md](SYSTEM.md) for how the system works and [CLAUDE.md](CLAUDE.md) for how to test.
 
 **ID scheme:** `PB-###`, assigned once and never reused — even if a bug is rejected or turns out to be a
-duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-030**.
+duplicate (mark it `Not a bug` / `Duplicate of PB-###` and move on). Next free id: **PB-033**. Feature requests use `FR-###` (next: **FR-002**).
 
 **Severity** — what it costs if left alone:
 
@@ -61,9 +63,23 @@ Found by the end-to-end production audit on 2026-10-23 (`PANELOS_E2E_BUG_REPORT.
 
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
+| **PB-030** | `Critical` | Open | Operations | **Nothing is scheduled.** `app/Console/Kernel.php` defines four jobs (nightly `db:backup --keep=14`, daily `reminders:send` 09:00, daily `sms:send-reminders` 10:00, weekly `reminders:cleanup`) but it is a Laravel 10 artifact — Laravel 11 does not load it, and `php artisan schedule:list` confirms *"No scheduled tasks have been defined."* Supervisord dutifully runs `schedule:run` every 60s and does nothing. **Consequence: there is no routine database backup** (dumps only happen at deploy time), and no automated payment or SMS reminders at all. Fix: port the four definitions into `routes/console.php` using Laravel 11's `Schedule` facade, then verify with `schedule:list`. |
 | **PB-021** | `Medium` | **Needs decision** | Invoicing | Fixed transport is never invoiced. The quotation adds it *after* tax and untaxed; a per-line invoice can't express an untaxed line, so billing it would silently change its tax treatment. **Decide whether transport should be taxed** — then it's a one-line change on both sides. |
 | **PB-022** | `Low` | Deferred | PDF | Generated PDFs are ~1 MB each, dominated by the company logo embedded as a full-size base64 data-URI. Correct, just heavy. |
 | **PB-023** | `Low` | Deferred | Tax | Quotations hard-code 18% while invoices read `TaxConfiguration`. They agree out of the box; they diverge the moment someone changes the invoice rate. |
+
+### Production workflow
+
+| ID | Severity | Status | Area | Title |
+|---|---|---|---|---|
+| **PB-031** | `High` | Open | Production | **Stage tracking is decorative.** `BatchStageLogService::areAllStagesCompleted()` and `getNextStage()` are defined but **never called** — `completeBatch()` only checks `status === 'in_progress'`. A batch can be completed, QC'd and dispatched with **zero stage logs**. Sequence is enforced *if* you use stages; using them at all is optional. |
+| **PB-032** | `Medium` | Open | Production | **No sign-off on any production step.** `batch_stage_logs` records only `logged_by_user_id` — the same operator starts and completes a stage. QC is the only approved artefact in the whole system (`approved_by_user_id` + `approved_at`). No rejection/rework path on a stage. |
+
+### Feature requests
+
+| ID | Priority | Status | Area | Title |
+|---|---|---|---|---|
+| **FR-001** | `High` | Proposed | Production | **Per-stage approval gate.** Client wants every production step signed off before the next begins. Depends on PB-031 (enforcement) and PB-032 (approver fields). Design in §5. |
 
 ### Production data — not code
 
@@ -89,8 +105,8 @@ Baseline on MySQL: 418 tests, 152 passing, 266 failing/erroring.
 
 | ID | Severity | Status | Area | Title |
 |---|---|---|---|---|
-| **PB-026** | `Medium` | Open | Tests | 19 test files call `Company::create(['name' => …])` without `subdomain` (`NOT NULL UNIQUE`) → **184 errors** under MySQL strict mode, plus ~28 cascade failures. One fix clears most of the suite. |
-| **PB-027** | `Low` | Open | Tests | `ProductionBatchFactory` doesn't exist (4 files use it) → 25 errors. |
+| **PB-026** | `Medium` | Fixed – not deployed | Tests | 19 test files call `Company::create(['name' => 'Test Company'])` in `setUp()` without `subdomain` (`NOT NULL`), killing **all 184 tests** in those classes before any of them runs. Fails identically on MySQL *and* SQLite — this was never an engine difference. The other 82 failures are unrelated (PB-027/028/029). **Fixed** by dropping the NOT NULL on `companies.subdomain` — the subdomain concept is unused (tenancy resolves from `auth()->user()->company_id`, never the host), so the constraint bought nothing. **Measured yield: +3 passing, not +184.** It was the first of a stack of blockers in the same `setUp()` chains; the 184 now run and immediately hit the next one (see PB-027). |
+| **PB-027** | `Low` | Open | Tests | Missing factories, now the largest blocker: `Dispatch::factory()` undefined (**129 tests** — the model lacks `HasFactory` and there is no factory), `ProductionBatchFactory` missing (25), plus bare creates hitting NOT NULL `company_id` (25) and `name` (22). Expect the same pattern: each fix exposes the next layer. |
 | **PB-028** | `Low` | Open | Tests | Tests call `Coil::factory()` / `Chemical::factory()` — models renamed to `CoilStock` / `ChemicalStock` → 19 errors. |
 | **PB-029** | `Low` | **Needs triage** | Tests | Stale payloads (`items` instead of `panel_rows`) and tests asserting **deliberately removed** behaviour — e.g. `DispatchTest` still tests coil allocation at dispatch, which was replaced by consumption at production start. Those should be **deleted, not fixed**; making them pass would mean re-implementing removed behaviour. |
 
