@@ -1,0 +1,42 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — one-time manual check of the storage:link symlink on
+#  production (debugging the broken-logo-image report). Never runs
+#  automatically; safe to delete once the symlink fix is confirmed.
+# ═══════════════════════════════════════════════════════════════
+
+name: Check Storage Link
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Inspect public/storage symlink + a known file
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment:
+      name: production
+    steps:
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          name: panelos_deploy
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Inspect symlink and company logo path
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/panelos_deploy \
+              -o StrictHostKeyChecking=accept-new \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "docker exec panelos_backend sh -c 'ls -la /var/www/html/public/storage; echo ---; php artisan tinker --execute=\"\\\$c = \\App\\Models\\Company::withoutGlobalScope(\\\"tenant\\\")->where(\\\"email\\\",\\\"info@signaturepufpanel.com\\\")->first(); echo \\\"id={\\\$c->id} logo={\\\$c->logo}\\\" . PHP_EOL;\"; echo ---; find /var/www/html/storage/app/public/logos -type f 2>&1'"
