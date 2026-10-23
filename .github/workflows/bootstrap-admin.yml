@@ -1,0 +1,44 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — one-time super-admin bootstrap (manual only)
+#  Runs `php artisan admin:bootstrap` on the production container via the
+#  same SSH path deploy.yml uses. Never triggers automatically.
+# ═══════════════════════════════════════════════════════════════
+
+name: Bootstrap Super Admin
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    name: Create/update the platform super admin
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment:
+      name: production
+    steps:
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          name: panelos_deploy
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Run admin:bootstrap on the server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+        run: |
+          ssh -i ~/.ssh/panelos_deploy \
+              -o StrictHostKeyChecking=accept-new \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "docker exec panelos_backend php artisan admin:bootstrap --email='$ADMIN_EMAIL' --password='$ADMIN_PASSWORD'"
