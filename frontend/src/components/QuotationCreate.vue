@@ -733,7 +733,7 @@ function addAccessoryRow(type = 'standard') {
   if (type === 'installation') {
     accessories_rows.value.push({
       _key: _keySeq++, type: 'installation', accessory_id: 'installation',
-      description: 'Erection & Installation Charges', qty: 1, unit: 'SQM', rate: 0, amount: 0,
+      description: 'Erection & Installation Charges', qty: 1, unit: 'LS', rate: 0, amount: 0,
     })
   } else if (type === 'door') {
     accessories_rows.value.push({
@@ -1020,7 +1020,7 @@ async function loadForEdit() {
     })),
   }))
 
-  accessories_rows.value = (q.accessories || []).map(a => ({
+  const masterRows = (q.accessories || []).map(a => ({
     _key:         _keySeq++,
     type:         a.pivot?.type || 'standard',
     accessory_id: a.id,
@@ -1033,6 +1033,24 @@ async function loadForEdit() {
     door_width:   a.pivot?.door_width  || null,
     door_height:  a.pivot?.door_height || null,
   }))
+
+  // Installation, custom items and doors typed into the form have no master accessory; the server keeps
+  // them as rows, so they come back here and are sent back unchanged on save (PB-045).
+  const ownRows = (q.lines || []).map(l => ({
+    _key:         _keySeq++,
+    // the form's "— Custom —" accessory is a standard row with no master item
+    type:         l.type === 'custom' ? 'standard' : l.type,
+    accessory_id: l.type === 'installation' ? 'installation' : (l.type === 'door' ? 'door' : ''),
+    description:  l.description || '',
+    qty:          Number(l.quantity) || 0,
+    unit:         l.unit || (l.type === 'door' ? 'NOS' : 'LS'),
+    rate:         Number(l.unit_price) || 0,
+    amount:       Number(l.amount) || 0,
+    door_type:    l.door_type || null,
+    door_width:   l.door_width || null,
+    door_height:  l.door_height || null,
+  }))
+  accessories_rows.value = [...masterRows, ...ownRows]
 
   recalcTotals()
   } catch (e) {

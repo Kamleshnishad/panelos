@@ -908,6 +908,23 @@
         "created_at": "timestamp",
         "updated_at": "timestamp"
     },
+    "quotation_lines": {
+        "id": "bigint unsigned",
+        "quotation_id": "bigint unsigned",
+        "type": "varchar(20)",
+        "description": "varchar(500)",
+        "unit": "varchar(20)",
+        "quantity": "decimal(10,2)",
+        "unit_price": "decimal(12,2)",
+        "amount": "decimal(12,2)",
+        "hsn_code": "varchar(20)",
+        "door_type": "varchar(20)",
+        "door_width": "smallint unsigned",
+        "door_height": "smallint unsigned",
+        "sort_order": "smallint unsigned",
+        "created_at": "timestamp",
+        "updated_at": "timestamp"
+    },
     "roles": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

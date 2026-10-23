@@ -151,6 +151,25 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Installation, custom items and typed-in doors (no master accessory) -->
+      <div v-if="quotation.lines?.length > 0" class="acc-section">
+        <h4>Installation &amp; other items</h4>
+        <table class="size-table">
+          <thead>
+            <tr><th>Item</th><th>Qty</th><th>Unit</th><th class="text-right">Rate (₹)</th><th class="text-right">Amount (₹)</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="l in quotation.lines" :key="l.id">
+              <td>{{ lineLabel(l) }}</td>
+              <td>{{ Number(l.quantity) }}</td>
+              <td>{{ l.unit }}</td>
+              <td class="text-right">{{ fmtNum(l.unit_price) }}</td>
+              <td class="text-right bold blue">{{ fmtNum(l.amount) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Inline rate-entry save bar (sticky — live totals visible without scrolling) -->
@@ -235,6 +254,15 @@ function lineAmt(sz) {
 }
 function itemAmt(item) {
   return (item.sizes || []).reduce((s, z) => s + lineAmt(z), 0)
+}
+
+// Label for an installation / custom / door row.
+function lineLabel(l) {
+  if (l.type === 'door') {
+    const size = l.door_width && l.door_height ? ` ${l.door_width}×${l.door_height} mm` : ''
+    return `Door / window${size}${l.description ? ' — ' + l.description : ''}`
+  }
+  return l.description || (l.type === 'installation' ? 'Installation / site work' : 'Custom item')
 }
 
 // Live financial summary — mirrors backend recalculate() so it updates as rates

@@ -217,6 +217,36 @@ class InvoiceService
             $added += $amount;
         }
 
+        // Installation, custom items and typed-in doors are kept as rows on the quotation; bill each as its own
+        // line. installation_amount is their sum, so the invoice total is the same as the old single lump.
+        if ($quotation->lines->isNotEmpty()) {
+            foreach ($quotation->lines as $line) {
+                $amount = (float) $line->amount;
+                if ($amount <= 0) continue;
+
+                $label = $line->description ?: match ($line->type) {
+                    'door' => 'Door / window', 'custom' => 'Custom item', default => 'Installation / site work',
+                };
+                if ($line->type === 'door' && $line->door_width && $line->door_height) {
+                    $label .= " ({$line->door_width}×{$line->door_height}mm)";
+                }
+
+                InvoiceItem::create([
+                    'invoice_id'     => $invoice->id,
+                    'panel_type_id'  => null,
+                    'description'    => $label,
+                    'quantity'       => (float) $line->quantity,
+                    'unit_price'     => (float) $line->unit_price,
+                    'amount'         => $amount,
+                    'tax_rate'       => 0,
+                    'tax_amount'     => 0,
+                    'total_with_tax' => $amount,
+                ]);
+                $added += $amount;
+            }
+            return $added;
+        }
+
         $installation = (float) ($quotation->installation_amount ?? 0);
         if ($installation > 0) {
             InvoiceItem::create([

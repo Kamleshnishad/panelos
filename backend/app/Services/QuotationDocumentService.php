@@ -19,10 +19,11 @@ class QuotationDocumentService
     private const DEFAULT_ACCENT = '#2B50E0';
     private const INSTALLATION_SAC = '994568';
     private const DEFAULT_ACCESSORY_HSN = '73089090';
+    private const DEFAULT_DOOR_HSN = '73083000';
 
     public function build(Quotation $q): array
     {
-        $q->loadMissing('items.sizes', 'items.panelType', 'accessories', 'customer', 'company');
+        $q->loadMissing('items.sizes', 'items.panelType', 'accessories', 'lines', 'customer', 'company');
         $company = $q->company;
         $customer = $q->customer;
 
@@ -189,9 +190,16 @@ class QuotationDocumentService
             ];
         }
 
-        // Installation (and door/custom rows with no master item) are stored only as a lump sum today,
-        // so they print as one line.
-        if ((float) $q->installation_amount > 0) {
+        // Rows with no master accessory: custom items, doors typed into the form, then installation last.
+        foreach (['custom', 'door', 'installation'] as $type) {
+            foreach ($q->lines->where('type', $type) as $line) {
+                $lines[] = $this->fromLine($line, ++$sr);
+            }
+        }
+
+        // A quotation that has an installation amount but no rows (cannot happen after the backfill, but
+        // never lose money from a printout) prints it as one lump line.
+        if ($q->lines->isEmpty() && (float) $q->installation_amount > 0) {
             $lines[] = [
                 'sr' => ++$sr, 'kind' => 'installation', 'title' => 'INSTALLATION / SITE WORK',
                 'subtitle' => null, 'description' => null, 'specs' => [], 'sizes' => [],
@@ -201,6 +209,36 @@ class QuotationDocumentService
         }
 
         return $lines;
+    }
+
+    private function fromLine($line, int $sr): array
+    {
+        $door = $line->type === 'door';
+        $desc = trim((string) $line->description);
+
+        $subtitle = null;
+        if ($door) {
+            $size = ($line->door_width && $line->door_height) ? "{$line->door_width} × {$line->door_height} mm" : null;
+            $subtitle = trim(implode(' · ', array_filter([
+                $line->door_type ? ucfirst(str_replace('_', ' ', $line->door_type)) : null, $size,
+            ]))) ?: null;
+        }
+
+        $title = match ($line->type) {
+            'door'   => 'DOOR / WINDOW',
+            'custom' => strtoupper($desc !== '' ? $desc : 'Custom item'),
+            default  => strtoupper($desc !== '' ? $desc : 'Installation / site work'),
+        };
+
+        return [
+            'sr' => $sr, 'kind' => $line->type, 'title' => $title, 'subtitle' => $subtitle,
+            // For a door the description is the form's optional notes; elsewhere it is already the title.
+            'description' => $door && $desc !== '' ? $desc : null,
+            'specs' => [], 'sizes' => [],
+            'hsn' => $line->hsn_code ?: ($door ? self::DEFAULT_DOOR_HSN : self::INSTALLATION_SAC),
+            'qty' => (float) $line->quantity, 'uom' => $line->unit ?: ($door ? 'NOS' : 'LS'),
+            'rate' => (float) $line->unit_price, 'amount' => (float) $line->amount,
+        ];
     }
 
     private function skin($item, string $side): ?string

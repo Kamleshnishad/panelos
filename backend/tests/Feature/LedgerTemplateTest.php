@@ -95,7 +95,7 @@ class LedgerTemplateTest extends TestCase
         foreach (['911,476.00', '772,437.50', '438,037.50', '225,050.00', '109,350.00', '69,519.38', '455,738.00',
                   'SCP-', 'IDEAL AGRI CARE', 'SUPPLY OF SIGNATURE PUF PANEL MAKE CONTINUOUS LINE PUF PANEL — CEILING 30MM THICK.',
                   '0.50 mm PPGL · Off White · RAL 9002 · Plain', 'PUF · 40 (±2) kg/m³', 'Guard film · Cello tape',
-                  'Hinged door · 1000 × 2100 mm', 'Hinged door · 2000 × 2100 mm', 'INSTALLATION / SITE WORK', '994568',
+                  'Hinged door · 1000 × 2100 mm', 'Hinged door · 2000 × 2100 mm', 'INSTALLATION', '994568',
                   'EXTRA AS ACTUAL', 'Gujarat (24)', 'Intra-state'] as $needle) {
             $this->assertStringContainsString($needle, $html, "Missing: {$needle}");
         }

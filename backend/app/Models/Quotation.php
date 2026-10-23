@@ -72,6 +72,8 @@ class Quotation extends BaseModel
     public function company()       { return $this->belongsTo(Company::class); }
     public function items()         { return $this->hasMany(QuotationItem::class)->orderBy('sort_order'); }
     public function accessories()   { return $this->belongsToMany(Accessory::class, 'quotation_accessories')->withPivot('quantity', 'unit_price', 'amount', 'type', 'description', 'unit', 'door_type', 'door_width', 'door_height')->withTimestamps(); }
+    /** Installation / custom / typed-in door rows (no master accessory). installation_amount is their sum. */
+    public function lines()         { return $this->hasMany(QuotationLine::class)->orderBy('sort_order')->orderBy('id'); }
     public function orders()        { return $this->hasMany(Order::class); }
     public function parent()        { return $this->belongsTo(Quotation::class, 'parent_quotation_id'); }
     public function revisions()     { return $this->hasMany(Quotation::class, 'parent_quotation_id'); }

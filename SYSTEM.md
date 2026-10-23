@@ -471,8 +471,10 @@ Rules applied by `saveItems()`:
   silently; it is only a suggestion served by `/suggested-rate`.
 * Item-level `rate_per_sqm` is the weighted average across its size rows; `amount` is their sum.
 * Accessories with a numeric `accessory_id` attach to the pivot (tenant-checked).
-  `door`/`custom` rows **without** a master id and all `installation` rows add their amount to
-  `installation_amount` instead.
+  `installation` rows, `door` rows typed into the form and the form's "— Custom —" accessory have no master
+  item: each is kept as its own row in `quotation_lines` (type, description, unit, quantity, unit price, amount,
+  optional HSN, door size) and `installation_amount` is rewritten as the sum of those rows. The edit form loads
+  and re-sends them, so saving never loses them (PB-045). Revise and duplicate copy them.
 * `is_inter_state` is derived at save time by comparing the state code from the company's GSTIN prefix
   against `customer.state_code`.
 
@@ -870,7 +872,8 @@ drifts by paise), `subtotal` is summed, then `TaxService::applyTaxToInvoice()` r
 writes `tax_amount` and `total_amount` so PDFs and accessors can never drift apart.
 
 **Non-panel lines.** The order's accessories, doors and installation charge are added as invoice lines with
-`panel_type_id = null` and a `description`, read from the order's accepted quotation (accepted quotations
+`panel_type_id = null` and a `description` (installation / custom / door rows one line each, with their real
+quantity and unit price; a quotation with an amount but no rows falls back to one lump line), read from the order's accepted quotation (accepted quotations
 are immutable, so no second snapshot is needed). They are billed **once per order**: if another live
 invoice for the same order already carries them, a later invoice skips them, so a multi-dispatch order
 cannot double-bill. Fixed **transport** is deliberately excluded — see §24.
@@ -1257,7 +1260,7 @@ item.rate_per_sqm  = item.amount / Σ size.sqm           // weighted average
 
 panel_subtotal     = Σ item.amount
 accessory_subtotal = Σ pivot.amount
-installation_amount= Σ amounts of installation rows + unlinked door/custom rows
+installation_amount= Σ quotation_lines.amount   (installation, custom, typed-in doors)
 
 subtotal        = panel_subtotal + accessory_subtotal + installation_amount
 discount_amount = subtotal × discount_pct / 100
@@ -1625,6 +1628,7 @@ as live defects; what is listed below is what is still true of the code today.
 | Duplicate `create-order` returned a generic 500 | 400 with the real domain message |
 | An accepted quotation with an order could still be revised | Blocked |
 | Removing every installation row left the old amount in the total | Always rewritten, including to 0 |
+| Editing a quotation in the form reset installation to 0; typed-in doors and custom accessories were dropped | Stored as rows and round-tripped by the form (PB-045) |
 | `remaining_due` leaked floats like `64000.119999999995` | Rounded to 2 dp |
 | Lead `source` was case-sensitive; lead validation returned a generic message | Case-insensitive; first field error surfaced |
 | `/gst-breakdown` 404'd; GST config stored `state_name: "Unknown"` | Falls back to `TaxCalculation`; state names resolve from either format |

@@ -237,6 +237,8 @@ class QuotationService
                 ]);
             }
 
+            $this->copyLines($original, $newQuotation);
+
             return $newQuotation->load('items.sizes', 'items.panelType', 'accessories', 'customer');
         });
     }
@@ -353,10 +355,22 @@ class QuotationService
                 ]);
             }
 
+            $this->copyLines($original, $newQuotation);
             $this->recalculate($newQuotation);
 
             return $newQuotation->load('items.sizes', 'items.panelType', 'accessories', 'customer');
         });
+    }
+
+    /** Installation / custom / door rows travel with a revision or a duplicate (installation_amount is replicated with the quotation). */
+    private function copyLines(Quotation $from, Quotation $to): void
+    {
+        foreach ($from->lines as $line) {
+            $to->lines()->create($line->only([
+                'type', 'description', 'unit', 'quantity', 'unit_price', 'amount',
+                'hsn_code', 'door_type', 'door_width', 'door_height', 'sort_order',
+            ]));
+        }
     }
 
     // ── Pricing engine ────────────────────────────────────────────────────
@@ -483,7 +497,7 @@ class QuotationService
 
     private function saveAccessories(Quotation $quotation, array $accessories): void
     {
-        $installationTotal = 0;
+        $lines = [];
 
         foreach ($accessories as $acc) {
             $type = $acc['type'] ?? null;
@@ -491,14 +505,9 @@ class QuotationService
             $rate = (float) ($acc['rate'] ?? $acc['unit_price'] ?? 0);
             $amt  = $qty * $rate;
 
-            if ($type === 'installation') {
-                $installationTotal += $amt;
-                continue;
-            }
-
-            // door/custom/standard — if a real accessory_id (integer) provided, attach to pivot
+            // A master accessory (a real id) is attached with its price on the pivot.
             $accId = $acc['accessory_id'] ?? null;
-            if ($accId && is_numeric($accId)) {
+            if ($type !== 'installation' && $accId && is_numeric($accId)) {
                 // Tenant guard: only the quotation's own company's accessories may be attached.
                 \App\Models\Accessory::where('company_id', $quotation->company_id)->findOrFail((int) $accId);
                 $quotation->accessories()->attach((int) $accId, [
@@ -512,17 +521,38 @@ class QuotationService
                     'door_width'  => $acc['door_width']  ?? null,
                     'door_height' => $acc['door_height'] ?? null,
                 ]);
+                continue;
             }
-            // door/window rows without a master accessory_id add their amount to installation_amount
-            if (in_array($type, ['door', 'custom']) && (!$accId || !is_numeric($accId))) {
-                $installationTotal += $amt;
-            }
+
+            // Everything else has no master item: installation, a custom item, a door/window typed into
+            // the form. Each is kept as its own row (qty, unit, rate), not folded into one number and lost.
+            // A "standard" row with no master is the form's "— Custom —" item.
+            $lineType = match ($type) { 'installation' => 'installation', 'door' => 'door', default => 'custom' };
+            $lines[] = [
+                'type'        => $lineType,
+                'description' => $acc['description'] ?? null,
+                'unit'        => $acc['unit'] ?? ($lineType === 'door' ? 'NOS' : 'LS'),
+                'quantity'    => $qty,
+                'unit_price'  => $rate,
+                'amount'      => $amt,
+                'hsn_code'    => $acc['hsn_code'] ?? null,
+                'door_type'   => $lineType === 'door' ? ($acc['door_type'] ?? null) : null,
+                'door_width'  => $lineType === 'door' ? ($acc['door_width'] ?? null) : null,
+                'door_height' => $lineType === 'door' ? ($acc['door_height'] ?? null) : null,
+                'sort_order'  => count($lines),
+            ];
+        }
+
+        // Replace the rows wholesale — the payload is the whole accessories list.
+        $quotation->lines()->delete();
+        foreach ($lines as $line) {
+            $quotation->lines()->create($line);
         }
 
         // Written unconditionally: the old `if ($installationTotal > 0)` meant
         // removing every installation row on an edit left the previous amount
-        // sitting in the total forever — and it now flows through to the invoice.
-        $quotation->update(['installation_amount' => $installationTotal]);
+        // standing. The column stays the authoritative sum of the rows.
+        $quotation->update(['installation_amount' => array_sum(array_column($lines, 'amount'))]);
     }
 
     /** Public entry point to recompute a quotation's totals (used after accessory changes). */
@@ -617,7 +647,7 @@ class QuotationService
 
     public function getDetails(Quotation $quotation): array
     {
-        $quotation->load('items.sizes', 'items.panelType', 'accessories', 'customer', 'parent', 'revisions')
+        $quotation->load('items.sizes', 'items.panelType', 'accessories', 'lines', 'customer', 'parent', 'revisions')
             ->loadCount('orders');   // lets the UI hide Revise once an order exists (PB-012)
 
         return array_merge($quotation->toArray(), [
