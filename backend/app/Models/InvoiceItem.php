@@ -18,8 +18,21 @@ class InvoiceItem extends Model
         'amount',
         'tax_rate',
         'tax_amount',
-        'total_with_tax'
+        'total_with_tax',
+        // No DB default and $timestamps = false means nothing populates this
+        // unless something sets it. Belt-and-suspenders with the creating
+        // hook below, which covers direct attribute sets too (not just
+        // mass-assignment) — see DispatchItem for the sibling bug.
+        'created_at',
     ];
+
+    protected static function boot(): void
+    {
+        parent::boot();
+        static::creating(function (InvoiceItem $item) {
+            $item->created_at ??= now();
+        });
+    }
 
     protected $casts = [
         'quantity' => 'decimal:2',

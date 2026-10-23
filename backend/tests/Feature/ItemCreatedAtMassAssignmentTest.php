@@ -12,20 +12,26 @@ use App\Models\QualityControl;
 use Tests\TestCase;
 
 /**
- * DispatchItem has $timestamps = false (no updated_at column) and
- * DispatchService explicitly passes created_at on create() — but it wasn't
- * in $fillable, so mass-assignment silently dropped it and no auto-timestamp
- * mechanism filled the gap either. Harmless on a lenient MySQL sql_mode;
- * production's strict mode rejected the resulting INSERT outright, which is
- * how this was actually found — not previously logged as a finding.
+ * DispatchItem, InvoiceItem and TaxCalculation all share the same shape:
+ * $timestamps = false, a created_at column with no DB default, and nothing
+ * reliably setting it (mass-assignment silently dropped an explicit value
+ * for DispatchItem; InvoiceItem/TaxCalculation never set it at all). Harmless
+ * on a lenient MySQL sql_mode; production's strict mode rejects the INSERT
+ * outright, which is how DispatchItem's bug was found, and then the same
+ * failure immediately reappeared one step later for InvoiceItem/TaxCalculation
+ * when the dispatch-to-invoice chain was run end to end.
  */
-class DispatchItemCreatedAtTest extends TestCase
+class ItemCreatedAtMassAssignmentTest extends TestCase
 {
     use \Tests\Traits\HasDatabaseTestHelpers;
 
     public function test_dispatch_creation_sets_created_at_on_its_items(): void
     {
         $admin = $this->createAdminUser();
+        \App\Models\TaxConfiguration::create([
+            'company_id' => $admin->company_id, 'tax_type' => 'exclusive',
+            'default_tax_rate' => 18, 'is_active' => true,
+        ]);
         $panelType = PanelType::factory()->create(['company_id' => $admin->company_id]);
         $customer = Customer::factory()->create(['company_id' => $admin->company_id]);
         $quotation = Quotation::create([
@@ -61,5 +67,17 @@ class DispatchItemCreatedAtTest extends TestCase
         $this->assertDatabaseHas('dispatch_items', ['panel_type_id' => $panelType->id]);
         $item = \App\Models\DispatchItem::first();
         $this->assertNotNull($item->created_at);
+
+        $dispatchId = $response->json('data.id');
+        $invoiceResponse = $this->actingAs($admin, 'sanctum')->postJson('/api/invoices/from-dispatch', [
+            'dispatch_id' => $dispatchId,
+            'invoice_date' => now()->toDateString(),
+        ]);
+
+        $invoiceResponse->assertStatus(201);
+        $invoiceItem = \App\Models\InvoiceItem::first();
+        $this->assertNotNull($invoiceItem->created_at);
+        $taxCalculation = \App\Models\TaxCalculation::first();
+        $this->assertNotNull($taxCalculation->created_at);
     }
 }

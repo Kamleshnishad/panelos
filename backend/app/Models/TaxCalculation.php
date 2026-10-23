@@ -17,8 +17,20 @@ class TaxCalculation extends Model
         'tax_amount',
         'sgst_amount',
         'cgst_amount',
-        'igst_amount'
+        'igst_amount',
+        // No DB default and $timestamps = false — same sibling bug as
+        // InvoiceItem/DispatchItem. TaxService::applyTaxToInvoice() never
+        // set this, so every invoice's tax calc fails under strict sql_mode.
+        'created_at',
     ];
+
+    protected static function boot(): void
+    {
+        parent::boot();
+        static::creating(function (TaxCalculation $tax) {
+            $tax->created_at ??= now();
+        });
+    }
 
     protected $casts = [
         'tax_rate' => 'decimal:2',
