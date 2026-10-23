@@ -18,6 +18,7 @@
     <div v-if="submitError" class="error-banner">{{ submitError }}</div>
 
     <div class="qc-body">
+    <div class="qc-main">
       <!-- ── Section 1: Header Info ─────────────────────────────── -->
       <section class="card">
         <h3>{{ isBoq ? 'BOQ Details' : 'Quotation Details' }}</h3>
@@ -399,8 +400,13 @@
           </div>
         </div>
       </section>
+    </div>
 
-      <!-- ── Section 4: Totals Summary ──────────────────────────── -->
+    <!-- ── Section 4: Totals Summary — sticky sidebar so live totals stay
+         visible while scrolling the (often long) panel-rows/accessories
+         columns in qc-main, instead of only appearing after scrolling
+         past everything ── -->
+    <div class="qc-sidebar">
       <!-- BOQ mode: spec-only summary, no money -->
       <section v-if="isBoq" class="card totals-card boq-summary">
         <h3>BOQ Summary</h3>
@@ -474,6 +480,7 @@
           </div>
         </div>
       </section>
+    </div>
     </div>
 
     <!-- Sticky running totals (stays visible while scrolling rows) -->
@@ -1093,7 +1100,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadGua
 </script>
 
 <style scoped>
-.qc-wrap { font-family: inherit; max-width: 1100px; margin: 0 auto; }
+.qc-wrap { font-family: inherit; max-width: 1320px; margin: 0 auto; }
 
 .qc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .qc-header h2 { flex: 1; margin: 0; font-size: 20px; color: var(--primary); }
@@ -1101,7 +1108,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadGua
 
 .error-banner { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
 
-.qc-body { display: flex; flex-direction: column; gap: 18px; }
+/* Two-column layout: qc-main scrolls normally, qc-sidebar (the totals
+   card) stays pinned in view via position: sticky so live totals are
+   visible without scrolling past the whole form first. */
+.qc-body { display: flex; gap: 18px; align-items: flex-start; }
+.qc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+.qc-sidebar { width: 400px; flex-shrink: 0; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
 
 .card { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px 24px; }
 .card h3 { margin: 0 0 16px; font-size: 15px; color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary-tint); padding-bottom: 8px; }
@@ -1120,6 +1132,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadGua
   .size-section { overflow-x: auto; }
   .cust-grid { grid-template-columns: 1fr; }
   .sticky-totals { gap: 16px; flex-wrap: wrap; }
+  /* Not enough room for a 400px sidebar beside the form — stack instead,
+     falling back to the bottom sticky-totals bar for live-total visibility. */
+  .qc-body { flex-direction: column; }
+  .qc-sidebar { width: 100%; position: static; max-height: none; overflow-y: visible; }
 }
 @media (max-width: 600px) {
   .form-grid, .form-grid.compact { grid-template-columns: 1fr; }
@@ -1215,7 +1231,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadGua
 .acc-table td { padding: 5px 8px; border: 1px solid #e0e0e0; vertical-align: middle; }
 
 /* Totals */
-.totals-card { max-width: 480px; margin-left: auto; }
+.totals-card { width: 100%; }
 .totals-grid { display: flex; flex-direction: column; gap: 0; }
 .t-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
 .t-row.border-top { border-top: 2px solid var(--primary); margin-top: 4px; padding-top: 9px; font-weight: 600; }
