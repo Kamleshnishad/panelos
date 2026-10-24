@@ -25,7 +25,12 @@ class NotificationSettingsController extends Controller
         $data['whatsapp_ready']    = $s->isWhatsappReady();
         $data['mail']              = \App\Support\MailStatus::describe($r->user()->company_id);
         // The company's own mailbox. The password is never sent back, only whether one is saved.
-        $data['smtp_password_set'] = !empty($s->getAttribute('smtp_password'));
+        $data['smtp_password_set']       = !empty($s->getAttribute('smtp_password'));
+        $data['notif_smtp_password_set'] = !empty($s->getAttribute('notif_smtp_password'));
+        // Which mailbox each kind of customer e-mail uses (the admin's choice, else the default), and the kinds themselves.
+        $company = $r->user()->company_id;
+        $data['mail_routing'] = collect(\App\Support\CompanyMail::TYPES)->map(fn ($m, $type) => \App\Support\CompanyMail::kindFor($company, $type))->all();
+        $data['mail_types']   = collect(\App\Support\CompanyMail::TYPES)->map(fn ($m, $type) => ['type' => $type, 'label' => $m['label'], 'default' => $m['default']])->values()->all();
         return $this->successResponse($data, 'Notification settings retrieved');
     }
 
@@ -46,36 +51,37 @@ class NotificationSettingsController extends Controller
             'notify_dispatch_done'    => 'nullable|boolean',
             'admin_phone'             => 'nullable|string|max:20',
             'email_payment_reminders' => 'nullable|boolean',
-            'smtp_enabled'            => 'nullable|boolean',
-            'smtp_host'               => ['nullable', 'string', 'max:150', function ($attr, $value, $fail) {
-                if ($value !== null && $value !== '' && ($why = \App\Support\SmtpHostGuard::problemWithHost($value))) $fail($why);
-            }],
-            'smtp_port'               => ['nullable', 'integer', 'in:' . implode(',', \App\Support\SmtpHostGuard::PORTS)],
-            'smtp_encryption'         => 'nullable|in:ssl,tls',
-            'smtp_username'           => 'nullable|string|max:190',
-            'smtp_password'           => 'nullable|string|max:300',
-            'smtp_from_address'       => 'nullable|email|max:190',
-            'smtp_from_name'          => 'nullable|string|max:150',
-            'clear_smtp_password'     => 'nullable|boolean',
-        ]);
+            'mail_routing'            => 'nullable|array',
+            'mail_routing.*'          => 'in:main,notifications',
+        ] + $this->mailboxRules('smtp_') + $this->mailboxRules('notif_smtp_'));
+
+        // Which mailbox each kind of e-mail uses: only known kinds, merged over what is saved so a partial save keeps the rest.
+        $current = NotificationSetting::forCompany($r->user()->company_id);
+        if (array_key_exists('mail_routing', $data)) {
+            $known = array_keys(\App\Support\CompanyMail::TYPES);
+            $data['mail_routing'] = array_merge($current->mail_routing ?? [], array_intersect_key($data['mail_routing'] ?? [], array_flip($known)));
+        }
 
         // A blank password keeps the saved one; it is replaced only when a new one is typed, or removed on request.
-        if (!empty($data['clear_smtp_password'])) {
-            $data['smtp_password'] = null;
-            $clearPassword = true;
-        } elseif (($data['smtp_password'] ?? '') === '') {
-            unset($data['smtp_password']);
-        }
-        unset($data['clear_smtp_password']);
+        $cleared = [];
+        $labels = ['smtp_' => 'main mailbox', 'notif_smtp_' => 'notifications mailbox'];
+        foreach (['smtp_', 'notif_smtp_'] as $p) {
+            if (!empty($data["clear_{$p}password"])) {
+                $data["{$p}password"] = null;
+                $cleared[] = $p;
+            } elseif (($data["{$p}password"] ?? '') === '') {
+                unset($data["{$p}password"]);
+            }
+            unset($data["clear_{$p}password"]);
 
-        // Switching the mailbox on needs everything it takes to log in and to say who the mail is from.
-        $current = NotificationSetting::forCompany($r->user()->company_id);
-        if (!empty($data['smtp_enabled'])) {
-            $merged = fn ($k) => array_key_exists($k, $data) ? $data[$k] : $current->getAttribute($k);
-            $missing = collect(['smtp_host' => 'mail server', 'smtp_port' => 'port', 'smtp_username' => 'user name', 'smtp_password' => 'password', 'smtp_from_address' => '"send as" address'])
-                ->filter(fn ($label, $k) => empty($merged($k)) || (($clearPassword ?? false) && $k === 'smtp_password'))->values();
-            if ($missing->isNotEmpty()) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['smtp_enabled' => 'To send from your own mailbox, fill in: ' . $missing->implode(', ') . '.']);
+            // Switching a mailbox on needs everything it takes to log in and to say who the mail is from.
+            if (!empty($data["{$p}enabled"])) {
+                $merged = fn ($k) => array_key_exists($p . $k, $data) ? $data[$p . $k] : $current->getAttribute($p . $k);
+                $missing = collect(['host' => 'mail server', 'port' => 'port', 'username' => 'user name', 'password' => 'password', 'from_address' => '"send as" address'])
+                    ->filter(fn ($label, $k) => empty($merged($k)) || (in_array($p, $cleared, true) && $k === 'password'))->values();
+                if ($missing->isNotEmpty()) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(["{$p}enabled" => "To switch on the {$labels[$p]}, fill in: " . $missing->implode(', ') . '.']);
+                }
             }
         }
 
@@ -90,8 +96,8 @@ class NotificationSettingsController extends Controller
         // Save: only skip truly null values (allow empty strings to clear fields)
         $save = array_filter($data, fn ($v) => $v !== null);
         $s->update($save);
-        if ($clearPassword ?? false) {
-            $s->forceFill(['smtp_password' => null, 'smtp_enabled' => false])->save();   // no password, so the mailbox cannot stay on
+        foreach ($cleared as $p) {
+            $s->forceFill(["{$p}password" => null, "{$p}enabled" => false])->save();   // no password, so the mailbox cannot stay on
         }
 
         return $this->successResponse([
@@ -106,8 +112,14 @@ class NotificationSettingsController extends Controller
      */
     public function testEmail(Request $r)
     {
+        $kind = $r->input('mailbox') === 'notifications' ? \App\Support\CompanyMailbox::NOTIFICATIONS : \App\Support\CompanyMailbox::MAIN;
         $status = \App\Support\MailStatus::describe($r->user()->company_id);
-        if (!$status['delivers']) {
+        // The test uses exactly the mailbox whose button was pressed. For the main one, no mailbox of its own means the server's mailer.
+        $own = \App\Support\CompanyMail::exactFor($r->user()->company_id, $kind);
+        if (!$own && $kind === \App\Support\CompanyMailbox::NOTIFICATIONS) {
+            return $this->errorResponse([], 'The notifications mailbox is not set up yet. Fill in every field, switch it on and save, then test it.', 'MAIL_NOT_SET_UP', 422);
+        }
+        if (!$status['delivers'] && !$own) {
             return $this->errorResponse(['mail' => $status], $status['headline'], 'MAIL_NOT_SET_UP', 422);
         }
 
@@ -115,7 +127,6 @@ class NotificationSettingsController extends Controller
         $company = $r->user()->company?->name ?? 'PanelOS';
         try {
             $body = "This is a test e-mail from {$company} on PanelOS.\n\nIf you can read it, e-mail is working: invoice, payment and reminder e-mails will be delivered.";
-            $own = \App\Support\CompanyMail::activeFor($r->user()->company_id);
             if ($own) {
                 // Through the company's own mailbox, synchronously, so a wrong password is shown here and now.
                 [$address, $name] = \App\Support\CompanyMail::from($own);
@@ -197,5 +208,23 @@ class NotificationSettingsController extends Controller
             'logs'      => $logs,
             'failed_7d' => $failed7d,
         ], 'Notification logs');
+    }
+
+    /** Validation for one of the two mailboxes; $p is the column prefix ('smtp_' or 'notif_smtp_'). */
+    private function mailboxRules(string $p): array
+    {
+        return [
+            "{$p}enabled"       => 'nullable|boolean',
+            "{$p}host"          => ['nullable', 'string', 'max:150', function ($attr, $value, $fail) {
+                if ($value !== null && $value !== '' && ($why = \App\Support\SmtpHostGuard::problemWithHost($value))) $fail($why);
+            }],
+            "{$p}port"          => ['nullable', 'integer', 'in:' . implode(',', \App\Support\SmtpHostGuard::PORTS)],
+            "{$p}encryption"    => 'nullable|in:ssl,tls',
+            "{$p}username"      => 'nullable|string|max:190',
+            "{$p}password"      => 'nullable|string|max:300',
+            "{$p}from_address"  => 'nullable|email|max:190',
+            "{$p}from_name"     => 'nullable|string|max:150',
+            "clear_{$p}password" => 'nullable|boolean',
+        ];
     }
 }

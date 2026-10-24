@@ -33,7 +33,7 @@ class EmailService
 
             // For now, send without attachment (PDF generation requires DomPDF)
             // In production, you would generate and attach the PDF file
-            CompanyMail::deliver($invoice->company_id, $customerEmail, new InvoiceSentMailable($invoice));
+            CompanyMail::deliver($invoice->company_id, $customerEmail, new InvoiceSentMailable($invoice), 'invoice');
 
             // Log email sent
             $this->logEmailSent($invoice, 'invoice_sent', $customerEmail);
@@ -56,7 +56,7 @@ class EmailService
 
             $daysOverdue = max(0, \App\Support\Days::overdue($invoice->due_date));
 
-            CompanyMail::deliver($invoice->company_id, $customerEmail, new PaymentReminderMailable($invoice, $daysOverdue));
+            CompanyMail::deliver($invoice->company_id, $customerEmail, new PaymentReminderMailable($invoice, $daysOverdue), 'payment_reminder');
 
             // Log email sent
             $this->logEmailSent($invoice, 'payment_reminder', $customerEmail);
@@ -77,7 +77,7 @@ class EmailService
                 throw new \Exception('Customer email not found');
             }
 
-            CompanyMail::deliver($invoice->company_id, $customerEmail, new PaymentReceivedMailable($invoice, $payment));
+            CompanyMail::deliver($invoice->company_id, $customerEmail, new PaymentReceivedMailable($invoice, $payment), 'payment_receipt');
 
             // Log email sent
             $this->logEmailSent($invoice, 'payment_received', $customerEmail);

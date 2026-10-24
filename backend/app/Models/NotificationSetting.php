@@ -18,6 +18,8 @@ class NotificationSetting extends Model
         'admin_phone',
         'email_payment_reminders',
         'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password', 'smtp_from_address', 'smtp_from_name',
+        'notif_smtp_enabled', 'notif_smtp_host', 'notif_smtp_port', 'notif_smtp_encryption', 'notif_smtp_username', 'notif_smtp_password', 'notif_smtp_from_address', 'notif_smtp_from_name',
+        'mail_routing',
     ];
 
     protected $casts = [
@@ -33,10 +35,14 @@ class NotificationSetting extends Model
         'smtp_enabled'           => 'boolean',
         'smtp_port'              => 'integer',
         'smtp_password'          => 'encrypted',   // never stored in the clear, never returned by the API
+        'notif_smtp_enabled'     => 'boolean',
+        'notif_smtp_port'        => 'integer',
+        'notif_smtp_password'    => 'encrypted',
+        'mail_routing'           => 'array',
     ];
 
     /** Hidden in API responses so tokens never leak in list endpoints */
-    protected $hidden = ['twilio_auth_token', 'smtp_password'];
+    protected $hidden = ['twilio_auth_token', 'smtp_password', 'notif_smtp_password'];
 
     public static function forCompany(int $companyId): self
     {
@@ -46,11 +52,15 @@ class NotificationSetting extends Model
         );
     }
 
-    /** Sends from the company's own mailbox: switched on and every field needed to log in and to say who it is from. */
+    /** One of the company's two mailboxes (CompanyMailbox::MAIN or ::NOTIFICATIONS) as the settings hold it. */
+    public function mailbox(string $kind = \App\Support\CompanyMailbox::MAIN): \App\Support\CompanyMailbox
+    {
+        return \App\Support\CompanyMailbox::fromSettings($this, $kind);
+    }
+
     public function hasOwnMailbox(): bool
     {
-        return $this->smtp_enabled && $this->smtp_host && $this->smtp_port && $this->smtp_username
-            && !empty($this->getAttribute('smtp_password')) && $this->smtp_from_address;
+        return $this->mailbox()->isComplete();
     }
 
     /** Whether the automatic reminder e-mails are on for a company (off unless an admin turned them on). Safe with no signed-in user. */

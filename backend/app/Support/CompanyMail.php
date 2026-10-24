@@ -8,16 +8,29 @@ use Illuminate\Mail\Mailer;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * A company's own mailbox for the e-mail it sends to its customers (invoices, reminders, payment receipts).
+ * A company's own mailboxes for the e-mail it sends to its customers.
  *
- * With the switch on and every field filled, mail goes out through that mailbox, synchronously and from that address.
- * Otherwise it falls back to the server-wide mailer, queued, exactly as before. It is synchronous because a queued
- * job runs in a worker that knows nothing about this company's settings, and because a wrong password should fail where
- * the user can see it. Platform mail (login codes, server alerts) deliberately never uses a company mailbox: a tenant
- * with a broken password must not lock its own staff out.
+ * Two kinds (see CompanyMailbox): the MAIN mailbox for what the team sends by hand (invoices, later quotations) and the
+ * NOTIFICATIONS mailbox for the automatic messages (payment reminders, receipts), so the main address is not the one
+ * sending every automatic message. Notifications fall back to the main mailbox when no separate one is set up, and
+ * both fall back to the server-wide mailer, queued, exactly as before.
+ *
+ * Mail through a company mailbox is sent now, not queued: a queued job runs in a worker that knows nothing about this
+ * company's settings, and a wrong password should fail where the user can see it. Platform mail (login codes, server
+ * alerts) deliberately never uses a company mailbox: a tenant with a broken password must not lock its own staff out.
  */
 class CompanyMail
 {
+    /**
+     * The kinds of customer e-mail the admin can route, with the mailbox each uses until the admin says otherwise.
+     * Adding a kind (say, quotations once they can be e-mailed) is one line here; the screen and the API follow.
+     */
+    public const TYPES = [
+        'invoice'         => ['label' => 'Invoices sent by your team', 'default' => CompanyMailbox::MAIN],
+        'payment_reminder' => ['label' => 'Payment reminders (automatic)', 'default' => CompanyMailbox::NOTIFICATIONS],
+        'payment_receipt' => ['label' => 'Payment receipts (automatic)', 'default' => CompanyMailbox::NOTIFICATIONS],
+    ];
+
     /** @var callable|null  replaces the real SMTP mailer; tests only */
     private static $factory = null;
 
@@ -26,54 +39,93 @@ class CompanyMail
         self::$factory = $factory;
     }
 
-    /** The company's settings when it sends from its own mailbox, null when it uses the server's. */
-    public static function activeFor(?int $companyId): ?NotificationSetting
+    /** Which mailbox (main or notifications) a kind of e-mail is set to use: the admin's choice, else the default. */
+    public static function kindFor(?int $companyId, string $type): string
+    {
+        $default = self::TYPES[$type]['default'] ?? CompanyMailbox::MAIN;
+        if (!$companyId) {
+            return $default;
+        }
+        $routing = NotificationSetting::withoutGlobalScope('tenant')->where('company_id', $companyId)->value('mail_routing');
+        $routing = is_string($routing) ? json_decode($routing, true) : $routing;
+        $chosen = is_array($routing) ? ($routing[$type] ?? null) : null;
+
+        return in_array($chosen, [CompanyMailbox::MAIN, CompanyMailbox::NOTIFICATIONS], true) ? $chosen : $default;
+    }
+
+    /**
+     * The mailbox this kind of mail goes out through, or null for the server's mailer.
+     * NOTIFICATIONS uses its own mailbox when complete, else the main one, else null.
+     */
+    public static function activeFor(?int $companyId, string $kind = CompanyMailbox::MAIN): ?CompanyMailbox
     {
         if (!$companyId) {
             return null;
         }
         $s = NotificationSetting::withoutGlobalScope('tenant')->where('company_id', $companyId)->first();
+        if (!$s) {
+            return null;
+        }
 
-        return $s && $s->hasOwnMailbox() ? $s : null;
+        $box = CompanyMailbox::fromSettings($s, $kind);
+        if ($box->isComplete()) {
+            return $box;
+        }
+        if ($kind === CompanyMailbox::NOTIFICATIONS) {
+            $main = CompanyMailbox::fromSettings($s, CompanyMailbox::MAIN);
+
+            return $main->isComplete() ? $main : null;
+        }
+
+        return null;
     }
 
-    /** Symfony/Laravel mailer config for the company's mailbox. 465 = implicit SSL, anything else starts plain and upgrades with STARTTLS. */
-    public static function config(NotificationSetting $s): array
+    /** Exactly this mailbox, with no fallback: the one the admin is testing or editing. Null unless it is switched on and complete. */
+    public static function exactFor(?int $companyId, string $kind): ?CompanyMailbox
+    {
+        $s = $companyId ? NotificationSetting::withoutGlobalScope('tenant')->where('company_id', $companyId)->first() : null;
+        $box = $s ? CompanyMailbox::fromSettings($s, $kind) : null;
+
+        return $box && $box->isComplete() ? $box : null;
+    }
+
+    /** Symfony/Laravel mailer config. 465 = implicit SSL, anything else starts plain and upgrades with STARTTLS. */
+    public static function config(CompanyMailbox $b): array
     {
         return [
             'transport' => 'smtp',
-            'scheme'    => $s->smtp_encryption === 'ssl' ? 'smtps' : 'smtp',
-            'host'      => $s->smtp_host,
-            'port'      => (int) $s->smtp_port,
-            'username'  => $s->smtp_username,
-            'password'  => $s->smtp_password,
+            'scheme'    => $b->encryption === 'ssl' ? 'smtps' : 'smtp',
+            'host'      => $b->host,
+            'port'      => (int) $b->port,
+            'username'  => $b->username,
+            'password'  => $b->password,
             'timeout'   => 10,
         ];
     }
 
     /** @return array{0:string,1:?string} address and display name the mail is sent as */
-    public static function from(NotificationSetting $s): array
+    public static function from(CompanyMailbox $b): array
     {
-        return [$s->smtp_from_address, $s->smtp_from_name ?: null];
+        return [$b->fromAddress, $b->fromName ?: null];
     }
 
-    public static function mailer(NotificationSetting $s): Mailer
+    public static function mailer(CompanyMailbox $b): Mailer
     {
         if (self::$factory) {
-            return (self::$factory)($s);
+            return (self::$factory)($b);
         }
-        SmtpHostGuard::assertSafeToConnect($s->smtp_host);
+        SmtpHostGuard::assertSafeToConnect($b->host);
 
-        return Mail::build(self::config($s));
+        return Mail::build(self::config($b));
     }
 
-    /** Sends $mailable to $to from the company's mailbox if it has one (now), else through the server's mailer (queued). */
-    public static function deliver(?int $companyId, string $to, Mailable $mailable): void
+    /** Sends $mailable to $to from the mailbox its type is routed to (now), else through the server's mailer (queued). */
+    public static function deliver(?int $companyId, string $to, Mailable $mailable, string $type = 'invoice'): void
     {
-        if ($s = self::activeFor($companyId)) {
-            [$address, $name] = self::from($s);
+        if ($box = self::activeFor($companyId, self::kindFor($companyId, $type))) {
+            [$address, $name] = self::from($box);
             $mailable->from($address, $name);
-            self::mailer($s)->to($to)->sendNow($mailable);
+            self::mailer($box)->to($to)->sendNow($mailable);
 
             return;
         }

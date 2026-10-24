@@ -73,77 +73,52 @@
           <span class="status-dot"></span>
           <span>{{ form.mail?.headline }}</span>
         </div>
-        <div class="test-row">
-          <button class="btn btn-secondary" :disabled="testingEmail" @click="testEmail">
-            {{ testingEmail ? 'Sending…' : '📤 Send me a test e-mail' }}
-          </button>
-          <span v-if="emailResult" :class="emailResult.ok ? 'test-ok' : 'test-err'">{{ emailResult.msg }}</span>
-        </div>
-        <p class="hint" style="margin-top:8px">The test goes to your own login address. Save settings first if you just changed the switch.</p>
+        <ul class="route-list" v-if="form.mail?.routes?.length">
+          <li v-for="r in form.mail.routes" :key="r.type">
+            <span class="route-label">{{ r.label }}</span>
+            <span class="route-arrow">→</span>
+            <span v-if="r.via === 'server'" class="route-from off">PanelOS server mailer</span>
+            <span v-else class="route-from">{{ r.from }}<em v-if="r.via === 'main'"> (main mailbox)</em></span>
+          </li>
+        </ul>
       </section>
 
-      <!-- Own mailbox -->
-      <section class="card">
-        <div class="card-head">
-          <h3>📬 Send customer e-mail from your own mailbox</h3>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.smtp_enabled" />
-            <span class="slider"></span>
-            <span class="toggle-label">{{ form.smtp_enabled ? 'Own mailbox on' : 'Own mailbox off' }}</span>
-          </label>
-        </div>
-        <p class="card-hint">
-          Invoices, payment reminders and receipts to your customers go out from <b>your</b> address instead of PanelOS's.
+      <!-- Own mailboxes -->
+      <mailbox-card :form="form" kind="main" title="Main mailbox" icon="📬" :testing="testingMail === 'main'" :result="mailResult.main"
+                    @test="testMailbox" @clear-password="clearMailboxPassword">
+        <template #intro>
+          For everything your team sends by hand: <b>quotations, invoices</b> and the like, from <b>your</b> address instead of PanelOS's.
           Log-in codes and system alerts are not affected. <b>Zoho example:</b> server <code>smtppro.zoho.in</code>
           (or <code>smtp.zoho.in</code> / <code>smtp.zoho.com</code>, whichever region your account is in), port 465 with SSL or 587 with TLS,
           your full e-mail address as user name, and an <b>app password</b> from Zoho (not your normal password).
-        </p>
-        <div class="form-grid" :class="{ dimmed: !form.smtp_enabled }">
-          <div class="form-group">
-            <label>Mail server</label>
-            <input v-model="form.smtp_host" placeholder="smtppro.zoho.in" autocomplete="off" />
-          </div>
-          <div class="form-group">
-            <label>Security</label>
-            <select v-model="form.smtp_encryption" @change="onEncryptionChange">
-              <option value="ssl">SSL (port 465)</option>
-              <option value="tls">TLS / STARTTLS (port 587)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Port</label>
-            <select v-model.number="form.smtp_port">
-              <option :value="465">465</option>
-              <option :value="587">587</option>
-              <option :value="2525">2525</option>
-              <option :value="25">25</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>User name</label>
-            <input v-model="form.smtp_username" placeholder="accounts@yourcompany.com" autocomplete="off" />
-          </div>
-          <div class="form-group">
-            <label>Password</label>
-            <input v-model="form.smtp_password" type="password" autocomplete="new-password"
-                   :placeholder="form.smtp_password_set ? 'saved — leave blank to keep' : 'app password'" />
-            <span class="hint">
-              <template v-if="form.smtp_password_set">✓ A password is saved (stored encrypted, never shown again).
-                <button type="button" class="link" @click="clearMailboxPassword">Remove it</button></template>
-              <template v-else>Stored encrypted. It cannot be read back, only replaced.</template>
-            </span>
-          </div>
-          <div class="form-group">
-            <label>Send as (From address)</label>
-            <input v-model="form.smtp_from_address" placeholder="accounts@yourcompany.com" autocomplete="off" />
-            <span class="hint">Most providers only accept the address of the mailbox you log in with.</span>
-          </div>
-          <div class="form-group">
-            <label>Sender name</label>
-            <input v-model="form.smtp_from_name" placeholder="Your Company Name" autocomplete="off" />
-          </div>
-        </div>
-        <p class="hint">Save, then press <b>Send me a test e-mail</b> in the E-mail card above. If the password is wrong, the mail server's own answer is shown there.</p>
+        </template>
+      </mailbox-card>
+
+      <mailbox-card :form="form" kind="notifications" title="Notifications mailbox (optional)" icon="🔔" :testing="testingMail === 'notifications'" :result="mailResult.notifications"
+                    @test="testMailbox" @clear-password="clearMailboxPassword">
+        <template #intro>
+          A second address for the <b>automatic messages</b> (payment reminders, receipts), so your main address is not the one
+          sending every notification. Leave it off and those messages use the main mailbox. Same settings as above, with the notifications account's own login.
+        </template>
+      </mailbox-card>
+
+      <section class="card" v-if="form.mail_types?.length">
+        <div class="card-head"><h3>🧭 Which mailbox sends what</h3></div>
+        <p class="card-hint">Choose, for each kind of customer e-mail, which of your two mailboxes sends it. A kind routed to a mailbox that is off or incomplete falls back to the main mailbox, then to the PanelOS server. Save to apply.</p>
+        <table class="routing-table">
+          <tbody>
+            <tr v-for="t in form.mail_types" :key="t.type">
+              <td>{{ t.label }}</td>
+              <td>
+                <select v-model="form.mail_routing[t.type]" :aria-label="'Mailbox for ' + t.label">
+                  <option value="main">Main mailbox</option>
+                  <option value="notifications">Notifications mailbox</option>
+                </select>
+              </td>
+              <td class="route-now">{{ routeNow(t.type) }}</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
       <!-- SMS -->
@@ -288,6 +263,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import notificationService from '../services/notificationService.js'
+import MailboxCard from './MailboxCard.vue'
 
 const loading   = ref(false)
 const saving    = ref(false)
@@ -296,8 +272,8 @@ const success   = ref(null)
 const showToken = ref(false)
 const testing   = ref(null)
 const testPhone = ref('')
-const testingEmail = ref(false)
-const emailResult = ref(null)
+const testingMail = ref(null)                       // 'main' | 'notifications' while a test is running
+const mailResult = reactive({ main: null, notifications: null })
 const testResult = reactive({ sms: null, whatsapp: null })
 const form = ref(null)
 const deliveryLogs = ref([])
@@ -325,9 +301,12 @@ async function load() {
     // Keep the token field empty (real token is masked server-side); token_is_set
     // drives the "✓ saved" badge. Leaving it blank on save keeps the stored token.
     d.twilio_auth_token = ''
-    d.smtp_password = ''                       // never sent back by the server; blank on save keeps the saved one
-    if (!d.smtp_encryption) d.smtp_encryption = 'ssl'
-    if (!d.smtp_port) d.smtp_port = 465
+    for (const p of ['smtp_', 'notif_smtp_']) {
+      d[p + 'password'] = ''                    // never sent back by the server; blank on save keeps the saved one
+      if (!d[p + 'encryption']) d[p + 'encryption'] = 'ssl'
+      if (!d[p + 'port']) d[p + 'port'] = 465
+    }
+    d.mail_routing = { ...(d.mail_routing ?? {}) }
     form.value = d
     loadLogs()
   } catch (e) {
@@ -351,20 +330,25 @@ async function save() {
   } finally { saving.value = false }
 }
 
-function onEncryptionChange() {
-  form.value.smtp_port = form.value.smtp_encryption === 'ssl' ? 465 : 587
-}
-
-async function clearMailboxPassword() {
-  if (!window.confirm('Remove the saved mailbox password? E-mail will go back to the PanelOS server until you enter a new one.')) return
+async function clearMailboxPassword(prefix) {
+  const which = prefix === 'notif_smtp_' ? 'notifications' : 'main'
+  if (!window.confirm(`Remove the saved ${which} mailbox password? That mailbox is switched off until you enter a new one.`)) return
   saving.value = true; error.value = null; success.value = null
   try {
-    await notificationService.save({ clear_smtp_password: true })
+    await notificationService.save({ [`clear_${prefix}password`]: true })
     success.value = 'Mailbox password removed.'
     await load()
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Could not remove the password.'
   } finally { saving.value = false }
+}
+
+// What will actually send a kind of e-mail right now (as of the last save).
+function routeNow(type) {
+  const r = (form.value?.mail?.routes ?? []).find(x => x.type === type)
+  if (!r) return ''
+  if (r.via === 'server') return 'sent by the PanelOS server'
+  return 'sent from ' + r.from + (r.via === 'main' ? ' (main mailbox)' : '')
 }
 
 async function testSend(channel) {
@@ -378,14 +362,14 @@ async function testSend(channel) {
   } finally { testing.value = null }
 }
 
-async function testEmail() {
-  testingEmail.value = true; emailResult.value = null
+async function testMailbox(kind) {
+  testingMail.value = kind; mailResult[kind] = null
   try {
-    const r = await notificationService.testEmail()
-    emailResult.value = { ok: true, msg: '✓ ' + (r?.message ?? 'Test e-mail sent.') }
+    const r = await notificationService.testEmail(kind)
+    mailResult[kind] = { ok: true, msg: '✓ ' + (r?.message ?? 'Test e-mail sent.') }
   } catch (e) {
-    emailResult.value = { ok: false, msg: e?.response?.data?.message ?? 'Could not send the test e-mail.' }
-  } finally { testingEmail.value = false }
+    mailResult[kind] = { ok: false, msg: e?.response?.data?.message ?? 'Could not send the test e-mail.' }
+  } finally { testingMail.value = null }
 }
 
 onMounted(load)
@@ -411,6 +395,16 @@ onMounted(load)
 .form-group select { padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fff; }
 .dimmed .link { pointer-events: auto; opacity: 1; }
 .link { background: none; border: none; color: var(--primary); cursor: pointer; padding: 0 4px; text-decoration: underline; font-size: inherit; }
+.route-list { list-style: none; margin: 10px 0 0; padding: 0; font-size: 13px; }
+.route-list li { padding: 3px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.route-label { font-weight: 600; color: #444; }
+.route-arrow { color: #999; }
+.route-from em { color: #888; font-style: normal; }
+.route-from.off { color: #b26a00; }
+.routing-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.routing-table td { padding: 8px 6px; border-bottom: 1px solid #f0f0f0; }
+.routing-table select { padding: 7px 10px; border: 1px solid #ddd; border-radius: 7px; background: #fff; }
+.route-now { color: #666; font-size: 12px; }
 .mail-status { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 8px; margin: 4px 0 12px; line-height: 1.45; }
 .mail-status .status-dot { margin-top: 5px; flex-shrink: 0; }
 .mail-status.ok  { background: #e8f5e9; color: #1b5e20; }
