@@ -7,6 +7,7 @@ use App\Models\NotificationSetting;
 use App\Services\EmailService;
 use App\Services\InvoiceService;
 use App\Support\CompanyMail;
+use App\Support\CompanyMailbox;
 use App\Support\SmtpHostGuard;
 use Illuminate\Mail\Mailer;
 use Illuminate\Support\Facades\DB;
@@ -43,8 +44,8 @@ class CompanySmtpTest extends TestCase
     private function fakeMailbox(?\Closure $onBuild = null): \Illuminate\Mail\Transport\ArrayTransport
     {
         $transport = new \Illuminate\Mail\Transport\ArrayTransport();
-        CompanyMail::useFactory(function (NotificationSetting $s) use ($transport, $onBuild) {
-            if ($onBuild) $onBuild($s);
+        CompanyMail::useFactory(function (CompanyMailbox $b) use ($transport, $onBuild) {
+            if ($onBuild) $onBuild($b);
 
             return new Mailer('company', app('view'), $transport, app('events'));
         });
@@ -65,7 +66,7 @@ class CompanySmtpTest extends TestCase
         $this->save($this->mailbox())->assertOk();
 
         $s = NotificationSetting::forCompany($admin->company_id);
-        $cfg = CompanyMail::config($s);
+        $cfg = CompanyMail::config($s->mailbox());
         $this->assertSame('smtps', $cfg['scheme']);          // 465 = implicit SSL
         $this->assertSame('smtppro.zoho.in', $cfg['host']);
         $this->assertSame(465, $cfg['port']);
@@ -73,7 +74,7 @@ class CompanySmtpTest extends TestCase
         $this->assertSame(10, $cfg['timeout'], 'A dead mail server must not hold a request open.');
 
         $this->save($this->mailbox(['smtp_port' => 587, 'smtp_encryption' => 'tls']))->assertOk();
-        $this->assertSame('smtp', CompanyMail::config($s->fresh())['scheme']);   // 587 = STARTTLS
+        $this->assertSame('smtp', CompanyMail::config($s->fresh()->mailbox())['scheme']);   // 587 = STARTTLS
 
         $raw = DB::table('notification_settings')->where('company_id', $admin->company_id)->value('smtp_password');
         $this->assertNotSame(self::SECRET, $raw);

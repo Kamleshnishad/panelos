@@ -545,7 +545,16 @@
         "smtp_username": "varchar(190)",
         "smtp_password": "text",
         "smtp_from_address": "varchar(190)",
-        "smtp_from_name": "varchar(150)"
+        "smtp_from_name": "varchar(150)",
+        "notif_smtp_enabled": "tinyint",
+        "notif_smtp_host": "varchar(150)",
+        "notif_smtp_port": "smallint unsigned",
+        "notif_smtp_encryption": "varchar(10)",
+        "notif_smtp_username": "varchar(190)",
+        "notif_smtp_password": "text",
+        "notif_smtp_from_address": "varchar(190)",
+        "notif_smtp_from_name": "varchar(150)",
+        "mail_routing": "json/longtext"
     },
     "orders": {
         "id": "bigint unsigned",
