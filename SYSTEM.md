@@ -1130,7 +1130,7 @@ Read: `GET /api/audit-logs` (needs `audit.view`; UI = `AuditLog.vue`).
 `config/document_templates.php`, **verifies the Blade actually exists**, and otherwise falls back to the
 default view — a removed template can never break PDF generation.
 
-**Quotation templates available:** `classic` (default, unchanged) and `ledger`. A registry entry may set
+**Quotation templates available:** `classic` (the default) and `ledger`. Neither may contain a specific company's details: Classic takes its header address, the factory address in the Price Basis term and the optional certification line from Settings → Company (a test fails if a view contains another company's name, address, GSTIN or certification). A registry entry may set
 `page_numbers => true`, which makes `QuotationPdfService` stamp "Page x of y" after rendering (the total is only
 known once laid out); entries without it are untouched. Templates that use `QuotationDocumentService` receive
 only layout work to do — it builds the numbered lines (panel, accessory, door, installation), GST summary by
