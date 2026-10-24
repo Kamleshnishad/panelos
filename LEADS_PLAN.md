@@ -55,7 +55,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 2.1 | Source detail and raw payload | done, local |
 | 2.2 | Lead intake service | done, local |
 | 2.3 | Inbound API, tokens, import log | done, local |
-| 2.4 | Assignment rules and instant alert | not started |
+| 2.4 | Assignment rules and instant alert | done, local (no screen yet: 2.5) |
 | 2.5 | Lead sources screen | not started |
 | 3.1 | IndiaMART settings and connection test | not started |
 | 3.2 | IndiaMART pull job | not started |
@@ -190,6 +190,9 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 ### 2.4 Assignment rules and instant alert (LC-10, LD-08 part)
 - **Build:** rules in Settings (default: none, leads stay unassigned as today): round-robin over chosen people, or by city, product or source; the assignee gets a bell notification and, if enabled, a WhatsApp message with name, product and a call link; reassign with history.
 - **Default I will use:** manual assignment until the client picks a rule. **Tests:** rotation order, skipped inactive users, rule precedence, no alert to the wrong person. **Size:** M. **Needs from client:** the assignment rule.
+- **Result:** `LeadAssignmentService`, `LeadAssignmentRule`, `LeadAssignmentRuleController`, migration `2026_10_25_000006`, `LeadAssignmentTest` (22). **No rule exists until someone makes one, so behaviour is unchanged by default.** Built on the plan: round-robin over chosen people,
+  fixed person (a pool of one), by source / city / application, first match by priority, reassign history in the timeline, bell to the new assignee. Not built: WhatsApp alerts (pending the client's answer). The settings screen is 2.5; until then rules are made through the API.
+  Extra, small: a repeat enquiry rings the person who already has the lead.
 
 ### 2.5 Lead sources screen (UI for 2.1 to 2.4)
 - **Build:** Settings page: sources list, inbound token (copy, regenerate), a ready-to-copy example request, assignment rules, the import log. **Size:** S to M. **Live check:** screenshot walk-through.

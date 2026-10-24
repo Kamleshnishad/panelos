@@ -113,6 +113,10 @@ class LeadIntakeService
 
             $about = $d['requirement'] ? ': ' . mb_substr($d['requirement'], 0, 300) : '';
             $this->note($lead, "Enquired again on {$source}" . ($d['external_id'] ? " (ref {$d['external_id']})" : '') . $about);
+            // The person who has this lead hears about it now. An unassigned lead has nobody to tell.
+            if ($lead->assigned_to_user_id) {
+                app(LeadAssignmentService::class)->alert($lead, (int) $lead->assigned_to_user_id, 'Enquired again');
+            }
 
             return new LeadIntakeResult(LeadIntakeResult::MERGED, $lead->id, $lead->lead_no);
         });

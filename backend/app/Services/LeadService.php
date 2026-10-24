@@ -66,14 +66,32 @@ class LeadService
         // Two leads made at the same moment read the same "last number". The unique (company_id, lead_no) key makes the loser fail,
         // so it runs again, reads the new last number and takes the next one (same helper as quotations and invoices; LD-07).
         return \App\Support\DocNumber::retry(
-            fn () => DB::transaction(fn () => Lead::create($data + ['lead_no' => $this->generateLeadNumber($companyId)])),
+            fn () => DB::transaction(function () use ($data, $companyId) {
+                $lead = Lead::create($data + ['lead_no' => $this->generateLeadNumber($companyId)]);
+                // Someone was chosen: record it and tell them. Nobody chosen: the company's assignment rules decide (none by default, 2.4).
+                $assign = app(LeadAssignmentService::class);
+                if (!empty($data['assigned_to_user_id'])) {
+                    $assign->announce($lead, null, (int) $data['assigned_to_user_id'], 'by hand', auth()?->id());
+                } else {
+                    $assign->assignByRules($lead);
+                }
+
+                return $lead;
+            }),
             5
         );
     }
 
     public function update(Lead $lead, array $data): Lead
     {
+        $from = $lead->assigned_to_user_id;
         $lead->update($data);
+        // Reassigning leaves a line in the timeline and tells the new person (and nobody else); see LeadAssignmentService.
+        if (array_key_exists('assigned_to_user_id', $data)) {
+            $to = $data['assigned_to_user_id'] ? (int) $data['assigned_to_user_id'] : null;
+            $actor = auth()?->user();
+            app(LeadAssignmentService::class)->announce($lead, $from ? (int) $from : null, $to, $actor ? "by {$actor->name}" : 'by hand', $actor?->id);
+        }
         return $lead->fresh('assignedUser', 'customer');
     }
 

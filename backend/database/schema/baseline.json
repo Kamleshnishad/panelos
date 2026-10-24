@@ -512,6 +512,21 @@
         "ip": "varchar(45)",
         "created_at": "timestamp"
     },
+    "lead_assignment_rules": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "name": "varchar(100)",
+        "priority": "smallint unsigned",
+        "is_active": "tinyint",
+        "source": "varchar(60)",
+        "city": "varchar(120)",
+        "application": "varchar(40)",
+        "user_ids": "json",
+        "last_user_id": "bigint unsigned",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
     "lead_sources": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

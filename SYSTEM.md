@@ -371,6 +371,15 @@ revisions) is linked, so ordering an older, separate quotation does not win the 
 them and changes nothing unless `--apply` is given; closed leads are listed as left alone. Marking a lead lost on the screen is a dialog with the company's lost-reason list (a reason is required there)
 and a note; the API still accepts a free-text `lost_reason`.
 
+**Assignment and the instant alert (LEADS_PLAN 2.4).** `lead_assignment_rules` (`LeadAssignmentRule`): `name`, `priority` (lowest first), `is_active`, optional `source` / `city` / `application` (case-insensitive equality; empty matches anything, so a rule with no
+conditions is the catch-all), `user_ids` (JSON list, the pool, in the order they take turns) and `last_user_id` (whose turn was last; reset when the list is edited). **A company has no rules by default and its leads stay unassigned.**
+`LeadService::create` decides: an `assigned_to_user_id` given -> that person (timeline "Assigned to X (by hand)", rules and the rotation untouched); none given -> `LeadAssignmentService::assignByRules` inside the creating transaction, which locks the rules so two leads
+arriving together take different turns: first active matching rule, the next *able* person after `last_user_id` (active, same company) wrapping round; if nobody in the rule is able, the next rule is tried; no match leaves it unassigned. Timeline text: "Assigned to X (rule: <name>)",
+"Assigned to X (by hand)", "Reassigned: A -> B (by <user>)", "Unassigned (was A, by <user>)"; nothing is written when the person did not change. `LeadService::update` records reassignments the same way. The **bell** (`lead_assigned` notifications, link to Leads) goes to the **new
+assignee only**: not the previous one, not anyone else, not the person who made the change themselves; it names the lead number, buyer, source, city, application, a piece of the requirement and the phone. A repeat enquiry that merges into an assigned lead (`LeadIntakeService`)
+rings its assignee ("Enquired again"); an unassigned lead has nobody to ring. Rules are managed at `GET|POST /api/settings/lead-assignment-rules`, `PUT|DELETE .../{id}` (reads open, changes `settings.manage`; people must be active users of the company, a source must be one of the company's sources; new rules go last).
+WhatsApp alerts are not built. The screen for the rules is LEADS_PLAN 2.5.
+
 **Inbound lead address (LEADS_PLAN 2.3).** `POST /api/inbound/leads/{token}` lets a website form, a partner or Zapier create leads with no login. Public route, no tenant middleware: the **token is the only credential and the only thing
 that picks the company**. `LeadInboundService`: a token is `lt_` + 48 random characters; `lead_inbound_tokens` stores only `sha256(token)` (unique), the last four characters as a hint, the `source` its leads are recorded under (one of the company's own sources),
 `is_active`, `last_used_at`; the plain token is returned once, by create and regenerate, and never again (regenerate replaces the hash, so the old address dies at once; a deleted, switched-off or inactive-company token is the same 401). Order of checks:
