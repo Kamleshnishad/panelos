@@ -1,0 +1,104 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — nightly OFF-SERVER database backup (EN-05).
+#  The scheduler's db:backup writes dumps into a Docker volume on the SAME server as
+#  the database: if the server or its disk is lost, the backups go with it. This
+#  job takes a fresh dump over SSH, proves it restores into a throwaway MySQL, then
+#  stores it encrypted as a GitHub Actions artifact (kept 30 days).
+#
+#  Needs one repo secret: BACKUP_PASSPHRASE. The dump holds customer data and
+#  integration secrets, so the job REFUSES to upload without it — never plaintext.
+#  Keep the passphrase somewhere other than GitHub (password manager): without it
+#  the backups cannot be opened.
+#
+#  Restore:  gpg --decrypt panelos-YYYYMMDD.sql.gz.gpg | gunzip | mysql -u… -p… <database>
+#  Scheduled runs fire only from the default branch. A failed run e-mails the repo owner.
+# ═══════════════════════════════════════════════════════════════
+
+name: Off-server backup
+
+on:
+  schedule:
+    - cron: '45 2 * * *'   # 02:45 UTC, after the 01:30 in-app backup and the 02:15 prune
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Dump, prove restore, encrypt, store
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: production
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: restore_check
+          MYSQL_DATABASE: restore_check
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -prestore_check"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Refuse to run without an encryption passphrase
+        run: |
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::Repo secret BACKUP_PASSPHRASE is not set. Set it (Settings -> Secrets and variables -> Actions), then re-run."
+            exit 1
+          fi
+
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          name: panelos_deploy
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Take a fresh dump on the server and stream it here
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/panelos_deploy -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker exec panelos_backend php artisan db:backup --keep=14 >/dev/null && docker exec panelos_backend sh -c 'cat \$(ls -t /var/www/html/storage/app/backups/panelos-*.sql | head -1)'" \
+            | gzip -9 > dump.sql.gz
+          ls -l dump.sql.gz
+          [ "$(stat -c %s dump.sql.gz)" -gt 10000 ] || { echo "::error::Dump is suspiciously small"; exit 1; }
+
+      - name: Prove the dump restores
+        run: |
+          set -euo pipefail
+          gunzip -c dump.sql.gz | mysql -h 127.0.0.1 -u root -prestore_check restore_check
+          tables=$(mysql -N -h 127.0.0.1 -u root -prestore_check restore_check -e "select count(*) from information_schema.tables where table_schema='restore_check'")
+          users=$(mysql -N -h 127.0.0.1 -u root -prestore_check restore_check -e "select count(*) from users")
+          companies=$(mysql -N -h 127.0.0.1 -u root -prestore_check restore_check -e "select count(*) from companies")
+          echo "restored: $tables tables, $users users, $companies companies"
+          [ "$tables" -ge 30 ] && [ "$users" -ge 1 ] && [ "$companies" -ge 1 ] \
+            || { echo "::error::Restore check failed: the dump is incomplete"; exit 1; }
+
+      - name: Encrypt
+        run: |
+          set -euo pipefail
+          name="panelos-$(date -u +%Y%m%d).sql.gz.gpg"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+              --symmetric --cipher-algo AES256 -o "$name" dump.sql.gz
+          echo "BACKUP_FILE=$name" >> "$GITHUB_ENV"
+          rm -f dump.sql.gz
+          ls -l "$name"
+
+      - name: Store (30 days)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
+          if-no-files-found: error

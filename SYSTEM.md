@@ -128,6 +128,8 @@ string (`PublicFileController` validates and streams it).
 
 **Health & alerts** (EN-03/EN-04) — `GET /api/health` returns `{status OK|DEGRADED, database, scheduler OK|STALE|UNKNOWN, errors_last_hour, failed_jobs}`; 503 when the database is down, the scheduler has not beaten for 5 minutes (`health-heartbeat` task, every minute, in `routes/console.php`) or there were 25+ server errors this hour. `.github/workflows/uptime.yml` probes `/up` and `/api/health` every 10 minutes from GitHub and fails (GitHub e-mails the owner) after 3 tries. Every real server error (the exception `report` hook in `bootstrap/app.php`: never 401/403/404/422) is counted and `AlertService` e-mails the operator, at most once per 15 minutes, only when the platform switch is on and the mailer can deliver. Recipient: `platform_settings.alert_email`, else every super admin's e-mail. Super Admin → Settings → *Server alerts* has the on/off switch, the address, live health and *Send test alert*. The alert path never throws.
 
+**Backups** (EN-05) — `db:backup` (scheduler, 01:30) keeps 14 dumps in the `storage` volume on the server. `.github/workflows/offsite-backup.yml` (02:45 UTC) is the off-server copy: fresh dump over SSH → restore check in a throwaway MySQL 8 → AES-256 gpg with repo secret `BACKUP_PASSPHRASE` → artifact kept 30 days. Restore: `gpg --decrypt panelos-YYYYMMDD.sql.gz.gpg | gunzip | mysql …`. The passphrase must be stored outside GitHub.
+
 ---
 
 ## 3. Authentication & session
