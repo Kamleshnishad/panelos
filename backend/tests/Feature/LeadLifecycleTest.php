@@ -226,7 +226,7 @@ class LeadLifecycleTest extends TestCase
     {
         $lead = $this->lead(['company_name' => 'Zephyr Cold Storage', 'contact_name' => 'Zoya Khan', 'email' => 'zoya@zephyr.test', 'phone' => '9833333333', 'city' => 'Rajkot']);
 
-        $res = $this->postJson("/api/leads/{$lead->id}/convert")->assertOk();
+        $res = $this->postJson("/api/leads/{$lead->id}/convert", ['state_code' => '24'])->assertOk();
 
         $customer = Customer::find($res->json('data.customer_id'));
         $this->assertSame($lead->id, $res->json('data.lead_id'));
@@ -246,28 +246,16 @@ class LeadLifecycleTest extends TestCase
     {
         $lead = $this->lead();
 
-        $one = $this->postJson("/api/leads/{$lead->id}/convert")->json('data.customer_id');
-        $two = $this->postJson("/api/leads/{$lead->id}/convert")->json('data.customer_id');
+        $one = $this->postJson("/api/leads/{$lead->id}/convert", ['state_code' => '24'])->json('data.customer_id');
+        $two = $this->postJson("/api/leads/{$lead->id}/convert", ['state_code' => '24'])->json('data.customer_id');
 
         $this->assertSame($one, $two);
         $this->assertSame(1, Customer::where('company_id', $this->company->id)->count());
     }
 
-    public function test_CURRENT_convert_leaves_the_state_blank_and_does_not_look_for_an_existing_customer(): void
-    {
-        // LD-04. Sub-phase 1.5 asks for the state, reuses a matching customer and uses the normal code sequence.
-        $existing = Customer::factory()->create(['company_id' => $this->company->id, 'name' => 'Ravi Patel', 'phone' => '9876543210']);
-        $lead = $this->lead(['contact_name' => 'Ravi Patel', 'phone' => '9876543210']);
-
-        $customerId = $this->postJson("/api/leads/{$lead->id}/convert")->json('data.customer_id');
-
-        $this->assertNotSame($existing->id, $customerId, 'A second Ravi Patel is created.');
-        $this->assertSame('', Customer::find($customerId)->getRawOriginal('state_code'), 'No state, so the GST split is unknown.');
-    }
-
     private function quotationFor(Lead $lead, ?int $customerId = null)
     {
-        $customerId ??= $this->postJson("/api/leads/{$lead->id}/convert")->json('data.customer_id');
+        $customerId ??= $this->postJson("/api/leads/{$lead->id}/convert", ['state_code' => '24'])->json('data.customer_id');
         $pt = PanelType::factory()->create(['company_id' => $this->company->id]);
 
         return $this->postJson('/api/quotations', [
@@ -430,7 +418,7 @@ class LeadLifecycleTest extends TestCase
     public function test_the_customer_profile_lists_the_leads_that_became_that_customer(): void
     {
         $lead = $this->lead(['contact_name' => 'Profile Buyer']);
-        $customerId = $this->postJson("/api/leads/{$lead->id}/convert")->json('data.customer_id');
+        $customerId = $this->postJson("/api/leads/{$lead->id}/convert", ['state_code' => '24'])->json('data.customer_id');
 
         $profile = $this->getJson("/api/customers/{$customerId}/profile")->assertOk()->json('data');
 

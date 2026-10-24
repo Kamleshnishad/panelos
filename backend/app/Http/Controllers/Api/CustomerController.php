@@ -94,7 +94,7 @@ class CustomerController extends Controller
         $customer = Customer::create([
             'company_id'     => $companyId,
             'name'           => $validated['name'],
-            'code'           => $validated['code'] ?? strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $validated['name']), 0, 4)) . rand(100, 999),
+            'code'           => $validated['code'] ?? Customer::nextCode($companyId, $validated['name']),
             'type'           => $validated['type'] ?? 'retail',
             'contact_person' => $validated['contact_person'] ?? null,
             'email'          => $validated['email'] ?? null,

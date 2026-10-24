@@ -49,7 +49,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 1.2 | Status engine | done, local |
 | 1.3 | Automatic won, lost-reason dialog | done, local |
 | 1.4 | Duplicate detection | done, local |
-| 1.5 | Convert fixes | not started |
+| 1.5 | Convert fixes | done, local |
 | 1.6 | Numbering race and small hardening | not started |
 | 1.7 | Follow-up reminders | not started |
 | 2.1 | Source detail and raw payload | not started |
@@ -141,6 +141,8 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Build:** before creating a customer, look for an existing one by phone, e-mail, GSTIN or name and offer to use it; ask for the state (or take it from the GSTIN) so the quotation's GST split is right; use the customer screen's code sequence instead of a random number; carry city and address.
 - **Tests:** existing customer reused, state code set, code unique, GSTIN-derived state.
 - **Live check:** convert a test lead. **Size:** M. **Needs from client:** nothing.
+- **Result:** `ensureCustomer` rewritten (existing-customer look-up, state/GSTIN, address, unique code), `Customer::nextCode`, 409 `CUSTOMER_EXISTS`, convert dialog in `LeadManager.vue`, `LeadConvertTest` (17). The `CURRENT` convert test was replaced
+  by these. Side fix: random customer codes could collide (PB-063). Other tests that convert now send a state. Not done: the customer's credit limit and terms are still defaults; the lead has no address field, so only an optional one typed at convert time is carried.
 
 ### 1.6 Numbering race and small hardening (LD-07)
 - **Goal:** two leads created at the same instant never fail.

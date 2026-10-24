@@ -172,36 +172,80 @@ class LeadService
      * itself is created by the normal QuotationCreate flow, which back-links the
      * lead via lead_id (see QuotationService::create).
      */
-    public function ensureCustomer(Lead $lead): int
+    /**
+     * Options (all optional): customer_id (use this existing customer), create_new (skip the look-alike check),
+     * state_code / state (a code, alpha code or name), gstin, address_line1, pincode.
+     *
+     * A lead that is already linked returns its customer. Otherwise, unless customer_id or create_new is given, customers with the same
+     * phone, e-mail, GSTIN or name are looked for and, if any exist, LeadCustomerMatchException lists them. A new customer needs a state,
+     * which may come from the GSTIN, so the quotation's GST split is right.
+     */
+    public function ensureCustomer(Lead $lead, array $o = []): int
     {
         if ($lead->customer_id && Customer::where('company_id', $lead->company_id)->whereKey($lead->customer_id)->exists()) {
             return $lead->customer_id;
         }
 
+        if (!empty($o['customer_id'])) {
+            $customer = Customer::where('company_id', $lead->company_id)->find((int) $o['customer_id']);
+            if (!$customer) {
+                $this->refuse('customer_id', 'That customer was not found.');
+            }
+            $this->linkCustomer($lead, $customer, 'linked');
+
+            return $customer->id;
+        }
+
+        $gstin = strtoupper(preg_replace('/\s+/', '', (string) ($o['gstin'] ?? ''))) ?: null;
+        $matches = $this->customerMatches($lead, $gstin);
+        if ($matches && empty($o['create_new'])) {
+            throw new \App\Exceptions\LeadCustomerMatchException($matches);
+        }
+        if ($gstin && collect($matches)->contains(fn ($m) => in_array('gstin', $m['matched_on'], true))) {
+            $this->refuse('gstin', 'A customer with this GSTIN already exists. Use that customer instead.');
+        }
+
+        $stateCode = \App\Support\GstState::normalize($o['state_code'] ?? $o['state'] ?? null);
+        $gstinState = $gstin ? \App\Support\GstState::normalize($gstin) : null;
+        if ($stateCode && $gstinState && $stateCode !== $gstinState) {
+            $this->refuse('state_code', 'The GSTIN belongs to ' . \App\Support\GstState::name($gstinState) . ', not ' . \App\Support\GstState::name($stateCode) . '.');
+        }
+        $stateCode ??= $gstinState;
+        if (!$stateCode) {
+            $this->refuse('state_code', "Choose the customer's state (or enter the GSTIN), so GST is split correctly on the quotation.");
+        }
+
         $name = $lead->company_name ?: $lead->contact_name;
-        // Mirror CustomerController::store exactly so all NOT-NULL columns are set.
-        $customer = Customer::create([
+        // Mirror CustomerController::store so all NOT-NULL columns are set. Retried once on a unique-code clash.
+        $customer = \App\Support\DocNumber::retry(fn () => Customer::create([
             'company_id'          => $lead->company_id,
             'name'                => $name,
-            'code'                => strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $name), 0, 4)) . rand(100, 999),
+            'code'                => Customer::nextCode($lead->company_id, $name),
             'type'                => 'retail',
             'contact_person'      => $lead->contact_name,
             'email'               => $lead->email,
             'phone'               => $lead->phone ?: '',
             'whatsapp_no'         => null,
-            'gstin'               => null,
-            'address_line1'       => '',
+            'gstin'               => $gstin,
+            'address_line1'       => $o['address_line1'] ?? '',
             'city'                => $lead->city ?: '',
-            'state'               => '',
-            'state_code'          => '',
-            'pincode'             => '',
+            'state'               => \App\Support\GstState::name($stateCode),
+            'state_code'          => $stateCode,
+            'pincode'             => $o['pincode'] ?? '',
             'country'             => 'India',
             'credit_limit'        => 0,
             'outstanding_balance' => 0,
             'payment_terms_days'  => 30,
             'is_active'           => true,
-        ]);
+        ]));
 
+        $this->linkCustomer($lead, $customer, 'created/linked');
+
+        return $customer->id;
+    }
+
+    private function linkCustomer(Lead $lead, Customer $customer, string $how): void
+    {
         $lead->update(['customer_id' => $customer->id]);
 
         LeadActivity::create([
@@ -209,11 +253,45 @@ class LeadService
             'lead_id'       => $lead->id,
             'user_id'       => auth()?->id(),
             'type'          => 'status_change',
-            'description'   => "Customer created/linked: {$customer->name}",
+            'description'   => "Customer {$how}: {$customer->name}",
             'activity_date' => now(),
         ]);
+    }
 
-        return $customer->id;
+    /**
+     * Customers of this company that look like the lead's buyer: same phone (last 10 digits, whatever the formatting), e-mail, GSTIN, or name.
+     * Name alone is a weak match, so these are only ever offered, never used automatically.
+     *
+     * @return list<array{id:int,code:string,name:string,phone:?string,email:?string,city:?string,gstin:?string,matched_on:list<string>}>
+     */
+    public function customerMatches(Lead $lead, ?string $gstin = null): array
+    {
+        $phoneKey = LeadMatcher::phoneKey($lead->phone);
+        $emailKey = LeadMatcher::emailKey($lead->email);
+        $names = array_values(array_unique(array_filter([mb_strtolower(trim((string) $lead->company_name)), mb_strtolower(trim((string) $lead->contact_name))])));
+
+        $rows = Customer::withoutGlobalScope('tenant')->where('company_id', $lead->company_id)
+            ->where(function ($q) use ($phoneKey, $emailKey, $gstin, $names) {
+                if ($phoneKey) $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', ''), ')', '') LIKE ?", ['%' . $phoneKey]);
+                if ($emailKey) $q->orWhereRaw('LOWER(TRIM(email)) = ?', [$emailKey]);
+                if ($gstin)    $q->orWhereRaw('UPPER(gstin) = ?', [$gstin]);
+                foreach ($names as $n) $q->orWhereRaw('LOWER(TRIM(name)) = ?', [$n]);
+            })
+            ->orderBy('id')->limit(10)->get();
+
+        return $rows->map(function (Customer $c) use ($phoneKey, $emailKey, $gstin, $names) {
+            $digits = preg_replace('/\D+/', '', (string) $c->phone);
+
+            return [
+                'id' => $c->id, 'code' => $c->code, 'name' => $c->name, 'phone' => $c->phone, 'email' => $c->email, 'city' => $c->city, 'gstin' => $c->gstin,
+                'matched_on' => array_values(array_filter([
+                    $phoneKey && strlen($digits) >= 10 && str_ends_with($digits, $phoneKey) ? 'phone' : null,
+                    $emailKey && mb_strtolower(trim((string) $c->email)) === $emailKey ? 'email' : null,
+                    $gstin && strtoupper((string) $c->gstin) === $gstin ? 'gstin' : null,
+                    in_array(mb_strtolower(trim($c->name)), $names, true) ? 'name' : null,
+                ])),
+            ];
+        })->all();
     }
 
     /**

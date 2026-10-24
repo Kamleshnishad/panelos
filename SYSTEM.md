@@ -386,12 +386,17 @@ switched off rather than deleted, and *Other* is built in (the fallback). `GET /
 `lost_reason_id` (a reason from the list; stored as `lost_reason` = its name with `lost_reason_id` beside it) and an optional `lost_note`; free-text `lost_reason` still works.
 Every status change auto-writes a `status_change` activity, so the lead timeline is complete.
 
-**Convert** (`LeadService::ensureCustomer`) creates a `Customer` from the lead's details if one is not
-already linked (auto-generates `code` as 4 letters + 3 digits, `type='retail'`, `payment_terms_days=30`),
-links `lead.customer_id`, and logs an activity. It does **not** create the quotation — the UI then opens
-`QuotationCreate` prefilled with `{customer_id, lead_id}`. When that quotation is saved with `lead_id`,
-`QuotationService::create` calls `LeadService::linkQuotation`, which flips the lead to `quoted` and stores
-`quotation_id`.
+**Convert** (`POST /api/leads/{id}/convert`, `LeadService::ensureCustomer`, LEADS_PLAN 1.5) links the lead to a customer and returns `{lead_id, customer_id}`; it does **not** create the quotation.
+The UI then opens `QuotationCreate` prefilled with `{customer_id, lead_id}`, and when that quotation is saved with `lead_id`, `QuotationService::create` calls `LeadService::linkQuotation`, which moves the lead
+to `quoted` and stores `quotation_id`. Rules, in order:
+1. A lead that already has a customer returns it, asking nothing.
+2. `customer_id` in the body links that existing customer of the same company (timeline: "Customer linked: ...").
+3. Otherwise customers of the company that look like the buyer are looked for: same phone (last 10 digits, any formatting), e-mail, GSTIN (if given) or name. If there are any, the answer is **409 `CUSTOMER_EXISTS`**
+   with `errors.customers` (id, code, name, phone, email, city, gstin, matched_on) unless the body carries `create_new: true`. Name alone is only ever offered, never used automatically.
+4. A new customer needs a **state**: `state_code` (2-digit code, alpha code or name) or a `gstin` whose first two digits give it. A state that disagrees with the GSTIN is refused; a GSTIN that already belongs to a
+   customer is refused with `create_new` too. The customer gets `state_code` as the 2-digit GST code and `state` as its name, so `GstState` splits CGST/SGST vs IGST correctly. Optional `address_line1`, `pincode`; city comes from the lead.
+5. The code is `Customer::nextCode()`: first four letters of the name (or CUST) plus a number that counts up from the highest existing one in the company (RAVI101, RAVI102...), also used by the customer screen. Creation retries once on a unique-key clash.
+Defaults on the new customer: `type='retail'`, `payment_terms_days=30`, no credit limit.
 
 **Dashboard** returns: funnel counts, win rate, conversion % per source, top 5 lost reasons, and
 follow-up buckets (overdue / today / this week). The sidebar badge on **Leads** is the count of leads whose

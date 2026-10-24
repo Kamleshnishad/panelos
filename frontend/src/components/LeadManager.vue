@@ -120,6 +120,38 @@
       </div>
     </div>
 
+    <!-- Convert: the customer's state, and the look-alike customers if there are any -->
+    <div v-if="cv.open" class="modal-overlay sd-overlay" @click.self="cv.open = false">
+      <div class="modal-box">
+        <div class="modal-header"><h3>Convert to quotation</h3><button class="btn-close" @click="cv.open = false">✕</button></div>
+        <template v-if="!cv.matches.length">
+          <p class="cv-note">A customer is created from this lead. The state decides whether the quotation charges CGST + SGST or IGST.</p>
+          <div class="form-grid one">
+            <div class="form-group"><label for="cv-state">State *</label>
+              <select id="cv-state" v-model="cv.state_code" class="sd-input"><option value="">Choose a state…</option><option v-for="(name, code) in states" :key="code" :value="code">{{ name }}</option></select>
+            </div>
+            <div class="form-group"><label for="cv-gstin">GSTIN (optional, fills the state)</label><input id="cv-gstin" v-model="cv.gstin" type="text" maxlength="15" class="sd-input" /></div>
+            <div class="form-group"><label for="cv-address">Address (optional)</label><input id="cv-address" v-model="cv.address_line1" type="text" maxlength="255" class="sd-input" /></div>
+          </div>
+        </template>
+        <template v-else>
+          <p class="cv-note"><strong>This buyer looks like a customer you already have.</strong> Use that customer, or create a new one.</p>
+          <ul class="cv-matches">
+            <li v-for="m in cv.matches" :key="m.id">
+              <span><strong>{{ m.name }}</strong> ({{ m.code }})<span v-if="m.city"> · {{ m.city }}</span> · same {{ m.matched_on.join(' and ') }}</span>
+              <button class="btn btn-primary sm" :disabled="cv.busy" @click="submitConvert({ customer_id: m.id })">Use this customer</button>
+            </li>
+          </ul>
+        </template>
+        <p v-if="cv.error" class="sd-error">{{ cv.error }}</p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" @click="cv.open = false">Cancel</button>
+          <button v-if="cv.matches.length" class="btn btn-ghost" :disabled="cv.busy" @click="cv.matches = []; cv.create_new = true">None of these: create a new customer</button>
+          <button v-else class="btn btn-primary" :disabled="cv.busy" @click="submitConvert()">{{ cv.busy ? 'Working…' : 'Convert' }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Create / Edit modal -->
     <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
       <div class="modal-box lg">
@@ -470,21 +502,48 @@ function markLost(l) {
   })
 }
 
+const states = ref({})   // GST state code -> name, for the convert dialog
+const cv = reactive({ open: false, lead: null, state_code: '', gstin: '', address_line1: '', create_new: false, matches: [], error: '', busy: false })
+// A GSTIN starts with the state's code: fill the state from it.
+watch(() => cv.gstin, (g) => { const code = String(g || '').slice(0, 2); if (/^\d{2}$/.test(code) && states.value[code]) cv.state_code = code })
+
 async function convertLead(l) {
-  const ok = await confirmDialog({
-    title: 'Convert to Quotation?',
-    message: 'A customer will be created/linked from this lead and a new quotation opened. The lead will move to "quoted" on save.',
-    confirmLabel: 'Convert', cancelLabel: 'Cancel',
-  })
-  if (!ok) return
-  busy.value = true
+  if (l.customer_id) {                                        // already linked: nothing to ask
+    busy.value = true
+    try { const d = await leadService.convert(l.id); finishConvert(d?.data ?? d) }
+    catch (e) { toastError(e?.response?.data?.message ?? 'Convert failed.') }
+    finally { busy.value = false }
+    return
+  }
+  Object.assign(cv, { open: true, lead: l, state_code: '', gstin: '', address_line1: '', create_new: false, matches: [], error: '', busy: false })
+  if (!Object.keys(states.value).length) {
+    try { const r = await leadService.states(); states.value = r?.data ?? {} } catch { /* the dialog still shows; the server refuses a missing state */ }
+  }
+}
+
+function finishConvert(d) {
+  cv.open = false
+  detail.value = null
+  emit('convert', { customer_id: d.customer_id, lead_id: d.lead_id })
+}
+
+async function submitConvert(extra = {}) {
+  const body = { ...extra }
+  if (!extra.customer_id) {
+    if (cv.state_code) body.state_code = cv.state_code
+    if (cv.gstin.trim()) body.gstin = cv.gstin.trim().toUpperCase()
+    if (cv.address_line1.trim()) body.address_line1 = cv.address_line1.trim()
+    if (cv.create_new) body.create_new = true
+  }
+  cv.busy = true; cv.error = ''
   try {
-    const res = await leadService.convert(l.id)
-    const d = res?.data ?? res
-    detail.value = null
-    emit('convert', { customer_id: d.customer_id, lead_id: d.lead_id })
-  } catch (e) { toastError(e?.response?.data?.message ?? 'Convert failed.') }
-  finally { busy.value = false }
+    const res = await leadService.convert(cv.lead.id, body)
+    finishConvert(res?.data ?? res)
+  } catch (e) {
+    const data = e?.response?.data
+    if (e?.response?.status === 409 && data?.error_code === 'CUSTOMER_EXISTS') { cv.matches = data.errors?.customers ?? []; return }
+    cv.error = data?.message ?? 'Convert failed.'
+  } finally { cv.busy = false }
 }
 
 async function removeLead(l) {
@@ -580,6 +639,9 @@ onMounted(() => { load(); loadOptions() })
 .dup-box ul { margin: 6px 0; padding-left: 18px; }
 .dup-box a { color: var(--primary); font-weight: 700; }
 .dup-hint { font-size: 12px; color: #8d6e00; }
+.cv-note { font-size: 13px; color: #455a64; margin: 0 0 10px; }
+.cv-matches { list-style: none; margin: 0 0 8px; padding: 0; }
+.cv-matches li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #eceff1; font-size: 13px; }
 .sd-error { color: #c62828; font-size: 13px; margin: 8px 0 0; }
 .form-grid.one { grid-template-columns: 1fr; }
 

@@ -216,7 +216,7 @@ class LeadStatusEngineTest extends TestCase
 
     private function quote(Lead $lead)
     {
-        $customer = $this->postJson("/api/leads/{$lead->id}/convert")->json('data.customer_id');
+        $customer = $this->postJson("/api/leads/{$lead->id}/convert", ['state_code' => '24', 'create_new' => true])->json('data.customer_id');
         $pt = PanelType::factory()->create(['company_id' => $this->company->id]);
 
         return $this->postJson('/api/quotations', ['customer_id' => $customer, 'lead_id' => $lead->id, 'panel_rows' => $this->panelRows($pt->id, 10, 900)]);

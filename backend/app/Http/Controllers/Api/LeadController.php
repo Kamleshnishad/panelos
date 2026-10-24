@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Lead;
+use App\Exceptions\LeadCustomerMatchException;
+use App\Rules\IndianGstin;
+use App\Rules\IndianPincode;
 use App\Services\LeadMatcher;
 use App\Services\LeadService;
 use App\Traits\ApiResponse;
@@ -194,8 +197,20 @@ class LeadController extends Controller
     {
         try {
             $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
-            $customerId = $this->leads->ensureCustomer($lead);
+            $o = $r->validate([
+                'customer_id'   => 'nullable|integer',
+                'create_new'    => 'nullable|boolean',
+                'state_code'    => 'nullable|string|max:40',
+                'gstin'         => ['nullable', 'string', 'size:15', new IndianGstin()],
+                'address_line1' => 'nullable|string|max:255',
+                'pincode'       => ['nullable', 'string', 'max:10', new IndianPincode()],
+            ]);
+            $customerId = $this->leads->ensureCustomer($lead, $o);
             return $this->successResponse(['lead_id' => $lead->id, 'customer_id' => $customerId], 'Customer ready');
+        } catch (LeadCustomerMatchException $e) {
+            return $this->errorResponse(['customers' => $e->matches], $e->getMessage(), 'CUSTOMER_EXISTS', 409);
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'CONVERT_ERROR', 400);
         }

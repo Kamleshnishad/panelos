@@ -17,7 +17,8 @@ export default {
   update(id, data)         { return api('put',  `/api/leads/${id}`, data) },
   changeStatus(id, data)   { return api('post', `/api/leads/${id}/status`, data) },
   addActivity(id, data)    { return api('post', `/api/leads/${id}/activities`, data) },
-  convert(id)              { return api('post', `/api/leads/${id}/convert`) },
+  convert(id, data = {})   { return api('post', `/api/leads/${id}/convert`, data) },
+  states()                 { return api('get',  '/api/gst/states') },
   remove(id)               { return api('delete', `/api/leads/${id}`) },
 
   users()                  { return api('get',  '/api/users') },
