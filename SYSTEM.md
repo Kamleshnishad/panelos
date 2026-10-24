@@ -1368,6 +1368,8 @@ on MySQL.
 
 Hit one of these and the message tells you exactly which invariant you tripped.
 
+**What never reaches the browser (PB-043).** The `RedactErrorLeaks` API middleware replaces any error text that looks like SQL, a database host, a file path or an internal class name with a reference id (the original is in the server log), so the messages below are the only wording a user sees. Domain messages and 422 validation errors are never rewritten. List screens take `sort_by`/`sort_order` through `App\Support\SafeSort`: an unknown column or direction falls back to the default order.
+
 | Message | Where | Why |
 |---|---|---|
 | `Rates are pending. Enter rates for all panel rows before sending.` | quotation send | An item still has `rate_per_sqm <= 0` |

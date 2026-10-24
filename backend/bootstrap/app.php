@@ -14,6 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // No SQL / host / class-name text in any API error body (PB-043).
+        $middleware->api(append: [\App\Http\Middleware\RedactErrorLeaks::class]);
+
         $middleware->alias([
             'tenant.active' => \App\Http\Middleware\EnsureActiveTenant::class,
             'perm.module'   => \App\Http\Middleware\EnforceModulePermissions::class,
