@@ -66,6 +66,16 @@ class Lead extends BaseModel
         return in_array($this->status, self::CLOSED, true);
     }
 
+    protected static function boot()
+    {
+        parent::boot();
+        // phone_key / email_key are what duplicate detection looks up (LeadMatcher); they follow phone and email on every save.
+        static::saving(function (Lead $lead) {
+            $lead->phone_key = \App\Services\LeadMatcher::phoneKey($lead->phone);
+            $lead->email_key = \App\Services\LeadMatcher::emailKey($lead->email);
+        });
+    }
+
     public function company()      { return $this->belongsTo(Company::class); }
     public function assignedUser() { return $this->belongsTo(User::class, 'assigned_to_user_id'); }
     public function customer()     { return $this->belongsTo(Customer::class); }

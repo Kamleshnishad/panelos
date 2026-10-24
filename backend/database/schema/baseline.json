@@ -445,6 +445,8 @@
         "company_name": "varchar(200)",
         "phone": "varchar(30)",
         "email": "varchar(150)",
+        "phone_key": "varchar(10)",
+        "email_key": "varchar(150)",
         "city": "varchar(120)",
         "source": "varchar(60)",
         "requirement": "text",

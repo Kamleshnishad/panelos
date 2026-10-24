@@ -146,9 +146,19 @@
           <div class="form-group full"><label>Notes</label><FormInput v-model="form.notes" name="notes" :rules="[{ maxLength: 1000 }]" /></div>
         </div>
         <div v-if="formError" class="error-msg">{{ formError }}</div>
+        <div v-if="dupes.length" class="dup-box" role="alert">
+          <strong>This looks like a buyer you already have:</strong>
+          <ul>
+            <li v-for="d in dupes" :key="d.id">
+              <a href="#" @click.prevent="openDuplicate(d)">{{ d.lead_no }}</a> — {{ d.contact_name }}<span v-if="d.company_name">, {{ d.company_name }}</span>
+              · {{ statusLabel(d.status) }}<span v-if="d.assigned_to"> · {{ d.assigned_to }}</span> · same {{ d.matched_on.join(' and ') }}
+            </li>
+          </ul>
+          <span class="dup-hint">Open it, or save this one anyway.</span>
+        </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" @click="showForm = false">Cancel</button>
-          <button class="btn btn-primary" :disabled="saving || !form.contact_name" @click="save">{{ saving ? 'Saving…' : (form.id ? 'Save' : 'Create Lead') }}</button>
+          <button class="btn btn-primary" :disabled="saving || !form.contact_name" @click="save">{{ saving ? 'Saving…' : (dupes.length ? (form.id ? 'Save anyway' : 'Create anyway') : (form.id ? 'Save' : 'Create Lead')) }}</button>
         </div>
       </div>
     </div>
@@ -226,7 +236,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import leadService from '../services/leadService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 import FormInput from './Form/FormInput.vue'
@@ -343,6 +353,7 @@ async function loadUsers() {
 function openCreate() {
   Object.assign(form, { id: null, contact_name: '', company_name: '', phone: '', email: '', city: '', source: 'Other', application: '', assigned_to_user_id: null, est_qty_sqm: null, est_value: null, next_follow_up_date: '', requirement: '', notes: '' })
   formError.value = null
+  dupes.value = []
   showForm.value = true
   if (!users.value.length) loadUsers()
 }
@@ -355,22 +366,36 @@ function openEdit(l) {
     next_follow_up_date: l.next_follow_up_date ? String(l.next_follow_up_date).slice(0, 10) : '', requirement: l.requirement || '', notes: l.notes || '',
   })
   formError.value = null
+  dupes.value = []
   detail.value = null
   showForm.value = true
   if (!users.value.length) loadUsers()
+}
+
+// Same phone or e-mail as a lead that already exists: shown in the form until the buyer chooses to open it or save anyway.
+const dupes = ref([])
+watch(() => [form.phone, form.email], () => { dupes.value = [] })
+
+function openDuplicate(d) {
+  showForm.value = false
+  dupes.value = []
+  openDetail({ id: d.id })
 }
 
 async function save() {
   saving.value = true; formError.value = null
   try {
     const payload = { ...form }; delete payload.id
+    if (dupes.value.length) payload.allow_duplicate = true      // they have seen the matches and chose to go on
     if (form.id) await leadService.update(form.id, payload)
     else await leadService.create(payload)
     toastSuccess(form.id ? 'Lead updated.' : 'Lead created.')
     showForm.value = false
     await load()
   } catch (e) {
-    formError.value = e?.response?.data?.message ?? Object.values(e?.response?.data?.errors ?? {}).flat().join(' ') ?? 'Failed to save lead.'
+    const body = e?.response?.data
+    if (e?.response?.status === 409 && body?.error_code === 'DUPLICATE_LEAD') { dupes.value = body.errors?.duplicates ?? []; return }
+    formError.value = body?.message ?? Object.values(body?.errors ?? {}).flat().join(' ') ?? 'Failed to save lead.'
   } finally { saving.value = false }
 }
 
@@ -551,6 +576,10 @@ onMounted(() => { load(); loadOptions() })
 .status-badge.invalid { background: #eceff1; color: #546e7a; }
 .modal-overlay.sd-overlay { z-index: 1100; }   /* above the lead drawer (1000) it is opened from */
 .sd-input { width: 100%; padding: 8px 10px; border: 1px solid #cfd8dc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+.dup-box { margin-top: 12px; padding: 10px 14px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; font-size: 13px; color: #6d4c00; }
+.dup-box ul { margin: 6px 0; padding-left: 18px; }
+.dup-box a { color: var(--primary); font-weight: 700; }
+.dup-hint { font-size: 12px; color: #8d6e00; }
 .sd-error { color: #c62828; font-size: 13px; margin: 8px 0 0; }
 .form-grid.one { grid-template-columns: 1fr; }
 

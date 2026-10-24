@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Lead;
+use App\Services\LeadMatcher;
 use App\Services\LeadService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -76,11 +77,32 @@ class LeadController extends Controller
         }
     }
 
+    /** The matches, unless the caller has already seen them and sent allow_duplicate. */
+    private function duplicatesToWarnAbout(Request $r, array $data, ?int $exceptId = null): array
+    {
+        if ($r->boolean('allow_duplicate')) {
+            return [];
+        }
+
+        return $this->leads->findDuplicates($this->cid($r), $data, $exceptId);
+    }
+
+    private function duplicateResponse(array $dupes)
+    {
+        $first = $dupes[0];
+        $msg = "This looks like {$first['lead_no']} ({$first['contact_name']}). Open it, or save anyway.";
+
+        return $this->errorResponse(['duplicates' => $dupes], $msg, 'DUPLICATE_LEAD', 409);
+    }
+
     public function store(Request $r)
     {
         try {
             $this->normaliseSource($r);
             $data = $r->validate($this->rules(false, $this->cid($r), null));
+            if ($dupes = $this->duplicatesToWarnAbout($r, $data)) {
+                return $this->duplicateResponse($dupes);
+            }
             return $this->createdResponse($this->leads->create($this->cid($r), $data), 'Lead created', 201);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
@@ -95,6 +117,12 @@ class LeadController extends Controller
             $data = $r->validate($this->rules(true, $this->cid($r), $lead->source));
             if ($r->has('status') && $r->input('status') !== $lead->status) {
                 throw ValidationException::withMessages(['status' => 'Change the status with the status action, so it is checked and written to the timeline.']);
+            }
+            // Only when the phone or e-mail was actually changed to something that belongs to another lead; editing other fields never nags.
+            $contact = ['phone' => array_key_exists('phone', $data) ? $data['phone'] : $lead->phone, 'email' => array_key_exists('email', $data) ? $data['email'] : $lead->email];
+            $changed = LeadMatcher::phoneKey($contact['phone']) !== $lead->phone_key || LeadMatcher::emailKey($contact['email']) !== $lead->email_key;
+            if ($changed && ($dupes = $this->duplicatesToWarnAbout($r, $contact, $lead->id))) {
+                return $this->duplicateResponse($dupes);
             }
             return $this->successResponse($this->leads->update($lead, $data), 'Lead updated');
         } catch (ValidationException $e) {
@@ -208,6 +236,7 @@ class LeadController extends Controller
         return [
             'contact_name'        => [...explode('|', $req), 'string', 'max:150'],
             'company_name'        => 'nullable|string|max:200',
+            'allow_duplicate'     => 'nullable|boolean',
             'phone'               => 'nullable|string|max:30',
             'email'               => 'nullable|email|max:150',
             'city'                => 'nullable|string|max:120',

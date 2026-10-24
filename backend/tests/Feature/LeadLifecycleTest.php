@@ -100,11 +100,13 @@ class LeadLifecycleTest extends TestCase
         $this->newLead(['source' => 'Smoke Signals'])->assertStatus(422);
     }
 
-    public function test_CURRENT_the_same_phone_number_can_be_entered_again_as_a_new_lead(): void
+    public function test_the_same_phone_number_is_warned_about_and_can_still_be_entered_on_purpose(): void
     {
-        // LD-05: no duplicate detection. Sub-phase 1.4 turns this into a warning.
+        // LD-05 (1.4). The full matching rules are in LeadDuplicatesTest.
         $first = $this->newLead(['phone' => '9822222222'])->assertStatus(201)->json('data.id');
-        $second = $this->newLead(['phone' => '9822222222'])->assertStatus(201)->json('data.id');
+
+        $this->newLead(['phone' => '9822222222'])->assertStatus(409)->assertJsonPath('error_code', 'DUPLICATE_LEAD')->assertJsonPath('errors.duplicates.0.id', $first);
+        $second = $this->newLead(['phone' => '9822222222', 'allow_duplicate' => true])->assertStatus(201)->json('data.id');
 
         $this->assertNotSame($first, $second);
         $this->assertSame(2, Lead::where('phone', '9822222222')->count());

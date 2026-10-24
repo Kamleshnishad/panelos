@@ -52,6 +52,12 @@ class LeadService
         ]);
     }
 
+    /** Leads that look like the same buyer (same phone or e-mail). On update, pass the lead's own id so it never matches itself. */
+    public function findDuplicates(int $companyId, array $data, ?int $exceptLeadId = null): array
+    {
+        return app(LeadMatcher::class)->matches($companyId, $data['phone'] ?? null, $data['email'] ?? null, $exceptLeadId);
+    }
+
     public function create(int $companyId, array $data): Lead
     {
         $data['company_id'] = $companyId;

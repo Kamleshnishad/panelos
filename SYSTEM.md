@@ -371,6 +371,13 @@ revisions) is linked, so ordering an older, separate quotation does not win the 
 them and changes nothing unless `--apply` is given; closed leads are listed as left alone. Marking a lead lost on the screen is a dialog with the company's lost-reason list (a reason is required there)
 and a note; the API still accepts a free-text `lost_reason`.
 
+**Duplicates (LEADS_PLAN 1.4).** `App\Services\LeadMatcher` is the one definition of "the same buyer": same phone (compared on the last 10 digits) or same e-mail (lower case) within the company.
+The keys live on the lead (`phone_key`, `email_key`, set by the `Lead` model on every save, indexed), so the check is a lookup. `POST /api/leads` answers **409 `DUPLICATE_LEAD`** with
+`errors.duplicates` (up to 10 leads: id, lead_no, contact_name, company_name, status, assigned_to, created_at, matched_on) unless the request carries `allow_duplicate: true`; `PUT /api/leads/{id}`
+does the same only when the phone or e-mail changes to something that belongs to another lead (editing other fields, or the format of its own number, never warns). Won, lost and invalid leads
+count as matches; deleted leads and other companies never match; a phone shorter than 10 digits or an invalid e-mail has no key, so blank leads never match each other. Importers must call
+`LeadService::findDuplicates()` (same matcher) and decide for themselves; the service `create()` does not block.
+
 **Lead lists (LEADS_PLAN 1.1).** `leads.source` and `leads.status` are plain strings, no longer database enums. The allowed *sources* and the *lost reasons* are lists each company
 edits in **Master Data → Lead lists** (`lead_sources`, `lead_lost_reasons`; `LeadListService`). Starter lists are seeded for every company the first time they are read (15 sources,
 7 reasons). Leads store the source and the reason by **name**, so reports and old rows keep working; renaming an entry rewrites it on that company's leads, an entry that leads use is

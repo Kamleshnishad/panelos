@@ -48,7 +48,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 1.1 | Lists as data (sources, lost reasons) | done, local |
 | 1.2 | Status engine | done, local |
 | 1.3 | Automatic won, lost-reason dialog | done, local |
-| 1.4 | Duplicate detection | not started |
+| 1.4 | Duplicate detection | done, local |
 | 1.5 | Convert fixes | not started |
 | 1.6 | Numbering race and small hardening | not started |
 | 1.7 | Follow-up reminders | not started |
@@ -133,6 +133,8 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Build:** `LeadMatcher` (normalised phone and e-mail, ignoring spaces, +91 and punctuation); on create and edit the screen shows "this looks like LEAD-… (assigned to …), open it or create anyway"; the API returns the matches; the same matcher will be used by every importer later.
 - **Tests:** phone formats, e-mail case, different companies never match, soft-deleted leads are not matched.
 - **Live check:** try a duplicate on the live screen. **Size:** M. **Needs from client:** nothing.
+- **Result:** `LeadMatcher`, columns `phone_key`/`email_key` with a back-filling migration, 409 `DUPLICATE_LEAD`, warning panel in the lead form, `LeadDuplicatesTest` (16). The lifecycle test
+  `the_same_phone_number_can_be_entered_again...` became `..._is_warned_about_and_can_still_be_entered_on_purpose`. The warning also covers customers later (1.5 reuses the matcher idea for customers).
 
 ### 1.5 Convert fixes (LD-04)
 - **Goal:** converting a lead never creates a bad or duplicate customer.
