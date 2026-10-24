@@ -44,6 +44,8 @@ class GstMultiStateTest extends TestCase
         ]);
 
         $this->invoice = $this->company->invoices()->first();
+        // The customer is in Maharashtra, the same state the tests register for the supplier: intra-state unless a test says otherwise.
+        \App\Models\Customer::query()->update(['state' => 'Maharashtra', 'state_code' => '27']);
         $this->gstService = new GstService();
     }
 

@@ -20,8 +20,9 @@ class CompanyFactory extends Factory
             'pan' => $this->faker->bothify('?????#####?'),
             'address_line1' => $this->faker->streetAddress(),
             'city' => $this->faker->city(),
-            'state' => $this->faker->stateAbbr(),
-            'state_code' => $this->faker->bothify('??'),
+            // Fixed, not random (see CustomerFactory): random letters sometimes spell a real state code.
+            'state' => 'Gujarat',
+            'state_code' => '24',
             'pincode' => $this->faker->postcode(),
             'bank_name' => $this->faker->company() . ' Bank',
             'bank_account_no' => $this->faker->bankAccountNumber(),
