@@ -73,7 +73,7 @@ jobs:
           ssh -i ~/.ssh/panelos_deploy \
               -o StrictHostKeyChecking=accept-new \
               "$DEPLOY_USER@$DEPLOY_HOST" \
-              "docker exec panelos_backend php artisan tenant:provision \
+              "docker exec -u panelos panelos_backend php artisan tenant:provision \
                 --company='$COMPANY_NAME' --email='$EMAIL' --admin-name='$ADMIN_NAME' \
                 --password='$TENANT_PASSWORD' --phone='$PHONE' --address='$ADDRESS' \
                 --city='$CITY' --state='$STATE' --state-code='$STATE_CODE' \

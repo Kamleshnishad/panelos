@@ -42,4 +42,4 @@ jobs:
           ssh -i ~/.ssh/panelos_deploy \
               -o StrictHostKeyChecking=accept-new \
               "$DEPLOY_USER@$DEPLOY_HOST" \
-              "echo ---scheduled-tasks---; docker exec panelos_backend php artisan schedule:list; echo; echo ---supervisord-scheduler-process---; docker exec panelos_backend ps aux | grep -c '[s]chedule:run' || true; echo ---existing-backups---; docker exec panelos_backend sh -c 'ls -lt /var/www/html/storage/app/backups/*.sql 2>/dev/null | head -5' || echo 'no dumps yet'"
+              "echo ---scheduled-tasks---; docker exec -u panelos panelos_backend php artisan schedule:list; echo; echo ---supervisord-scheduler-process---; docker exec panelos_backend ps aux | grep -c '[s]chedule:run' || true; echo ---existing-backups---; docker exec panelos_backend sh -c 'ls -lt /var/www/html/storage/app/backups/*.sql 2>/dev/null | head -5' || echo 'no dumps yet'"

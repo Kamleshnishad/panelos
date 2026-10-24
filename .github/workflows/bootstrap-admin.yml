@@ -41,4 +41,4 @@ jobs:
           ssh -i ~/.ssh/panelos_deploy \
               -o StrictHostKeyChecking=accept-new \
               "$DEPLOY_USER@$DEPLOY_HOST" \
-              "docker exec panelos_backend php artisan admin:bootstrap --email='$ADMIN_EMAIL' --password='$ADMIN_PASSWORD'"
+              "docker exec -u panelos panelos_backend php artisan admin:bootstrap --email='$ADMIN_EMAIL' --password='$ADMIN_PASSWORD'"

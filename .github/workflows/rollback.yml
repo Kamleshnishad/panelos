@@ -136,7 +136,7 @@ jobs:
             if [ "${RUN_MIGRATIONS}" = "true" ]; then
               echo ""
               echo "▸ Running migrations (forward) per explicit request"
-              docker exec panelos_backend php artisan migrate --force
+              docker exec -u panelos panelos_backend php artisan migrate --force
             else
               echo ""
               echo "▸ Skipping migrations (default behaviour)"

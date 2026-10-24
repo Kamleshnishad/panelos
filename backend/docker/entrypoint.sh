@@ -32,7 +32,11 @@ php artisan storage:link 2>&1 || true
 # storage/ is a persistent volume, so a bad file survives container recreation; this
 # repairs it on every start. The logging config also sets permission 0666 so a file
 # created later by root stays writable.
-chown -R panelos:panelos storage/logs 2>/dev/null || true
-chmod -R u+rwX,g+rwX storage/logs 2>/dev/null || true
+chown -R panelos:panelos storage bootstrap/cache 2>/dev/null || true
+chmod -R u+rwX,g+rwX storage bootstrap/cache 2>/dev/null || true
+# The same fault, a second victim (PB-062): artisan run as root through `docker exec` created cache lock files that the
+# scheduler (user panelos) could not open, so every task that uses withoutOverlapping() - the nightly backup, the hourly
+# notification scan, the reminders - failed with "Permission denied" and never ran. The deploy workflows now exec as
+# panelos; this repairs files left behind in the persistent volume by the old ones.
 
 exec /usr/bin/supervisord -c /etc/supervisord.conf

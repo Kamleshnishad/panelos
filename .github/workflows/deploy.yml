@@ -209,7 +209,7 @@ jobs:
 
             echo ""
             echo "▸ Pre-migration DB backup (so a bad migration is recoverable)"
-            docker exec panelos_backend php artisan db:backup || echo "  ⚠ backup step failed — continuing; check storage/app/backups"
+            docker exec -u panelos panelos_backend php artisan db:backup || echo "  ⚠ backup step failed — continuing; check storage/app/backups"
             # Copy newest dump out of the container so the runner can archive it off-host (OPS-C2)
             rm -f /tmp/panelos-deploy-backup.sql
             LATEST_BAK=\$(docker exec panelos_backend sh -c 'ls -t /var/www/html/storage/app/backups/*.sql 2>/dev/null | head -1' || true)
@@ -217,11 +217,11 @@ jobs:
 
             echo ""
             echo "▸ Running database migrations"
-            docker exec panelos_backend php artisan migrate --force
+            docker exec -u panelos panelos_backend php artisan migrate --force
 
             echo ""
             echo "▸ Verifying DB schema against committed baseline"
-            docker exec panelos_backend php artisan schema:check
+            docker exec -u panelos panelos_backend php artisan schema:check
 
             echo ""
             echo "▸ Container status"
