@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ChemicalStock extends BaseModel
 {
+    use \App\Traits\Auditable;
     use SoftDeletes;
 
     protected $table = 'chemical_stocks';

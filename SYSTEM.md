@@ -299,7 +299,7 @@ depth — which is why a cross-tenant id yields **404, not 403**. All models use
 
 Parallel subsystems: **Inventory** (coils / chemicals / consumables) fed by **Procurement**
 (suppliers → PO → GRN); **Notifications** on order confirmed, dispatch done, payment due, low stock;
-**Audit log** on 10 high-value models.
+**Audit log** on 20 models (EN-06 added roles, users, company, stock and its movements, dispatches, accessories, tax rate).
 
 ---
 
@@ -1127,7 +1127,10 @@ UI: `NotificationBell.vue` in the AppShell header (polls every 60 s while the ta
 ### 19.6 Audit log
 
 `Auditable` trait on **Customer, Invoice, Lead, Order, PanelType, PaymentTransaction, ProductionRun,
-PurchaseOrder, Quotation, Supplier**. Records `created` / `updated` / `deleted` / `force_deleted` /
+PurchaseOrder, Quotation, Supplier**, and since EN-06 (PB-059) on **Role, User, Company, StockTransaction, CoilStock,
+ChemicalStock, ConsumableStock, Dispatch, Accessory, TaxConfiguration**. A model can list extra fields to skip in
+`$auditAlsoExclude` (User skips `last_login_at` and the 2FA code, so logins do not flood the log). A Company row is logged
+against its own tenant, so a super admin editing a tenant shows up in that tenant's log. Records `created` / `updated` / `deleted` / `force_deleted` /
 `restored` with before/after snapshots (stripping `password`, `remember_token`, timestamps) plus user, IP
 and user-agent. Writes are wrapped in `try/catch` so auditing can never break the operation.
 Read: `GET /api/audit-logs` (needs `audit.view`; UI = `AuditLog.vue`).

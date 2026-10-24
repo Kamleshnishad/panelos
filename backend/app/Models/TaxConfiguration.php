@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class TaxConfiguration extends Model
 {
+    use \App\Traits\Auditable;
     use \App\Models\Concerns\BelongsToTenant;
 
     protected $table = 'tax_configurations';
