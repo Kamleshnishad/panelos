@@ -19,37 +19,15 @@ class QualityControlTest extends TestCase
     use HasDatabaseTestHelpers;
 
     /**
-     * Helper to create a batch in qc_pending status
+     * A batch that has finished production and is waiting for inspection. Built directly: these tests are
+     * about quality control, and the old helper drove the whole quotation-to-batch flow through the API
+     * with a payload shape (`items`) that no longer exists.
      */
     private function createQcPendingBatch()
     {
         $user = $this->loginSuperAdmin();
-        $company = $user->company;
 
-        $customer = Customer::factory()->for($company)->create();
-        $panelType = PanelType::factory()->for($company)->create();
-
-        $quotResponse = $this->postJson('/api/quotations', [
-            'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 50,
-            ]],
-        ]);
-
-        $quotationId = $quotResponse->json('data.id');
-        $this->postJson("/api/quotations/{$quotationId}/send");
-        $this->postJson("/api/quotations/{$quotationId}/accept");
-        $orderResponse = $this->postJson("/api/quotations/{$quotationId}/create-order");
-        $orderId = $orderResponse->json('data.id');
-
-        $batchResponse = $this->postJson("/api/orders/{$orderId}/batches");
-        $batchId = $batchResponse->json('data.id');
-
-        $this->postJson("/api/batches/{$batchId}/start");
-        $this->postJson("/api/batches/{$batchId}/complete");
-
-        return ProductionBatch::find($batchId);
+        return ProductionBatch::factory()->for($user->company)->create(['status' => 'qc_pending']);
     }
 
     /**
@@ -123,27 +101,8 @@ class QualityControlTest extends TestCase
     public function test_cannot_create_qc_for_non_qc_pending_batch()
     {
         $user = $this->loginSuperAdmin();
-        $company = $user->company;
-
-        $customer = Customer::factory()->for($company)->create();
-        $panelType = PanelType::factory()->for($company)->create();
-
-        $quotResponse = $this->postJson('/api/quotations', [
-            'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 50,
-            ]],
-        ]);
-
-        $quotationId = $quotResponse->json('data.id');
-        $this->postJson("/api/quotations/{$quotationId}/send");
-        $this->postJson("/api/quotations/{$quotationId}/accept");
-        $orderResponse = $this->postJson("/api/quotations/{$quotationId}/create-order");
-        $orderId = $orderResponse->json('data.id');
-
-        $batchResponse = $this->postJson("/api/orders/{$orderId}/batches");
-        $batchId = $batchResponse->json('data.id');
+        // Production has not finished: the batch is still in progress.
+        $batchId = ProductionBatch::factory()->for($user->company)->create(['status' => 'in_progress'])->id;
 
         // Try to create QC without completing production
         $response = $this->postJson("/api/batches/{$batchId}/qc", [

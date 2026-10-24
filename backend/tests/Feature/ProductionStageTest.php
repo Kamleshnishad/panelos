@@ -167,10 +167,7 @@ class ProductionStageTest extends TestCase
 
         $quotResponse = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 50,
-            ]],
+            'panel_rows' => $this->panelRows($panelType->id, 50, 1000),
         ]);
 
         $quotationId = $quotResponse->json('data.id');
@@ -184,10 +181,10 @@ class ProductionStageTest extends TestCase
         $batchId = $batchResponse->json('data.id');
 
         // Start production on batch
-        $this->postJson("/api/batches/{$batchId}/start");
+        $this->postJson("/api/batches/{$batchId}/start", ['force' => true]);
 
         // Start cutting stage
-        $startResponse = $this->postJson("/api/batches/{$batchId}/stages/{$cuttingStage['id']}/start");
+        $startResponse = $this->postJson("/api/batches/{$batchId}/stages/{$cuttingStage['id']}/start", ['force' => true]);
 
         $startResponse->assertStatus(201)
             ->assertJson([
@@ -240,10 +237,7 @@ class ProductionStageTest extends TestCase
 
         $quotResponse = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 50,
-            ]],
+            'panel_rows' => $this->panelRows($panelType->id, 50, 1000),
         ]);
 
         $quotationId = $quotResponse->json('data.id');
@@ -256,10 +250,10 @@ class ProductionStageTest extends TestCase
         $batchId = $batchResponse->json('data.id');
 
         // Start production on batch
-        $this->postJson("/api/batches/{$batchId}/start");
+        $this->postJson("/api/batches/{$batchId}/start", ['force' => true]);
 
         // Try to start lamination (skipping cutting)
-        $response = $this->postJson("/api/batches/{$batchId}/stages/{$laminationStage['id']}/start");
+        $response = $this->postJson("/api/batches/{$batchId}/stages/{$laminationStage['id']}/start", ['force' => true]);
 
         $response->assertStatus(400)
             ->assertJson([
@@ -293,10 +287,7 @@ class ProductionStageTest extends TestCase
 
         $quotResponse = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 50,
-            ]],
+            'panel_rows' => $this->panelRows($panelType->id, 50, 1000),
         ]);
 
         $quotationId = $quotResponse->json('data.id');
@@ -309,7 +300,7 @@ class ProductionStageTest extends TestCase
         $batchId = $batchResponse->json('data.id');
 
         // Start and complete first stage
-        $this->postJson("/api/batches/{$batchId}/stages/{$cuttingStage['id']}/start");
+        $this->postJson("/api/batches/{$batchId}/stages/{$cuttingStage['id']}/start", ['force' => true]);
         $this->postJson("/api/batches/{$batchId}/stages/{$cuttingStage['id']}/complete");
 
         // Get progress

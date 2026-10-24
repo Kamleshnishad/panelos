@@ -92,9 +92,9 @@ class ProductionBatchController extends Controller
         } catch (\Exception $e) {
             return $this->errorResponse(
                 ['error' => $e->getMessage()],
-                'Failed to create batch',
+                $e->getMessage(),
                 'BATCH_CREATE_ERROR',
-                500
+                400
             );
         }
     }
@@ -177,9 +177,9 @@ class ProductionBatchController extends Controller
         } catch (\Exception $e) {
             return $this->errorResponse(
                 ['error' => $e->getMessage()],
-                'Failed to update batch',
+                $e->getMessage(),
                 'BATCH_UPDATE_ERROR',
-                500
+                400
             );
         }
     }
@@ -252,9 +252,9 @@ class ProductionBatchController extends Controller
         } catch (\Exception $e) {
             return $this->errorResponse(
                 ['error' => $e->getMessage()],
-                'Failed to complete batch',
+                $e->getMessage(),
                 'BATCH_COMPLETE_ERROR',
-                500
+                400
             );
         }
     }

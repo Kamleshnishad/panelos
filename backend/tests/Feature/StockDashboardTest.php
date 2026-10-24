@@ -4,8 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\User;
-use App\Models\Coil;
-use App\Models\Chemical;
 use App\Models\CoilStock;
 use App\Models\ChemicalStock;
 use App\Services\StockService;
@@ -16,6 +14,7 @@ use Tests\TestCase;
 class StockDashboardTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Traits\MakesStockRows;
 
     protected $company;
     protected $user;
@@ -35,7 +34,7 @@ class StockDashboardTest extends TestCase
 
     public function test_get_total_stock_value()
     {
-        $coil = Coil::factory()->create(['unit_cost' => 100]);
+        $coil = $this->coil(['unit_cost' => 100]);
         $this->stockService->addCoilStock($coil->id, 500, 'Stock', $this->company->id);
 
         $value = $this->dashboardService->getTotalStockValue($this->company->id);
@@ -45,7 +44,7 @@ class StockDashboardTest extends TestCase
 
     public function test_get_low_stock_items()
     {
-        $coil = Coil::factory()->create();
+        $coil = $this->coil();
         $stock = $this->stockService->addCoilStock($coil->id, 500, 'Stock', $this->company->id);
         $stock->update(['reorder_level' => 100]);
         $this->stockService->removeCoilStock($coil->id, 420, 'Removal', $this->company->id);
@@ -58,7 +57,7 @@ class StockDashboardTest extends TestCase
 
     public function test_get_expiring_soon_chemicals()
     {
-        $chemical = Chemical::factory()->create();
+        $chemical = $this->chemical();
         $expiryDate = now()->addDays(15)->format('Y-m-d');
 
         $this->stockService->addChemicalStock(
@@ -78,7 +77,7 @@ class StockDashboardTest extends TestCase
 
     public function test_get_stock_movement()
     {
-        $coil = Coil::factory()->create();
+        $coil = $this->coil();
         $this->stockService->addCoilStock($coil->id, 500, 'Initial', $this->company->id);
         $this->stockService->removeCoilStock($coil->id, 100, 'Removal', $this->company->id);
 
@@ -101,7 +100,7 @@ class StockDashboardTest extends TestCase
 
     public function test_alert_summary_calculation()
     {
-        $coil = Coil::factory()->create();
+        $coil = $this->coil();
         $stock = $this->stockService->addCoilStock($coil->id, 500, 'Stock', $this->company->id);
         $stock->update(['reorder_level' => 100]);
         $this->stockService->removeCoilStock($coil->id, 420, 'Removal', $this->company->id);
@@ -117,21 +116,22 @@ class StockDashboardTest extends TestCase
     public function test_dashboard_multi_tenant_isolation()
     {
         $otherCompany = Company::factory()->create();
-        $coil = Coil::factory()->create();
+        $otherUser = User::factory()->create(['company_id' => $otherCompany->id]);
+        // Only the other company is running low.
+        $this->coil(['quantity_in_stock' => 500, 'reorder_level' => 100]);
+        $this->coil(['quantity_in_stock' => 10, 'reorder_level' => 100], $otherCompany->id);
 
-        $this->stockService->addCoilStock($coil->id, 500, 'My Stock', $this->company->id);
-        $this->stockService->addCoilStock($coil->id, 300, 'Their Stock', $otherCompany->id);
+        $myLow = collect($this->dashboardService->getLowStockItems($this->company->id));
+        $this->actingAs($otherUser);
+        $theirLow = collect($this->dashboardService->getLowStockItems($otherCompany->id));
 
-        $myAlerts = $this->dashboardService->getAlertSummary($this->company->id);
-        $theirAlerts = $this->dashboardService->getAlertSummary($otherCompany->id);
-
-        $this->assertIsArray($myAlerts);
-        $this->assertIsArray($theirAlerts);
+        $this->assertCount(0, $myLow, 'A company must not see another company low stock.');
+        $this->assertGreaterThan(0, $theirLow->count());
     }
 
     public function test_dashboard_performance_with_large_data()
     {
-        $coils = Coil::factory()->count(50)->create();
+        $coils = collect(range(1, 50))->map(fn () => $this->coil());
 
         foreach ($coils as $coil) {
             $this->stockService->addCoilStock($coil->id, rand(100, 1000), 'Stock', $this->company->id);

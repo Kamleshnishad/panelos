@@ -21,9 +21,14 @@ class PlatformSetting extends Model
 
     protected $hidden = ['razorpay_key_secret', 'razorpay_webhook_secret'];
 
+    /**
+     * The single settings row. It used to be firstOrCreate(['id' => 1]), but `id` is not mass-assignable, so
+     * whenever row 1 did not exist that created a NEW row under some other id and returned it empty — every call
+     * then added another blank row and no saved key was ever found. Take whichever row exists; create one only if none.
+     */
     public static function current(): self
     {
-        return static::firstOrCreate(['id' => 1]);
+        return static::query()->orderBy('id')->first() ?? static::forceCreate([]);
     }
 
     /** Plan prices: DB override merged over config defaults. */

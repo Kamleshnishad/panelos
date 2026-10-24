@@ -28,13 +28,11 @@ class MlForecastingTest extends TestCase
             'name'       => 'Test User',
             'email'      => 'test@example.com',
             'password'   => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            'is_company_admin' => true,
         ]);
 
-        $this->panelType = PanelType::create([
-            'type'       => 'Steel Panel',
-            'company_id' => $this->company->id,
-        ]);
+        $this->panelType = PanelType::factory()->create(['company_id' => $this->company->id]);
 
         $this->actingAs($this->user);
         $this->ml = new MlForecastingService();
@@ -309,10 +307,7 @@ class MlForecastingTest extends TestCase
     public function test_ml_forecast_insufficient_data()
     {
         // Create a new panel type with no historical data
-        $emptyPanel = PanelType::create([
-            'type'       => 'Empty Panel',
-            'company_id' => $this->company->id,
-        ]);
+        $emptyPanel = PanelType::factory()->create(['company_id' => $this->company->id]);
 
         $response = $this->postJson('/api/forecasts/ml', [
             'panel_type_id' => $emptyPanel->id,

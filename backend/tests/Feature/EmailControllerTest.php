@@ -24,10 +24,12 @@ class EmailControllerTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            'is_company_admin' => true,
         ]);
 
         $this->actingAs($this->user);
+        \Illuminate\Support\Facades\Mail::fake();
     }
 
     public function test_send_invoice_email_endpoint()
@@ -43,8 +45,8 @@ class EmailControllerTest extends TestCase
 
         $response = $this->postJson("/api/invoices/{$invoice->id}/send-email");
 
-        $response->assertStatus(400) // Expected to fail without proper email config
-            ->assertJsonPath('success', false);
+        $response->assertStatus(200)->assertJsonPath('success', true);
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\InvoiceSentMailable::class);
     }
 
     public function test_email_preview_endpoint()
@@ -97,8 +99,8 @@ class EmailControllerTest extends TestCase
 
         $response = $this->postJson("/api/invoices/{$invoice->id}/send-payment-reminder");
 
-        $response->assertStatus(400) // Expected to fail without proper email config
-            ->assertJsonPath('success', false);
+        $response->assertStatus(200)->assertJsonPath('success', true);
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\PaymentReminderMailable::class);
     }
 
     public function test_send_payment_confirmation_endpoint()
@@ -121,7 +123,7 @@ class EmailControllerTest extends TestCase
 
         $response = $this->postJson("/api/invoices/{$invoice->id}/send-payment-confirmation");
 
-        $response->assertStatus(400) // Expected to fail without proper email config
-            ->assertJsonPath('success', false);
+        $response->assertStatus(200)->assertJsonPath('success', true);
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\PaymentReceivedMailable::class);
     }
 }

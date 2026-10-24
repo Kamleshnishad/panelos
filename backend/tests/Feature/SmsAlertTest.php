@@ -30,7 +30,8 @@ class SmsAlertTest extends TestCase
             'email' => 'test@example.com',
             'phone' => '+919876543210',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            'is_company_admin' => true,
         ]);
 
         $this->actingAs($this->user);

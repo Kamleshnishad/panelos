@@ -37,7 +37,7 @@ class PaymentReceivedMailable extends Mailable implements ShouldQueue
         $paymentStatus = $remaining <= 0 ? 'Fully Paid' : 'Partially Paid';
 
         return new \Illuminate\Mail\Mailables\Content(
-            view: 'emails.payment-received',
+            markdown: 'emails.payment-received',
             with: [
                 'invoice' => $this->invoice,
                 'payment' => $this->payment,

@@ -634,7 +634,7 @@ class ReportingService
         $aging = ['0_30' => 0, '31_60' => 0, '61_90' => 0, 'over_90' => 0];
         foreach ($invoices->where('status', '!=', 'paid') as $inv) {
             if (!$inv->due_date || !$inv->due_date->isPast()) continue;
-            $days = now()->diffInDays($inv->due_date);
+            $days = \App\Support\Days::overdue($inv->due_date);
             $bal  = max(0, (float) $inv->total_amount - (float) $inv->payments->sum('amount'));
             if ($bal <= 0) continue;
             if ($days <= 30)      $aging['0_30']   += $bal;

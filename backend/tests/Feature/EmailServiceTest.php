@@ -30,7 +30,8 @@ class EmailServiceTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            'is_company_admin' => true,
         ]);
 
         $this->actingAs($this->user);
@@ -49,29 +50,51 @@ class EmailServiceTest extends TestCase
 
     public function test_send_invoice_email()
     {
+        \Illuminate\Support\Facades\Mail::fake();
         $dispatch = Dispatch::factory()->for($this->company)->create();
         $invoice = $this->invoiceService->createFromDispatch($dispatch->id);
 
-        try {
-            $result = $this->emailService->sendInvoice($invoice, $this->company->id);
-            $this->assertTrue($result);
-        } catch (\Exception $e) {
-            // Email might fail if customer email not set, which is expected in test
-            $this->assertStringContainsString('email', strtolower($e->getMessage()));
-        }
+        // Used to throw a TypeError: InvoiceSentMailable declared a non-nullable $pdfPath and was handed null,
+        // so no invoice e-mail was ever sent. (The old test swallowed any exception, so it passed regardless.)
+        $this->assertTrue($this->emailService->sendInvoice($invoice, $this->company->id));
+
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\InvoiceSentMailable::class);
     }
 
     public function test_send_payment_reminder()
     {
+        \Illuminate\Support\Facades\Mail::fake();
         $dispatch = Dispatch::factory()->for($this->company)->create();
         $invoice = $this->invoiceService->createFromDispatch($dispatch->id);
         $this->invoiceService->sendInvoice($invoice->id, $this->company->id);
 
-        try {
-            $result = $this->emailService->sendPaymentReminder($invoice, $this->company->id);
-            $this->assertTrue($result);
-        } catch (\Exception $e) {
-            $this->assertStringContainsString('email', strtolower($e->getMessage()));
+        $this->assertTrue($this->emailService->sendPaymentReminder($invoice, $this->company->id));
+
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\PaymentReminderMailable::class);
+    }
+
+    /**
+     * Every mail template must actually render. They are Markdown templates (@component('mail::message')) but
+     * the mailables used view:, so rendering threw "No hint path defined for [mail]" and NO invoice, reminder or
+     * payment e-mail could ever be delivered. Mail::fake() hides this because it never renders, so render for real.
+     */
+    public function test_every_email_template_renders(): void
+    {
+        $dispatch = Dispatch::factory()->for($this->company)->create();
+        $invoice = $this->invoiceService->createFromDispatch($dispatch->id)->fresh();
+        $payment = \App\Models\PaymentTransaction::create([
+            'company_id' => $this->company->id, 'invoice_id' => $invoice->id, 'amount' => 100,
+            'payment_method' => 'bank_transfer', 'transaction_date' => now(), 'status' => 'completed',
+        ]);
+
+        foreach ([
+            'invoice' => new \App\Mail\InvoiceSentMailable($invoice),
+            'reminder (overdue)' => new \App\Mail\PaymentReminderMailable($invoice, 5),
+            'reminder (not yet due)' => new \App\Mail\PaymentReminderMailable($invoice, 0),
+            'payment received' => new \App\Mail\PaymentReceivedMailable($invoice, $payment),
+        ] as $name => $mailable) {
+            $html = $mailable->render();
+            $this->assertStringContainsString($invoice->invoice_no, $html, "{$name} email did not render the invoice number");
         }
     }
 

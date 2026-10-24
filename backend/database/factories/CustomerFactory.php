@@ -32,7 +32,8 @@ class CustomerFactory extends Factory
             'state_code' => strtoupper($this->faker->regexify('[A-Z]{2}')),
             'pincode' => $this->faker->postcode(),
             'country' => 'India',
-            'credit_limit' => $this->faker->randomFloat(2, 10000, 100000),
+            // 0 = no limit. Random limits made every order test pass or fail by chance; credit tests set their own.
+            'credit_limit' => 0,
             'outstanding_balance' => 0,
             'payment_terms_days' => $this->faker->numberBetween(0, 90),
             'notes' => $this->faker->optional()->sentence(),

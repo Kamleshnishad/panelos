@@ -26,14 +26,11 @@ class ForecastingControllerTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            'is_company_admin' => true,
         ]);
 
-        $this->panelType = PanelType::create([
-            'type' => 'Standard',
-            'thickness_mm' => 100,
-            'thermal_resistance' => 5.0
-        ]);
+        $this->panelType = PanelType::factory()->create(['company_id' => $this->company->id]);
 
         $this->actingAs($this->user);
     }

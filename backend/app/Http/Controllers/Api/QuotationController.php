@@ -215,6 +215,8 @@ class QuotationController extends Controller
         try {
             $quotation = Quotation::where('company_id', $request->user()->company_id)->findOrFail($id);
             return $this->pdfService->generate($quotation);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Quotation not found', 'NOT_FOUND', 404);   // also another company's id
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], 'PDF failed', 'PDF_ERROR', 500);
         }
@@ -226,6 +228,8 @@ class QuotationController extends Controller
         try {
             $quotation = Quotation::where('company_id', $request->user()->company_id)->findOrFail($id);
             return $this->pdfService->boqSheet($quotation, $request->boolean('download'));
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Quotation not found', 'NOT_FOUND', 404);
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], 'BOQ sheet failed', 'BOQ_PDF_ERROR', 500);
         }

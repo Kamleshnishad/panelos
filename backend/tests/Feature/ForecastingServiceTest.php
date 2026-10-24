@@ -30,14 +30,11 @@ class ForecastingServiceTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            'is_company_admin' => true,
         ]);
 
-        $this->panelType = PanelType::create([
-            'type' => 'Standard',
-            'thickness_mm' => 100,
-            'thermal_resistance' => 5.0
-        ]);
+        $this->panelType = PanelType::factory()->create(['company_id' => $this->company->id]);
 
         $this->actingAs($this->user);
         $this->forecastingService = app(ForecastingService::class);
@@ -120,7 +117,7 @@ class ForecastingServiceTest extends TestCase
         );
 
         foreach ($forecasts as $forecast) {
-            $this->assertIn($forecast->risk_level, ['low', 'medium', 'high']);
+            $this->assertContains($forecast->risk_level, ['low', 'medium', 'high']);
         }
     }
 
@@ -191,8 +188,8 @@ class ForecastingServiceTest extends TestCase
         $lastForecast = $forecasts[count($forecasts) - 1];
 
         $this->assertGreaterThan(
-            $lastForecast->confidence_score,
-            $firstForecast->confidence_score
+            $lastForecast['confidence_score'],   // the service returns plain rows (bulk insert), not models
+            $firstForecast['confidence_score']
         );
     }
 }

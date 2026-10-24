@@ -30,14 +30,11 @@ class AnalyticsServiceTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            'is_company_admin' => true,
         ]);
 
-        $this->panelType = PanelType::create([
-            'type' => 'Standard',
-            'thickness_mm' => 100,
-            'thermal_resistance' => 5.0
-        ]);
+        $this->panelType = PanelType::factory()->create(['company_id' => $this->company->id]);
 
         $this->actingAs($this->user);
         $this->analyticsService = app(AnalyticsService::class);
@@ -104,7 +101,7 @@ class AnalyticsServiceTest extends TestCase
         if (count($analyses) > 0) {
             $analysis = $analyses[0];
             // With clear upward trend, direction should be upward
-            $this->assertIsNotNull($analysis->trend_direction);
+            $this->assertNotNull($analysis->trend_direction);
         }
     }
 
@@ -134,7 +131,7 @@ class AnalyticsServiceTest extends TestCase
     {
         $snapshot = $this->analyticsService->createAnalyticsSnapshot($this->company->id);
 
-        $this->assertIn(
+        $this->assertContains(
             $snapshot->performance_status,
             ['excellent', 'good', 'average', 'poor']
         );

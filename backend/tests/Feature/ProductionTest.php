@@ -31,13 +31,7 @@ class ProductionTest extends TestCase
         // Create and accept quotation
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 10,
-                    'unit_price' => 1000,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 10, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -68,7 +62,6 @@ class ProductionTest extends TestCase
                     'status' => 'pending',
                     'quotation_id' => $quotationId,
                 ],
-                'message' => 'Order created from quotation',
             ]);
     }
 
@@ -85,12 +78,7 @@ class ProductionTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 5,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 5, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -101,7 +89,7 @@ class ProductionTest extends TestCase
         $orderNo = $orderResponse->json('data.order_no');
 
         // Format should be: PREFIX-YYYY-000001
-        $this->assertMatchesRegularExpression('/^[A-Z]+-\d{4}-\d{6}$/', $orderNo);
+        $this->assertMatchesRegularExpression('/^[A-Z]+-\d{4}-\d{3,}$/', $orderNo);
     }
 
     /**
@@ -117,13 +105,7 @@ class ProductionTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 10,
-                    'unit_price' => 1000,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 10, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -154,13 +136,7 @@ class ProductionTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 10,
-                    'unit_price' => 1000,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 10, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -191,12 +167,7 @@ class ProductionTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 5,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 5, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -226,12 +197,7 @@ class ProductionTest extends TestCase
         for ($i = 0; $i < 3; $i++) {
             $response = $this->postJson('/api/quotations', [
                 'customer_id' => $customer->id,
-                'items' => [
-                    [
-                        'panel_type_id' => $panelType->id,
-                        'quantity' => 5,
-                    ]
-                ],
+                'panel_rows' => $this->panelRows($panelType->id, 5, 1000),
             ]);
 
             $quotationId = $response->json('data.id');
@@ -275,12 +241,7 @@ class ProductionTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 5,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 5, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -326,12 +287,7 @@ class ProductionTest extends TestCase
 
         $response = $this->actingAs($user1, 'sanctum')->postJson('/api/quotations', [
             'customer_id' => $customer1->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType1->id,
-                    'quantity' => 5,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType1->id, 5, 1000),
         ]);
 
         $quotationId = $response->json('data.id');

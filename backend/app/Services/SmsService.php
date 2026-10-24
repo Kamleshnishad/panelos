@@ -66,7 +66,7 @@ class SmsService
             }
 
             $remainingDue = $this->calculateRemainingDue($invoice->id);
-            $daysOverdue  = max(0, now()->diffInDays($invoice->due_date));
+            $daysOverdue  = max(0, \App\Support\Days::overdue($invoice->due_date));
             $message      = $this->formatPaymentReminderMessage($invoice, $remainingDue, $daysOverdue);
 
             $result = $this->client->messages->create(
@@ -98,7 +98,7 @@ class SmsService
             }
 
             $remainingDue = $this->calculateRemainingDue($invoice->id);
-            $daysOverdue = max(0, now()->diffInDays($invoice->due_date));
+            $daysOverdue = max(0, \App\Support\Days::overdue($invoice->due_date));
 
             $message = $this->formatPaymentReminderMessage($invoice, $remainingDue, $daysOverdue);
 

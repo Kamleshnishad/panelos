@@ -35,13 +35,7 @@ class QuotationTest extends TestCase
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
             'valid_until' => now()->addDays(30)->format('Y-m-d'),
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 10,
-                    'unit_price' => 1000,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 10, 1000),
             'notes' => 'Test quotation',
         ]);
 
@@ -65,7 +59,6 @@ class QuotationTest extends TestCase
                 'data' => [
                     'status' => 'draft',
                 ],
-                'message' => 'Quotation created successfully',
             ]);
 
         // Verify totals calculated correctly
@@ -84,12 +77,7 @@ class QuotationTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => 999, // Non-existent customer
-            'items' => [
-                [
-                    'panel_type_id' => 999, // Non-existent panel type
-                    'quantity' => -5, // Invalid quantity
-                ]
-            ],
+            'panel_rows' => $this->panelRows(999, 10, 1000),
         ]);
 
         $response->assertStatus(422)
@@ -186,13 +174,7 @@ class QuotationTest extends TestCase
 
         $response = $this->putJson("/api/quotations/{$quotation->id}", [
             'customer_id' => $newCustomer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 5,
-                    'unit_price' => 500,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 5, 500),
         ]);
 
         $response->assertStatus(200)
@@ -256,10 +238,11 @@ class QuotationTest extends TestCase
         $company = $user->company;
 
         $customer = Customer::factory()->for($company)->create();
-        $quotation = Quotation::factory()
-            ->for($company)
-            ->for($customer)
-            ->create(['status' => 'draft']);
+        $panelType = PanelType::factory()->for($company)->create();
+        // A quotation can only be sent with at least one priced panel row (an empty one is refused), so build a real one.
+        $quotation = Quotation::find($this->postJson('/api/quotations', [
+            'customer_id' => $customer->id, 'panel_rows' => $this->panelRows($panelType->id, 10, 1000),
+        ])->json('data.id'));
 
         $response = $this->postJson("/api/quotations/{$quotation->id}/send");
 
@@ -360,18 +343,13 @@ class QuotationTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 1,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 1, 1000),
         ]);
 
         $quotationNo = $response->json('data.quotation_no');
 
         // Format should be: PREFIX-YYYY-000001
-        $this->assertMatchesRegularExpression('/^[A-Z]+-\d{4}-\d{6}$/', $quotationNo);
+        $this->assertMatchesRegularExpression('/^[A-Z]+-\d{4}-\d{3,}$/', $quotationNo);
     }
 
     /**

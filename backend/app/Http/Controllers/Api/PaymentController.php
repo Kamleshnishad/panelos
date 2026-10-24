@@ -256,6 +256,8 @@ class PaymentController extends Controller
             }
 
             return response()->json($result, 400);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return response()->json(['success' => false, 'message' => 'Invoice not found'], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -283,6 +285,8 @@ class PaymentController extends Controller
             }
 
             return response()->json($result, 400);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return response()->json(['success' => false, 'message' => 'Invoice not found'], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -330,6 +334,8 @@ class PaymentController extends Controller
             }
 
             return response()->json($result, 400);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return response()->json(['success' => false, 'message' => 'Invoice not found'], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

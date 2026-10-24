@@ -31,7 +31,8 @@ class PaymentReminderTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            'is_company_admin' => true,
         ]);
 
         $this->actingAs($this->user);
@@ -102,7 +103,7 @@ class PaymentReminderTest extends TestCase
     {
         $this->reminderService->scheduleRemindersForInvoice($this->invoice, $this->company->id);
 
-        $response = $this->getJson('/reminders/stats');
+        $response = $this->getJson('/api/reminders/stats');
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true)
@@ -154,7 +155,7 @@ class PaymentReminderTest extends TestCase
         $this->reminderService->sendDueReminders($this->company->id);
 
         $updatedReminder = PaymentReminder::where('invoice_id', $this->invoice->id)->first();
-        $this->assertIn($updatedReminder->reminder_type, ['first', 'second', 'final']);
+        $this->assertContains($updatedReminder->reminder_type, ['first', 'second', 'final']);
     }
 
     public function test_reminder_increments_count()
@@ -173,9 +174,9 @@ class PaymentReminderTest extends TestCase
 
     public function test_no_reminder_for_recent_invoice()
     {
-        $recentInvoice = Invoice::factory()->create([
-            'company_id' => $this->company->id,
-            'due_date' => now()->addDays(5),
+        $recentInvoice = Invoice::create([
+            'company_id' => $this->company->id, 'status' => 'sent', 'subtotal' => 1000, 'tax_amount' => 0, 'total_amount' => 1000,
+            'invoice_date' => now(), 'due_date' => now()->addDays(5),
         ]);
 
         $result = $this->reminderService->scheduleRemindersForInvoice($recentInvoice, $this->company->id);
@@ -188,8 +189,13 @@ class PaymentReminderTest extends TestCase
     {
         $this->reminderService->scheduleRemindersForInvoice($this->invoice, $this->company->id);
 
-        // Mark invoice as paid
-        $this->invoice->update(['status' => 'paid']);
+        // "Paid" means nothing is left to pay (it is computed from the payments, not from the status label).
+        \App\Models\PaymentTransaction::create([
+            'company_id' => $this->company->id, 'invoice_id' => $this->invoice->id,
+            'amount' => $this->invoice->fresh()->remaining_due, 'payment_method' => 'bank_transfer',
+            'transaction_date' => now(), 'status' => 'completed',
+        ]);
+        $this->assertTrue($this->invoice->fresh()->is_paid);
 
         $reminder = PaymentReminder::where('invoice_id', $this->invoice->id)->first();
         $reminder->update(['next_reminder_at' => now()]);

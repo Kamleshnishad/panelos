@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\User;
-use App\Models\Coil;
 use App\Models\PanelType;
 use App\Models\ProductionBatch;
 use App\Models\Dispatch;
@@ -41,8 +40,6 @@ class ChallanTest extends TestCase
             'tracking_number' => 'TRK123'
         ], $this->company->id);
         $panelType = PanelType::factory()->create();
-        $coil = Coil::factory()->create();
-        $panelType->update(['coil_id' => $coil->id]);
 
         $this->dispatchService->addDispatchItem($dispatch->id, $panelType->id, 10, 500, $this->company->id);
 
@@ -58,8 +55,6 @@ class ChallanTest extends TestCase
         $batch = ProductionBatch::factory()->for($this->company)->create(['status' => 'qc_passed']);
         $dispatch = $this->dispatchService->createDispatch($batch->id, [], $this->company->id);
         $panelType = PanelType::factory()->create();
-        $coil = Coil::factory()->create();
-        $panelType->update(['coil_id' => $coil->id]);
 
         $this->dispatchService->addDispatchItem($dispatch->id, $panelType->id, 10, 500, $this->company->id);
         $this->dispatchService->addDispatchItem($dispatch->id, $panelType->id, 5, 500, $this->company->id);
@@ -113,8 +108,6 @@ class ChallanTest extends TestCase
         $batch = ProductionBatch::factory()->for($this->company)->create(['status' => 'qc_passed']);
         $dispatch = $this->dispatchService->createDispatch($batch->id, [], $this->company->id);
         $panelType = PanelType::factory()->create();
-        $coil = Coil::factory()->create();
-        $panelType->update(['coil_id' => $coil->id]);
 
         $this->dispatchService->addDispatchItem($dispatch->id, $panelType->id, 10, 500, $this->company->id);
 

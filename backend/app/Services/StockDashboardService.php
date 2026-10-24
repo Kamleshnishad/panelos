@@ -86,7 +86,7 @@ class StockDashboardService
                 'name' => $item->name,
                 'batch_number' => $item->batch_number,
                 'expiry_date' => $item->expiry_date,
-                'days_remaining' => $item->expiry_date->diffInDays(now()),
+                'days_remaining' => \App\Support\Days::until($item->expiry_date),
                 'quantity' => $item->quantity_in_stock,
                 'unit' => $item->unit,
                 'status' => $item->expiry_date->isPast() ? 'expired' : 'expiring_soon'

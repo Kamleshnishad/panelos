@@ -45,7 +45,7 @@ class AttachmentUploadTest extends TestCase
         Storage::fake('public');
         $admin = $this->createAdminUser();
         $batch = $this->makeBatch($admin->company_id);
-        $stage = ProductionStage::create(['company_id' => $admin->company_id, 'name' => 'Lamination', 'sequence' => 1, 'is_active' => true]);
+        $stage = ProductionStage::firstOrCreate(['company_id' => $admin->company_id, 'sequence' => 1], ['name' => 'Lamination', 'is_active' => true]);
         $log = BatchStageLog::create(['batch_id' => $batch->id, 'stage_id' => $stage->id, 'status' => 'in_progress', 'started_at' => now()]);
 
         $response = $this->actingAs($admin, 'sanctum')->postJson(
@@ -68,7 +68,7 @@ class AttachmentUploadTest extends TestCase
         Storage::fake('public');
         $admin = $this->createAdminUser();
         $batch = $this->makeBatch($admin->company_id);
-        $stage = ProductionStage::create(['company_id' => $admin->company_id, 'name' => 'Lamination', 'sequence' => 1, 'is_active' => true]);
+        $stage = ProductionStage::firstOrCreate(['company_id' => $admin->company_id, 'sequence' => 1], ['name' => 'Lamination', 'is_active' => true]);
         BatchStageLog::create(['batch_id' => $batch->id, 'stage_id' => $stage->id, 'status' => 'in_progress', 'started_at' => now()]);
 
         $response = $this->actingAs($admin, 'sanctum')->postJson(
@@ -111,7 +111,8 @@ class AttachmentUploadTest extends TestCase
         ]);
         $companyId = $result['company']->id;
         $batch = $this->makeBatch($companyId);
-        $stage = \App\Models\ProductionStage::create(['company_id' => $companyId, 'name' => 'Lamination', 'sequence' => 1, 'is_active' => true]);
+        // A provisioned tenant already has its default production stages; use the first one.
+        $stage = \App\Models\ProductionStage::where('company_id', $companyId)->orderBy('sequence')->firstOrFail();
         BatchStageLog::create(['batch_id' => $batch->id, 'stage_id' => $stage->id, 'status' => 'in_progress', 'started_at' => now()]);
 
         $productionRole = \App\Models\Role::where('company_id', $companyId)->where('name', 'Production')->firstOrFail();
