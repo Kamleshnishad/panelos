@@ -23,7 +23,9 @@ class NotificationSettingsController extends Controller
         $data['token_is_set']      = $hasToken;
         $data['sms_ready']         = $s->isSmsReady();
         $data['whatsapp_ready']    = $s->isWhatsappReady();
-        $data['mail']              = \App\Support\MailStatus::describe();
+        $data['mail']              = \App\Support\MailStatus::describe($r->user()->company_id);
+        // The company's own mailbox. The password is never sent back, only whether one is saved.
+        $data['smtp_password_set'] = !empty($s->getAttribute('smtp_password'));
         return $this->successResponse($data, 'Notification settings retrieved');
     }
 
@@ -44,7 +46,38 @@ class NotificationSettingsController extends Controller
             'notify_dispatch_done'    => 'nullable|boolean',
             'admin_phone'             => 'nullable|string|max:20',
             'email_payment_reminders' => 'nullable|boolean',
+            'smtp_enabled'            => 'nullable|boolean',
+            'smtp_host'               => ['nullable', 'string', 'max:150', function ($attr, $value, $fail) {
+                if ($value !== null && $value !== '' && ($why = \App\Support\SmtpHostGuard::problemWithHost($value))) $fail($why);
+            }],
+            'smtp_port'               => ['nullable', 'integer', 'in:' . implode(',', \App\Support\SmtpHostGuard::PORTS)],
+            'smtp_encryption'         => 'nullable|in:ssl,tls',
+            'smtp_username'           => 'nullable|string|max:190',
+            'smtp_password'           => 'nullable|string|max:300',
+            'smtp_from_address'       => 'nullable|email|max:190',
+            'smtp_from_name'          => 'nullable|string|max:150',
+            'clear_smtp_password'     => 'nullable|boolean',
         ]);
+
+        // A blank password keeps the saved one; it is replaced only when a new one is typed, or removed on request.
+        if (!empty($data['clear_smtp_password'])) {
+            $data['smtp_password'] = null;
+            $clearPassword = true;
+        } elseif (($data['smtp_password'] ?? '') === '') {
+            unset($data['smtp_password']);
+        }
+        unset($data['clear_smtp_password']);
+
+        // Switching the mailbox on needs everything it takes to log in and to say who the mail is from.
+        $current = NotificationSetting::forCompany($r->user()->company_id);
+        if (!empty($data['smtp_enabled'])) {
+            $merged = fn ($k) => array_key_exists($k, $data) ? $data[$k] : $current->getAttribute($k);
+            $missing = collect(['smtp_host' => 'mail server', 'smtp_port' => 'port', 'smtp_username' => 'user name', 'smtp_password' => 'password', 'smtp_from_address' => '"send as" address'])
+                ->filter(fn ($label, $k) => empty($merged($k)) || (($clearPassword ?? false) && $k === 'smtp_password'))->values();
+            if ($missing->isNotEmpty()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['smtp_enabled' => 'To send from your own mailbox, fill in: ' . $missing->implode(', ') . '.']);
+            }
+        }
 
         $s = NotificationSetting::forCompany($r->user()->company_id);
 
@@ -57,6 +90,9 @@ class NotificationSettingsController extends Controller
         // Save: only skip truly null values (allow empty strings to clear fields)
         $save = array_filter($data, fn ($v) => $v !== null);
         $s->update($save);
+        if ($clearPassword ?? false) {
+            $s->forceFill(['smtp_password' => null, 'smtp_enabled' => false])->save();   // no password, so the mailbox cannot stay on
+        }
 
         return $this->successResponse([
             'sms_ready'      => $s->fresh()->isSmsReady(),
@@ -70,7 +106,7 @@ class NotificationSettingsController extends Controller
      */
     public function testEmail(Request $r)
     {
-        $status = \App\Support\MailStatus::describe();
+        $status = \App\Support\MailStatus::describe($r->user()->company_id);
         if (!$status['delivers']) {
             return $this->errorResponse(['mail' => $status], $status['headline'], 'MAIL_NOT_SET_UP', 422);
         }
@@ -78,10 +114,15 @@ class NotificationSettingsController extends Controller
         $to = $r->user()->email;
         $company = $r->user()->company?->name ?? 'PanelOS';
         try {
-            \Illuminate\Support\Facades\Mail::raw(
-                "This is a test e-mail from {$company} on PanelOS.\n\nIf you can read it, e-mail is working: invoice, payment and reminder e-mails will be delivered.",
-                fn ($m) => $m->to($to)->subject('PanelOS test e-mail'),
-            );
+            $body = "This is a test e-mail from {$company} on PanelOS.\n\nIf you can read it, e-mail is working: invoice, payment and reminder e-mails will be delivered.";
+            $own = \App\Support\CompanyMail::activeFor($r->user()->company_id);
+            if ($own) {
+                // Through the company's own mailbox, synchronously, so a wrong password is shown here and now.
+                [$address, $name] = \App\Support\CompanyMail::from($own);
+                \App\Support\CompanyMail::mailer($own)->raw($body, fn ($m) => $m->to($to)->from($address, $name)->subject('PanelOS test e-mail'));
+            } else {
+                \Illuminate\Support\Facades\Mail::raw($body, fn ($m) => $m->to($to)->subject('PanelOS test e-mail'));
+            }
         } catch (\Throwable $e) {
             return $this->errorResponse(['mail' => $status], 'The mail server refused it: ' . $e->getMessage(), 'MAIL_SEND_FAILED', 422);
         }

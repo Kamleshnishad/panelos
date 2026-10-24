@@ -537,7 +537,15 @@
         "admin_phone": "varchar(20)",
         "created_at": "timestamp",
         "updated_at": "timestamp",
-        "email_payment_reminders": "tinyint"
+        "email_payment_reminders": "tinyint",
+        "smtp_enabled": "tinyint",
+        "smtp_host": "varchar(150)",
+        "smtp_port": "smallint unsigned",
+        "smtp_encryption": "varchar(10)",
+        "smtp_username": "varchar(190)",
+        "smtp_password": "text",
+        "smtp_from_address": "varchar(190)",
+        "smtp_from_name": "varchar(150)"
     },
     "orders": {
         "id": "bigint unsigned",

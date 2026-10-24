@@ -17,6 +17,7 @@ class NotificationSetting extends Model
         'notify_order_confirmed', 'notify_dispatch_done',
         'admin_phone',
         'email_payment_reminders',
+        'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password', 'smtp_from_address', 'smtp_from_name',
     ];
 
     protected $casts = [
@@ -29,10 +30,13 @@ class NotificationSetting extends Model
         'notify_dispatch_done'   => 'boolean',
         'payment_due_days_before'=> 'integer',
         'email_payment_reminders'=> 'boolean',
+        'smtp_enabled'           => 'boolean',
+        'smtp_port'              => 'integer',
+        'smtp_password'          => 'encrypted',   // never stored in the clear, never returned by the API
     ];
 
     /** Hidden in API responses so tokens never leak in list endpoints */
-    protected $hidden = ['twilio_auth_token'];
+    protected $hidden = ['twilio_auth_token', 'smtp_password'];
 
     public static function forCompany(int $companyId): self
     {
@@ -40,6 +44,13 @@ class NotificationSetting extends Model
             ['company_id' => $companyId],
             ['sms_enabled' => false, 'whatsapp_enabled' => false, 'email_payment_reminders' => false]
         );
+    }
+
+    /** Sends from the company's own mailbox: switched on and every field needed to log in and to say who it is from. */
+    public function hasOwnMailbox(): bool
+    {
+        return $this->smtp_enabled && $this->smtp_host && $this->smtp_port && $this->smtp_username
+            && !empty($this->getAttribute('smtp_password')) && $this->smtp_from_address;
     }
 
     /** Whether the automatic reminder e-mails are on for a company (off unless an admin turned them on). Safe with no signed-in user. */
