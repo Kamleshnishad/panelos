@@ -57,7 +57,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 2.3 | Inbound API, tokens, import log | done, local |
 | 2.4 | Assignment rules and instant alert | done, local (no screen yet: 2.5) |
 | 2.5 | Lead sources screen | done, local |
-| 3.1 | IndiaMART settings and connection test | not started |
+| 3.1 | IndiaMART settings and connection test | done, local (against a fake; no real key yet) |
 | 3.2 | IndiaMART pull job | not started |
 | 3.3 | Connector health and alerts | not started |
 | 3.4 | IndiaMART go-live | not started |
@@ -206,14 +206,17 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 ### 3.1 Settings and a connection test (LC-01)
 - **Build:** an IndiaMART card (CRM key stored encrypted, shown as set or not, never returned); a "test connection" that pulls a tiny recent window and shows the count only, creating nothing.
 - **Tests:** key never in any response or log; failure messages readable. **Needs from client:** the CRM key (Lead Manager, CRM Integration in their seller account) and their plan. **Without it:** built and tested against a fake IndiaMART.
+- **Result:** `lead_connectors`, `IndiaMartClient`, `LeadConnectorService`, `LeadConnectorController`, card `IndiaMartSettings.vue`, `IndiaMartConnectionTest` (20, all against `Http::fake`). **Facts re-read from IndiaMART's own help page on 26 Oct 2026** (the earlier notes were from third parties and partly wrong):
+  key idle expiry is **7 days** (not 15); minimum **5 minutes** between requests and a 15-minute block after more than 5 in a minute, so **poll every 10 to 15 minutes** with a 5-minute overlap; window at most 7 days; times in IST as `DD-MM-YYYYHH:MM:SS`; no times = last 24 hours; de-duplicate on `UNIQUE_QUERY_ID`.
+  Still unconfirmed until a real key exists: the exact time format accepted, the field names for company, city, state and product, and the exact error wording (3.4).
 
 ### 3.2 The pull job (LC-01)
-- **Build:** scheduled every five minutes; asks for the period since the last success minus a safety overlap; maps IndiaMART's fields (to be confirmed against IndiaMART's current documentation first) to the intake service with source IndiaMART and `external_id` = IndiaMART's enquiry id; manual "pull this date range" button; runs as the app user so the lock problem of PB-062 cannot recur.
+- **Build:** scheduled every ten minutes (IndiaMART asks for 10 to 15 and refuses more than one request in 5; **corrected from "every five minutes"** after reading their help page); asks for the period since the last success minus a 5-minute overlap, never more than 7 days at a time, and skips a run if the last request was under 5 minutes ago; maps IndiaMART's fields (to be confirmed against IndiaMART's current documentation first) to the intake service with source IndiaMART and `external_id` = IndiaMART's enquiry id; manual "pull this date range" button; runs as the app user so the lock problem of PB-062 cannot recur.
 - **Tests:** overlap does not duplicate, repeat enquiry becomes an activity, rate limit respected, job survives an API error.
 - **Size:** M.
 
 ### 3.3 Connector health (LC-12)
-- **Build:** import log entry per run; alert to the owner when no successful pull for an hour or the key is rejected; warning before the 15-day idle expiry; a line on `/api/health` and on the uptime check.
+- **Build:** import log entry per run; alert to the owner when no successful pull for an hour or the key is rejected; warning before the **7-day** idle expiry (IndiaMART stops a key that has gone unused for 7 days; **corrected from 15**); a line on `/api/health` and on the uptime check.
 - **Tests:** each alert condition. **Size:** S.
 
 ### 3.4 Go-live with the client

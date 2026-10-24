@@ -527,6 +527,25 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "lead_connectors": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "type": "varchar(30)",
+        "is_enabled": "tinyint",
+        "credentials": "text",
+        "key_hint": "varchar(8)",
+        "last_test_at": "timestamp",
+        "last_test_ok": "tinyint",
+        "last_test_message": "varchar(255)",
+        "last_request_at": "timestamp",
+        "cursor_at": "timestamp",
+        "last_success_at": "timestamp",
+        "last_error_at": "timestamp",
+        "last_error": "varchar(255)",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
     "lead_sources": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

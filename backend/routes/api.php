@@ -149,6 +149,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::post('/settings/lead-assignment-rules', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'store'])->name('leadassign.store');
     Route::put('/settings/lead-assignment-rules/{id}', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'update'])->name('leadassign.update');
     Route::delete('/settings/lead-assignment-rules/{id}', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'destroy'])->name('leadassign.destroy');
+    Route::get('/settings/lead-connectors/indiamart', [\App\Http\Controllers\Api\LeadConnectorController::class, 'showIndiaMart'])->name('leadconn.indiamart.show');
+    Route::put('/settings/lead-connectors/indiamart', [\App\Http\Controllers\Api\LeadConnectorController::class, 'updateIndiaMart'])->name('leadconn.indiamart.update');
+    Route::post('/settings/lead-connectors/indiamart/test', [\App\Http\Controllers\Api\LeadConnectorController::class, 'testIndiaMart'])->name('leadconn.indiamart.test');
     Route::post('/settings/lead-sources', [\App\Http\Controllers\Api\LeadListController::class, 'storeSource'])->name('leadlists.sources.store');
     Route::put('/settings/lead-sources/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'updateSource'])->name('leadlists.sources.update');
     Route::delete('/settings/lead-sources/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'destroySource'])->name('leadlists.sources.destroy');
