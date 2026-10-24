@@ -387,6 +387,12 @@ class MlForecastingService
         ];
     }
 
+    /** Daily history for the compare-models and anomaly endpoints (the controller calls this name). */
+    public function getHistoricalSalesData($companyId, $panelTypeId, $days): array
+    {
+        return $this->getHistory($companyId, $panelTypeId, $days);
+    }
+
     // ── Private helpers ─────────────────────────────────────────────────────
 
     protected function getHistory($companyId, $panelTypeId, $days): array
@@ -406,7 +412,7 @@ class MlForecastingService
         return (int)DB::table('coil_stocks')
             ->where('company_id', $companyId)
             ->where('panel_type_id', $panelTypeId)
-            ->sum('quantity');
+            ->sum('quantity_in_stock');   // the column is quantity_in_stock; 'quantity' does not exist
     }
 
     protected function assessRisk($stock, $demand): string

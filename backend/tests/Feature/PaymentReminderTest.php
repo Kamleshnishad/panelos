@@ -154,7 +154,7 @@ class PaymentReminderTest extends TestCase
         $this->reminderService->sendDueReminders($this->company->id);
 
         $updatedReminder = PaymentReminder::where('invoice_id', $this->invoice->id)->first();
-        $this->assertIn($updatedReminder->reminder_type, ['first', 'second', 'final']);
+        $this->assertContains($updatedReminder->reminder_type, ['first', 'second', 'final']);
     }
 
     public function test_reminder_increments_count()
