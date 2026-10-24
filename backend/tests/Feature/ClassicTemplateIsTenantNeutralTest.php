@@ -75,6 +75,19 @@ class ClassicTemplateIsTenantNeutralTest extends TestCase
         $this->assertStringNotContainsString('factory,', $html, 'No dangling comma when there is no address.');
     }
 
+    public function test_cheques_and_the_signature_block_name_the_legal_entity_when_one_is_set(): void
+    {
+        [, $with] = $this->classicFor(['name' => 'Signature PUF Panel', 'legal_name' => 'UMA SIGNATURE PUF PANEL LLP']);
+        $this->assertStringContainsString('in favour of UMA SIGNATURE PUF PANEL LLP', $with);
+        $this->assertSame(2, substr_count($with, 'For UMA SIGNATURE PUF PANEL LLP'), 'Both signature blocks (page 1 and the terms page).');
+        $this->assertStringNotContainsString('in favour of Signature PUF Panel', $with);
+
+        // Without one, the trading name is used (and the header always shows the trading name).
+        [, $without] = $this->classicFor(['name' => 'Signature PUF Panel', 'legal_name' => null]);
+        $this->assertStringContainsString('in favour of Signature PUF Panel', $without);
+        $this->assertStringContainsString('For Signature PUF Panel', $without);
+    }
+
     public function test_the_company_address_is_escaped(): void
     {
         [, $html] = $this->classicFor(['address_line1' => '<script>alert(1)</script>', 'city' => 'Pune']);

@@ -23,6 +23,7 @@ class NotificationSettingsController extends Controller
         $data['token_is_set']      = $hasToken;
         $data['sms_ready']         = $s->isSmsReady();
         $data['whatsapp_ready']    = $s->isWhatsappReady();
+        $data['mail']              = \App\Support\MailStatus::describe();
         return $this->successResponse($data, 'Notification settings retrieved');
     }
 
@@ -42,6 +43,7 @@ class NotificationSettingsController extends Controller
             'notify_order_confirmed'  => 'nullable|boolean',
             'notify_dispatch_done'    => 'nullable|boolean',
             'admin_phone'             => 'nullable|string|max:20',
+            'email_payment_reminders' => 'nullable|boolean',
         ]);
 
         $s = NotificationSetting::forCompany($r->user()->company_id);
@@ -60,6 +62,31 @@ class NotificationSettingsController extends Controller
             'sms_ready'      => $s->fresh()->isSmsReady(),
             'whatsapp_ready' => $s->fresh()->isWhatsappReady(),
         ], 'Notification settings saved');
+    }
+
+    /**
+     * Send a test e-mail to the signed-in admin, synchronously, so a wrong SMTP setting shows up here as a readable
+     * error instead of silently failing later in a queue.
+     */
+    public function testEmail(Request $r)
+    {
+        $status = \App\Support\MailStatus::describe();
+        if (!$status['delivers']) {
+            return $this->errorResponse(['mail' => $status], $status['headline'], 'MAIL_NOT_SET_UP', 422);
+        }
+
+        $to = $r->user()->email;
+        $company = $r->user()->company?->name ?? 'PanelOS';
+        try {
+            \Illuminate\Support\Facades\Mail::raw(
+                "This is a test e-mail from {$company} on PanelOS.\n\nIf you can read it, e-mail is working: invoice, payment and reminder e-mails will be delivered.",
+                fn ($m) => $m->to($to)->subject('PanelOS test e-mail'),
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse(['mail' => $status], 'The mail server refused it: ' . $e->getMessage(), 'MAIL_SEND_FAILED', 422);
+        }
+
+        return $this->successResponse(['to' => $to, 'mail' => $status], "Test e-mail sent to {$to}. Check that inbox (and spam).");
     }
 
     /**

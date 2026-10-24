@@ -1092,6 +1092,13 @@ job is even queued). Phone numbers are normalised to E.164 (a bare 10-digit numb
 Every attempt is written to `notification_logs`. All call sites wrap the send in `try/catch` — a messaging
 failure can never break an order or a dispatch.
 
+**E-mail (admin side).** Settings → Customer Messaging → *E-mail*: a switch for the automatic payment-reminder
+e-mails (`notification_settings.email_payment_reminders`, **off by default**; the 09:00 `reminders:send` run skips any
+company that has not turned it on; sending a reminder by hand from an invoice always works), a one-line statement of
+whether the server can deliver mail at all (`App\Support\MailStatus`: the `log` mailer, the `.env.example` default,
+delivers nothing), and *Send me a test e-mail* (`POST /api/settings/notifications/test-email`, sent synchronously to the
+signed-in admin so a bad SMTP setting is shown as a readable error).
+
 Settings: `GET|PUT /api/settings/notifications`, `POST /api/settings/notifications/test`,
 `GET /api/settings/notifications/logs`.
 

@@ -465,6 +465,7 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::get('/settings/notifications',          [\App\Http\Controllers\Api\NotificationSettingsController::class, 'show'])->name('notif.settings.show');
     Route::put('/settings/notifications',          [\App\Http\Controllers\Api\NotificationSettingsController::class, 'update'])->name('notif.settings.update');
     Route::post('/settings/notifications/test',    [\App\Http\Controllers\Api\NotificationSettingsController::class, 'testSend'])->name('notif.settings.test');
+    Route::post('/settings/notifications/test-email', [\App\Http\Controllers\Api\NotificationSettingsController::class, 'testEmail'])->name('notif.settings.test-email');
     Route::get('/settings/notifications/logs',      [\App\Http\Controllers\Api\NotificationSettingsController::class, 'logs'])->name('notif.settings.logs');
 });
 

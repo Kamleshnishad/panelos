@@ -3,7 +3,7 @@
     <div class="ns-header">
       <div>
         <h2>Notification Settings</h2>
-        <p class="ns-sub">Configure Twilio credentials for SMS &amp; WhatsApp alerts.</p>
+        <p class="ns-sub">Switch e-mail reminders on or off, and configure SMS &amp; WhatsApp (Twilio) alerts.</p>
       </div>
       <button class="btn btn-primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save Settings' }}</button>
     </div>
@@ -52,6 +52,34 @@
             <span v-else class="hint">32-character token from your Twilio Console</span>
           </div>
         </div>
+      </section>
+
+      <!-- E-mail -->
+      <section class="card">
+        <div class="card-head">
+          <h3>✉️ E-mail</h3>
+          <label class="toggle">
+            <input type="checkbox" v-model="form.email_payment_reminders" />
+            <span class="slider"></span>
+            <span class="toggle-label">{{ form.email_payment_reminders ? 'Reminders on' : 'Reminders off' }}</span>
+          </label>
+        </div>
+        <p class="card-hint">
+          <b>Automatic payment reminders.</b> When on, PanelOS e-mails your customer every morning (9:00) for each
+          overdue invoice you have scheduled a reminder for. When off, nothing is sent automatically. Sending a
+          reminder by hand from an invoice always works.
+        </p>
+        <div class="mail-status" :class="form.mail?.delivers ? 'ok' : 'off'" role="status">
+          <span class="status-dot"></span>
+          <span>{{ form.mail?.headline }}</span>
+        </div>
+        <div class="test-row">
+          <button class="btn btn-secondary" :disabled="testingEmail" @click="testEmail">
+            {{ testingEmail ? 'Sending…' : '📤 Send me a test e-mail' }}
+          </button>
+          <span v-if="emailResult" :class="emailResult.ok ? 'test-ok' : 'test-err'">{{ emailResult.msg }}</span>
+        </div>
+        <p class="hint" style="margin-top:8px">The test goes to your own login address. Save settings first if you just changed the switch.</p>
       </section>
 
       <!-- SMS -->
@@ -204,6 +232,8 @@ const success   = ref(null)
 const showToken = ref(false)
 const testing   = ref(null)
 const testPhone = ref('')
+const testingEmail = ref(false)
+const emailResult = ref(null)
 const testResult = reactive({ sms: null, whatsapp: null })
 const form = ref(null)
 const deliveryLogs = ref([])
@@ -265,6 +295,16 @@ async function testSend(channel) {
   } finally { testing.value = null }
 }
 
+async function testEmail() {
+  testingEmail.value = true; emailResult.value = null
+  try {
+    const r = await notificationService.testEmail()
+    emailResult.value = { ok: true, msg: '✓ ' + (r?.message ?? 'Test e-mail sent.') }
+  } catch (e) {
+    emailResult.value = { ok: false, msg: e?.response?.data?.message ?? 'Could not send the test e-mail.' }
+  } finally { testingEmail.value = false }
+}
+
 onMounted(load)
 </script>
 
@@ -285,6 +325,13 @@ onMounted(load)
 .status-cell.ok  .status-dot { background: #2e7d32; }
 .status-cell.off .status-dot { background: #ccc; }
 .status-dot { width: 9px; height: 9px; border-radius: 50%; }
+.mail-status { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 8px; margin: 4px 0 12px; line-height: 1.45; }
+.mail-status .status-dot { margin-top: 5px; flex-shrink: 0; }
+.mail-status.ok  { background: #e8f5e9; color: #1b5e20; }
+.mail-status.ok  .status-dot { background: #2e7d32; }
+.mail-status.off { background: #fff4e5; color: #8a4b00; }
+.mail-status.off .status-dot { background: #e08a00; }
+
 .status-cell.ok  { color: #2e7d32; }
 .status-cell.off { color: #888; }
 .status-note { margin-left: auto; font-size: 12px; color: #667085; }

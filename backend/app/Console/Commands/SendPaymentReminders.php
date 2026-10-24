@@ -18,7 +18,9 @@ class SendPaymentReminders extends Command
 
         if ($this->option('company_id')) {
             $this->info('Sending reminders for company: ' . $this->option('company_id'));
-            $result = $reminderService->sendDueReminders($this->option('company_id'));
+            $result = \App\Models\NotificationSetting::emailRemindersEnabled((int) $this->option('company_id'))
+                ? $reminderService->sendDueReminders($this->option('company_id'))
+                : ['total' => 0, 'sent' => 0, 'failed' => 0, 'updated_schedule' => 0, 'skipped' => 1];
         } else {
             $this->info('Sending reminders for all companies...');
 
@@ -30,7 +32,13 @@ class SendPaymentReminders extends Command
                 'updated_schedule' => 0,
             ];
 
+            $skipped = 0;
             foreach ($companies as $companyId) {
+                // Automatic customer e-mails are opt-in per company (Customer Messaging -> E-mail).
+                if (!\App\Models\NotificationSetting::emailRemindersEnabled((int) $companyId)) {
+                    $skipped++;
+                    continue;
+                }
                 $result = $reminderService->sendDueReminders($companyId);
                 $totalResults['total'] += $result['total'] ?? 0;
                 $totalResults['sent'] += $result['sent'] ?? 0;
@@ -38,6 +46,7 @@ class SendPaymentReminders extends Command
                 $totalResults['updated_schedule'] += $result['updated_schedule'] ?? 0;
             }
 
+            $totalResults['skipped'] = $skipped;
             $result = $totalResults;
         }
 
@@ -48,6 +57,7 @@ class SendPaymentReminders extends Command
                 ['Total Pending', $result['total'] ?? 0],
                 ['Sent', $result['sent'] ?? 0],
                 ['Failed', $result['failed'] ?? 0],
+                ['Companies skipped (e-mail reminders switched off)', $result['skipped'] ?? 0],
                 ['Updated Schedule', $result['updated_schedule'] ?? 0],
             ]
         );

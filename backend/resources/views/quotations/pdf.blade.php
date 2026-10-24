@@ -104,6 +104,8 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
   // certification line come from Settings -> Company.
   $companyAddress = trim(implode(', ', array_filter([$company->address_line1 ?? null, $company->city, $company->state])) . ' ' . ($company->pincode ?? ''));
   $certification  = trim((string) ($company->certification_line ?? ''));
+  // Cheques and the signature block name the legal entity (Settings -> Company -> Legal company name), else the trading name.
+  $legalName      = trim((string) ($company->legal_name ?? '')) !== '' ? $company->legal_name : $company->name;
 @endphp
 
 <!-- ═══════════════════════════════════ PAGE 1 — PROFORMA INVOICE ════ -->
@@ -365,7 +367,7 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
   <div class="sign-block">
     <div class="sign-cell"></div>
     <div class="sign-cell" style="text-align:right">
-      <div class="sign-line">For {{ $company->name }}<br><span style="font-size:9px;color:#888">Authorised Signatory</span></div>
+      <div class="sign-line">For {{ $legalName }}<br><span style="font-size:9px;color:#888">Authorised Signatory</span></div>
     </div>
   </div>
 
@@ -404,7 +406,7 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
     <div class="tc-title">4. Payment Terms</div>
     <div class="tc-item">Advance: {{ $quotation->advance_pct }}% at order confirmation — ₹ {{ number_format($quotation->advance_amount, 2) }}</div>
     <div class="tc-item">Balance: {{ 100 - $quotation->advance_pct }}% minimum 2 working days before dispatch.</div>
-    <div class="tc-item">All payments by NEFT/RTGS/Cheque in favour of {{ $company->name }}.</div>
+    <div class="tc-item">All payments by NEFT/RTGS/Cheque in favour of {{ $legalName }}.</div>
   </div>
 
   <div class="tc-section">
@@ -450,7 +452,7 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
       <div class="sign-line">Customer Acceptance<br><span style="font-size:9px;color:#888">Stamp & Signature</span></div>
     </div>
     <div class="sign-cell" style="text-align:right">
-      <div class="sign-line">For {{ $company->name }}<br><span style="font-size:9px;color:#888">Authorised Signatory</span></div>
+      <div class="sign-line">For {{ $legalName }}<br><span style="font-size:9px;color:#888">Authorised Signatory</span></div>
     </div>
   </div>
 </div>

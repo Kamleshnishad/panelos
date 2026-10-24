@@ -16,6 +16,7 @@ class NotificationSetting extends Model
         'notify_payment_overdue', 'notify_low_stock',
         'notify_order_confirmed', 'notify_dispatch_done',
         'admin_phone',
+        'email_payment_reminders',
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class NotificationSetting extends Model
         'notify_order_confirmed' => 'boolean',
         'notify_dispatch_done'   => 'boolean',
         'payment_due_days_before'=> 'integer',
+        'email_payment_reminders'=> 'boolean',
     ];
 
     /** Hidden in API responses so tokens never leak in list endpoints */
@@ -36,8 +38,14 @@ class NotificationSetting extends Model
     {
         return static::firstOrCreate(
             ['company_id' => $companyId],
-            ['sms_enabled' => false, 'whatsapp_enabled' => false]
+            ['sms_enabled' => false, 'whatsapp_enabled' => false, 'email_payment_reminders' => false]
         );
+    }
+
+    /** Whether the automatic reminder e-mails are on for a company (off unless an admin turned them on). Safe with no signed-in user. */
+    public static function emailRemindersEnabled(int $companyId): bool
+    {
+        return (bool) static::withoutGlobalScope('tenant')->where('company_id', $companyId)->value('email_payment_reminders');
     }
 
     /** Resolved credentials: DB values take priority over env vars. */
