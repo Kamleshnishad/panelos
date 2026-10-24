@@ -13,7 +13,7 @@ use Tests\TestCase;
 /**
  * Phase 1 of QUOTATION_TEMPLATES_PLAN.md — the "Ledger" quotation template.
  * The fixture is the real UMA quotation (SCP-2027-012), so the numbers reconcile with the approved design:
- * 772,437.50 taxable, 139,038.75 GST, 911,476.00 grand total.
+ * 7,72,437.50 taxable, 1,39,038.75 GST, 9,11,476.00 grand total.
  */
 class LedgerTemplateTest extends TestCase
 {
@@ -37,7 +37,7 @@ class LedgerTemplateTest extends TestCase
 
         $html = $this->html($q);
 
-        foreach (['911,476.00', '772,437.50', '438,037.50', '225,050.00', '109,350.00', '69,519.38', '455,738.00',
+        foreach (['9,11,476.00', '7,72,437.50', '4,38,037.50', '2,25,050.00', '1,09,350.00', '69,519.38', '4,55,738.00',
                   'SCP-', 'IDEAL AGRI CARE', 'SUPPLY OF SIGNATURE PUF PANEL MAKE CONTINUOUS LINE PUF PANEL — CEILING 30MM THICK.',
                   '0.50 mm PPGL · Off White · RAL 9002 · Plain', 'PUF · 40 (±2) kg/m³', 'Guard film · Cello tape',
                   'Hinged door · 1000 × 2100 mm', 'Hinged door · 2000 × 2100 mm', 'INSTALLATION', '994568',
@@ -85,7 +85,7 @@ class LedgerTemplateTest extends TestCase
         $html = $this->html($q->fresh());
 
         $this->assertStringContainsString('<b>50%</b> of order value including taxes', $html);
-        $this->assertStringContainsString('<b>₹ 455,738.00</b>', $html);
+        $this->assertStringContainsString('<b>₹ 4,55,738.00</b>', $html);
         $this->assertStringContainsString('in favour of <b>Signature PUF Panel</b>', $html);
         $this->assertStringContainsString('Subject to <b>Vadodara</b> jurisdiction', $html);
         $this->assertDoesNotMatchRegularExpression('/\{[a-z_]+\}/', $html, 'An unfilled placeholder reached the page.');

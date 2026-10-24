@@ -7,7 +7,7 @@ use App\Models\Customer;
 use App\Models\PanelType;
 use App\Models\Quotation;
 
-/** The real UMA quotation (SCP-2027-012) as a fixture: 772,437.50 taxable, 139,038.75 GST, 911,476.00 total. */
+/** The real UMA quotation (SCP-2027-012) as a fixture: 7,72,437.50 taxable, 1,39,038.75 GST, 9,11,476.00 total. */
 trait BuildsUmaQuotation
 {
     use HasDatabaseTestHelpers;

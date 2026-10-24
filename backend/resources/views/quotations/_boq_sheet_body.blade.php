@@ -49,13 +49,13 @@
         </td>
         <td class="text-center">{{ $sz->width_mm }}</td>
         <td class="text-center bold">{{ $sz->nos }}</td>
-        <td class="text-center bold">{{ number_format($sz->sqm, 2) }}</td>
+        <td class="text-center bold">{{ \App\Support\Inr::fmt($sz->sqm, 2) }}</td>
       </tr>
       @endforeach
       <tr style="background:#EEF1FE;font-weight:bold">
         <td colspan="2" class="text-right">TOTAL</td>
         <td class="text-center">{{ $item->sizes->sum('nos') }}</td>
-        <td class="text-center" colspan="2">{{ number_format($item->total_sqm, 2) }} SQM</td>
+        <td class="text-center" colspan="2">{{ \App\Support\Inr::fmt($item->total_sqm, 2) }} SQM</td>
       </tr>
     </tbody>
   </table>
@@ -94,7 +94,7 @@
   <tbody>
     <tr style="background:#2B50E0;color:white;font-weight:bold">
       <td class="text-right" style="padding:8px">GRAND TOTAL — TOTAL SQM:</td>
-      <td class="text-right bold" style="padding:8px;width:160px">{{ number_format($quotation->total_sqm, 2) }} SQM</td>
+      <td class="text-right bold" style="padding:8px;width:160px">{{ \App\Support\Inr::fmt($quotation->total_sqm, 2) }} SQM</td>
     </tr>
   </tbody>
 </table>

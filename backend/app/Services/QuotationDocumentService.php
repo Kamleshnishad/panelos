@@ -260,7 +260,7 @@ class QuotationDocumentService
         $surface = $item->{$side . '_surface'};
 
         return implode(' · ', array_filter([
-            number_format((float) $thickness, 2) . ' mm ' . $material,
+            \App\Support\Inr::fmt((float) $thickness, 2) . ' mm ' . $material,
             $item->{$side . '_color'},
             $ral ? "RAL {$ral}" : null,
             $surface ? ucfirst(strtolower($surface)) : null,
@@ -325,10 +325,10 @@ class QuotationDocumentService
             '{company}'        => $legalName,
             '{document}'       => $documentWord,
             '{city}'           => $company->city,
-            '{advance_pct}'    => rtrim(rtrim(number_format($advancePct, 2), '0'), '.') . '%',
-            '{advance_amount}' => '₹ ' . number_format((float) $q->advance_amount, 2),
-            '{balance_pct}'    => rtrim(rtrim(number_format(100 - $advancePct, 2), '0'), '.') . '%',
-            '{balance_amount}' => '₹ ' . number_format((float) $q->balance_amount, 2),
+            '{advance_pct}'    => rtrim(rtrim(\App\Support\Inr::fmt($advancePct, 2), '0'), '.') . '%',
+            '{advance_amount}' => '₹ ' . \App\Support\Inr::fmt((float) $q->advance_amount, 2),
+            '{balance_pct}'    => rtrim(rtrim(\App\Support\Inr::fmt(100 - $advancePct, 2), '0'), '.') . '%',
+            '{balance_amount}' => '₹ ' . \App\Support\Inr::fmt((float) $q->balance_amount, 2),
             '{validity_days}'  => $q->validity_days . ' days',
             '{quoted_on}'      => $q->quoted_on?->format('d/m/Y'),
             '{valid_until}'    => $q->valid_until?->format('d/m/Y'),

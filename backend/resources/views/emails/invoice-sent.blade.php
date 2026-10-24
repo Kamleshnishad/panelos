@@ -8,7 +8,7 @@ We are pleased to send you the attached invoice for your recent order.
 ## Invoice Details
 
 - **Invoice Number:** {{ $invoiceNo }}
-- **Total Amount Due:** ${{ number_format($total, 2) }}
+- **Total Amount Due:** ₹{{ \App\Support\Inr::fmt($total, 2) }}
 - **Due Date:** {{ $dueDate }}
 
 ## What to Do Next

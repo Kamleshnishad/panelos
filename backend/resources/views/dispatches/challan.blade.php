@@ -162,7 +162,7 @@
             @endif
           </td>
           <td><div>{{ $spec->hsn_code ?? '39259010' }}</div></td>
-          <td class="text-right bold"><div>{{ number_format($item->quantity, 2) }}</div></td>
+          <td class="text-right bold"><div>{{ \App\Support\Inr::fmt($item->quantity, 2) }}</div></td>
           <td><div>SQM</div></td>
         </tr>
       @empty
@@ -172,7 +172,7 @@
       @if($items->count() > 0)
       <tr class="totals-row">
         <td colspan="3" class="text-right">TOTAL</td>
-        <td class="text-right">{{ number_format($totalSqm, 2) }}</td>
+        <td class="text-right">{{ \App\Support\Inr::fmt($totalSqm, 2) }}</td>
         <td>SQM</td>
       </tr>
       @endif

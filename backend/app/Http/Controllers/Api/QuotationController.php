@@ -204,10 +204,10 @@ class QuotationController extends Controller
 
     private function creditMsg(array $credit, string $name): string
     {
-        return "Credit limit exceeded for {$name}. Exposure ₹" . number_format($credit['exposure'] ?? $credit['outstanding'], 2)
-            . " + this order ₹" . number_format($credit['new_order'], 2)
-            . " would exceed the ₹" . number_format($credit['credit_limit'], 2)
-            . " limit by ₹" . number_format($credit['over_by'], 2) . '.';
+        return "Credit limit exceeded for {$name}. Exposure ₹" . \App\Support\Inr::fmt($credit['exposure'] ?? $credit['outstanding'], 2)
+            . " + this order ₹" . \App\Support\Inr::fmt($credit['new_order'], 2)
+            . " would exceed the ₹" . \App\Support\Inr::fmt($credit['credit_limit'], 2)
+            . " limit by ₹" . \App\Support\Inr::fmt($credit['over_by'], 2) . '.';
     }
 
     public function downloadPdf(Request $request, int $id)

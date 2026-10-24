@@ -76,7 +76,7 @@ table.items { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-
         <td>PanelOS Subscription — <strong>{{ ucfirst($p->plan) }}</strong> plan ({{ $p->months }} month{{ $p->months > 1 ? 's' : '' }})</td>
         <td>{{ $platform['hsn_sac'] }}</td>
         <td class="r">{{ $p->period_start?->format('d/m/y') }}–{{ $p->period_end?->format('d/m/y') }}</td>
-        <td class="r"><strong>₹ {{ number_format($p->taxable_amount, 2) }}</strong></td>
+        <td class="r"><strong>₹ {{ \App\Support\Inr::fmt($p->taxable_amount, 2) }}</strong></td>
       </tr>
     </tbody>
   </table>
@@ -84,14 +84,14 @@ table.items { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-
   <div class="words">Amount in words: <strong>Indian Rupees {{ $words }} Only</strong></div>
 
   <div class="totals">
-    <div class="trow sub"><div class="tl">Taxable Value</div><div class="tv">₹ {{ number_format($p->taxable_amount, 2) }}</div></div>
+    <div class="trow sub"><div class="tl">Taxable Value</div><div class="tv">₹ {{ \App\Support\Inr::fmt($p->taxable_amount, 2) }}</div></div>
     @if($intra)
-      <div class="trow sub"><div class="tl">CGST @ {{ rtrim(rtrim(number_format($p->gst_rate/2,2),'0'),'.') }}%</div><div class="tv">₹ {{ number_format($p->gst_amount/2, 2) }}</div></div>
-      <div class="trow sub"><div class="tl">SGST @ {{ rtrim(rtrim(number_format($p->gst_rate/2,2),'0'),'.') }}%</div><div class="tv">₹ {{ number_format($p->gst_amount/2, 2) }}</div></div>
+      <div class="trow sub"><div class="tl">CGST @ {{ rtrim(rtrim(\App\Support\Inr::fmt($p->gst_rate/2,2),'0'),'.') }}%</div><div class="tv">₹ {{ \App\Support\Inr::fmt($p->gst_amount/2, 2) }}</div></div>
+      <div class="trow sub"><div class="tl">SGST @ {{ rtrim(rtrim(\App\Support\Inr::fmt($p->gst_rate/2,2),'0'),'.') }}%</div><div class="tv">₹ {{ \App\Support\Inr::fmt($p->gst_amount/2, 2) }}</div></div>
     @else
-      <div class="trow sub"><div class="tl">IGST @ {{ rtrim(rtrim(number_format($p->gst_rate,2),'0'),'.') }}%</div><div class="tv">₹ {{ number_format($p->gst_amount, 2) }}</div></div>
+      <div class="trow sub"><div class="tl">IGST @ {{ rtrim(rtrim(\App\Support\Inr::fmt($p->gst_rate,2),'0'),'.') }}%</div><div class="tv">₹ {{ \App\Support\Inr::fmt($p->gst_amount, 2) }}</div></div>
     @endif
-    <div class="trow grand"><div class="tl">TOTAL</div><div class="tv">₹ {{ number_format($p->total_amount, 2) }}</div></div>
+    <div class="trow grand"><div class="tl">TOTAL</div><div class="tv">₹ {{ \App\Support\Inr::fmt($p->total_amount, 2) }}</div></div>
   </div>
 
   <div class="sign"><div class="line">For {{ $platform['name'] }}<br><span style="font-size:9px;color:#888;font-weight:normal">Authorised Signatory</span></div></div>

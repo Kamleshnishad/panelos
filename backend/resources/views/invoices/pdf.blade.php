@@ -155,11 +155,11 @@ table { width: 100%; border-collapse: collapse; }
     </div>
     <div class="party-cell right">
       <div class="party-label">Invoice Summary</div>
-      <div class="party-detail">Taxable Value: <strong>₹ {{ number_format($taxable, 2) }}</strong></div>
-      <div class="party-detail">Total GST ({{ rtrim(rtrim(number_format($taxRate,2),'0'),'.') }}%): <strong>₹ {{ number_format($taxAmount, 2) }}</strong></div>
-      <div class="party-detail" style="margin-top:4px;font-size:13px;color:#2B50E0">Grand Total: <strong>₹ {{ number_format($total, 2) }}</strong></div>
+      <div class="party-detail">Taxable Value: <strong>₹ {{ \App\Support\Inr::fmt($taxable, 2) }}</strong></div>
+      <div class="party-detail">Total GST ({{ rtrim(rtrim(\App\Support\Inr::fmt($taxRate,2),'0'),'.') }}%): <strong>₹ {{ \App\Support\Inr::fmt($taxAmount, 2) }}</strong></div>
+      <div class="party-detail" style="margin-top:4px;font-size:13px;color:#2B50E0">Grand Total: <strong>₹ {{ \App\Support\Inr::fmt($total, 2) }}</strong></div>
       @if($balance > 0.01)
-        <div class="party-detail" style="color:#D6322A">Balance Due: <strong>₹ {{ number_format($balance, 2) }}</strong></div>
+        <div class="party-detail" style="color:#D6322A">Balance Due: <strong>₹ {{ \App\Support\Inr::fmt($balance, 2) }}</strong></div>
       @else
         <div class="party-detail" style="color:#14894E"><strong>PAID IN FULL</strong></div>
       @endif
@@ -184,14 +184,14 @@ table { width: 100%; border-collapse: collapse; }
       <tr>
         <td class="text-center"><div>{{ $i + 1 }}</div></td>
         <td>
-          <div class="desc-text">{{ $item->panelType->name ?? ($item->description ?: 'Item') }}@if($item->panelType && $item->panelType->thickness) — {{ rtrim(rtrim(number_format($item->panelType->thickness,2),'0'),'.') }}mm @endif</div>
+          <div class="desc-text">{{ $item->panelType->name ?? ($item->description ?: 'Item') }}@if($item->panelType && $item->panelType->thickness) — {{ rtrim(rtrim(\App\Support\Inr::fmt($item->panelType->thickness,2),'0'),'.') }}mm @endif</div>
           @if($item->panelType && $item->panelType->category)<div class="desc-detail">{{ ucfirst(str_replace('_',' ',$item->panelType->category)) }} panel</div>@endif
         </td>
         <td class="text-center"><div>{{ $item->panelType->hsn_code ?? '—' }}</div></td>
-        <td class="text-center"><div>{{ rtrim(rtrim(number_format($item->quantity,2),'0'),'.') }}</div></td>
-        <td class="text-right"><div>₹ {{ number_format($item->unit_price, 2) }}</div></td>
-        <td class="text-right"><div>₹ {{ number_format($item->amount, 2) }}</div></td>
-        <td class="text-right bold"><div>₹ {{ number_format($item->total_with_tax, 2) }}</div></td>
+        <td class="text-center"><div>{{ rtrim(rtrim(\App\Support\Inr::fmt($item->quantity,2),'0'),'.') }}</div></td>
+        <td class="text-right"><div>₹ {{ \App\Support\Inr::fmt($item->unit_price, 2) }}</div></td>
+        <td class="text-right"><div>₹ {{ \App\Support\Inr::fmt($item->amount, 2) }}</div></td>
+        <td class="text-right bold"><div>₹ {{ \App\Support\Inr::fmt($item->total_with_tax, 2) }}</div></td>
       </tr>
       @endforeach
     </tbody>
@@ -209,37 +209,37 @@ table { width: 100%; border-collapse: collapse; }
       <div class="totals-wrap">
         <div class="total-row sub-line">
           <div class="total-label">Taxable Amount</div>
-          <div class="total-value">₹ {{ number_format($taxable, 2) }}</div>
+          <div class="total-value">₹ {{ \App\Support\Inr::fmt($taxable, 2) }}</div>
         </div>
         @if($isInter)
         <div class="total-row sub-line">
-          <div class="total-label">IGST @ {{ rtrim(rtrim(number_format($taxRate,2),'0'),'.') }}%</div>
-          <div class="total-value">₹ {{ number_format($igst, 2) }}</div>
+          <div class="total-label">IGST @ {{ rtrim(rtrim(\App\Support\Inr::fmt($taxRate,2),'0'),'.') }}%</div>
+          <div class="total-value">₹ {{ \App\Support\Inr::fmt($igst, 2) }}</div>
         </div>
         @else
         <div class="total-row sub-line">
-          <div class="total-label">CGST @ {{ rtrim(rtrim(number_format($taxRate/2,2),'0'),'.') }}%</div>
-          <div class="total-value">₹ {{ number_format($cgst, 2) }}</div>
+          <div class="total-label">CGST @ {{ rtrim(rtrim(\App\Support\Inr::fmt($taxRate/2,2),'0'),'.') }}%</div>
+          <div class="total-value">₹ {{ \App\Support\Inr::fmt($cgst, 2) }}</div>
         </div>
         <div class="total-row sub-line">
-          <div class="total-label">SGST @ {{ rtrim(rtrim(number_format($taxRate/2,2),'0'),'.') }}%</div>
-          <div class="total-value">₹ {{ number_format($sgst, 2) }}</div>
+          <div class="total-label">SGST @ {{ rtrim(rtrim(\App\Support\Inr::fmt($taxRate/2,2),'0'),'.') }}%</div>
+          <div class="total-value">₹ {{ \App\Support\Inr::fmt($sgst, 2) }}</div>
         </div>
         @endif
         <div class="total-row grand">
           <div class="total-label">GRAND TOTAL</div>
-          <div class="total-value">₹ {{ number_format($total, 2) }}</div>
+          <div class="total-value">₹ {{ \App\Support\Inr::fmt($total, 2) }}</div>
         </div>
         @if($paid > 0.01)
         <div class="total-row sub-line paid">
           <div class="total-label">Amount Paid</div>
-          <div class="total-value">₹ {{ number_format($paid, 2) }}</div>
+          <div class="total-value">₹ {{ \App\Support\Inr::fmt($paid, 2) }}</div>
         </div>
         @endif
         @if($balance > 0.01)
         <div class="total-row due">
           <div class="total-label">BALANCE DUE</div>
-          <div class="total-value">₹ {{ number_format($balance, 2) }}</div>
+          <div class="total-value">₹ {{ \App\Support\Inr::fmt($balance, 2) }}</div>
         </div>
         @endif
       </div>

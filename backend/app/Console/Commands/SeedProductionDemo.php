@@ -149,7 +149,7 @@ class SeedProductionDemo extends Command
         $quotations->accept($boq->fresh());
         $quotation = $boq->fresh();
         $this->line("  Quotation  {$quotation->quotation_no}  accepted  (total "
-            . number_format((float) $quotation->total_amount, 2) . ')');
+            . \App\Support\Inr::fmt((float) $quotation->total_amount, 2) . ')');
 
         // 3. Order.
         $order = $orders->createFromQuotation($quotation);
