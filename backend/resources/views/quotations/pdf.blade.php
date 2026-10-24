@@ -100,6 +100,10 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
   $customer = $quotation->customer;
   $items    = $quotation->items;
   $isInter  = $quotation->is_inter_state;
+  // This template serves every company: nothing about one company may be typed into it. The address and the
+  // certification line come from Settings -> Company.
+  $companyAddress = trim(implode(', ', array_filter([$company->address_line1 ?? null, $company->city, $company->state])) . ' ' . ($company->pincode ?? ''));
+  $certification  = trim((string) ($company->certification_line ?? ''));
 @endphp
 
 <!-- ═══════════════════════════════════ PAGE 1 — PROFORMA INVOICE ════ -->
@@ -112,10 +116,14 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
         <img src="{{ $company->image_data_uri }}" class="company-logo" alt="logo">
       @endif
       <div class="company-name">{{ strtoupper($company->name) }}</div>
-      <div class="company-sub">{{ $company->address_line1 ?? $company->address ?? '' }}{{ $company->city ? ', '.$company->city : '' }}{{ $company->state ? ', '.$company->state : '' }} {{ $company->pincode ?? '' }}</div>
+      <div class="company-sub">{{ $companyAddress }}</div>
       <div class="company-sub">{{ $company->phone ?? '' }}  |  {{ $company->email ?? '' }}</div>
-      @if($company->gstin)
-        <div class="company-sub">GSTIN: <strong>{{ $company->gstin }}</strong> &nbsp; AN ISO 9001:2015 COMPANY</div>
+      @if($company->gstin || $certification !== '')
+        <div class="company-sub">
+          @if($company->gstin)GSTIN: <strong>{{ $company->gstin }}</strong>@endif
+          @if($company->gstin && $certification !== '') &nbsp; @endif
+          {{ $certification }}
+        </div>
       @endif
     </div>
     <div class="title-cell">
@@ -388,7 +396,7 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
 
   <div class="tc-section">
     <div class="tc-title">3. Price Basis</div>
-    <div class="tc-item">All prices are Ex-Works from our factory, Survey No 158/1, Dhanora, Karjan, Vadodara.</div>
+    <div class="tc-item">All prices are Ex-Works from our factory{{ $companyAddress !== '' ? ', ' . $companyAddress : '' }}.</div>
     <div class="tc-item">GST, transportation, loading, unloading and other charges extra as applicable.</div>
   </div>
 
