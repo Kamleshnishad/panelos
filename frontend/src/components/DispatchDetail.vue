@@ -114,12 +114,19 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in dispatch.items" :key="item.id">
-            <td class="bold">{{ item.panel_type?.name ?? 'Panel #' + item.panel_type_id }}</td>
-            <td class="text-right">{{ fmtQty(item.quantity) }}</td>
-            <td class="text-right">{{ fmtNum(item.unit_price) }}</td>
-            <td class="text-right bold blue">{{ fmtNum(item.amount) }}</td>
-          </tr>
+          <template v-for="item in dispatch.items" :key="item.id">
+            <tr>
+              <td class="bold">{{ item.panel_type?.name ?? 'Panel #' + item.panel_type_id }}</td>
+              <td class="text-right">{{ fmtQty(item.quantity) }}</td>
+              <td class="text-right">{{ fmtNum(item.unit_price) }}</td>
+              <td class="text-right bold blue">{{ fmtNum(item.amount) }}</td>
+            </tr>
+            <tr v-if="item.sizes?.length" class="sizes-row">
+              <td colspan="4">
+                <span v-for="(z, i) in item.sizes" :key="z.id">{{ z.length_mm }} × {{ z.width_mm }} mm × {{ z.nos }} nos<span v-if="i < item.sizes.length - 1"> · </span></span>
+              </td>
+            </tr>
+          </template>
           <tr class="total-row">
             <td class="bold">Total</td>
             <td class="text-right bold">{{ fmtQty(totalQty) }}</td>
@@ -355,6 +362,7 @@ onMounted(load)
 .items-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .items-table th { background: var(--primary-tint); color: #333; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; border: 1px solid var(--primary-bd); }
 .items-table td { padding: 8px 10px; border: 1px solid #e0e0e0; }
+.items-table .sizes-row td { font-size: 12px; color: #555; background: #fafafa; border-top: none; }
 .total-row td { background: var(--surface-2); font-weight: 700; }
 .text-right { text-align: right; }
 .blue { color: var(--primary); }

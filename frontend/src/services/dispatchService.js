@@ -20,6 +20,9 @@ export default {
   // Create from batch
   createFromBatch(batchId, data) { return api('post', `/api/batches/${batchId}/dispatch`, data) },
 
+  // What is left to send for a batch (per order line and size row)
+  plan(batchId)               { return api('get', `/api/batches/${batchId}/dispatch-plan`) },
+
   // Lifecycle
   allocate(id)                { return api('post', `/api/dispatches/${id}/allocate`) },
   complete(id, data)          { return api('post', `/api/dispatches/${id}/complete`, data) },

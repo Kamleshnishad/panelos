@@ -305,6 +305,7 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::post('/dispatches/{id}/attachments', [AttachmentController::class, 'storeForDispatch'])->name('dispatches.attachments.store');
 
     Route::get('/batches/{batchId}/dispatches', [DispatchController::class, 'getDispatchesByBatch'])->name('dispatches.by_batch');
+    Route::get('/batches/{batchId}/dispatch-plan', [DispatchController::class, 'plan'])->name('dispatches.plan');
 
     // Invoice Management
     Route::post('/invoices/from-dispatch', [InvoiceController::class, 'createFromDispatch'])->name('invoices.from-dispatch');

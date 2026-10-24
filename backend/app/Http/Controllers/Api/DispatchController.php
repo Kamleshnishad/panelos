@@ -49,6 +49,11 @@ class DispatchController extends Controller
                 'transport_amount' => 'nullable|numeric|min:0',
                 'transporter_name' => 'nullable|string|max:150',
                 'vehicle_no' => 'nullable|string|max:30',
+                // Partial dispatch (FT-03): the pieces of each size row to send now. Omit to send everything still to send.
+                'items' => 'nullable|array',
+                'items.*.order_item_size_id' => 'nullable|integer',
+                'items.*.order_item_id' => 'nullable|integer',
+                'items.*.nos' => 'nullable|integer|min:1',
             ]);
 
             $companyId = auth()->user()->company_id;
@@ -178,6 +183,18 @@ class DispatchController extends Controller
         }
     }
 
+    /** What is left to dispatch for a batch: per order line and size row, ordered / already on a dispatch / remaining. */
+    public function plan($batchId)
+    {
+        try {
+            return $this->apiResponse(true, $this->dispatchService->planFor($batchId, auth()->user()->company_id), 'Dispatch plan retrieved successfully');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return $this->apiResponse(false, null, 'Batch not found', 404);
+        } catch (\Exception $e) {
+            return $this->apiResponse(false, null, $e->getMessage(), 400);
+        }
+    }
+
     public function getDispatchesByBatch($batchId)
     {
         try {
@@ -185,7 +202,7 @@ class DispatchController extends Controller
 
             $dispatches = Dispatch::where('company_id', $companyId)
                 ->where('batch_id', $batchId)
-                ->with('items', 'allocations')
+                ->with('items.sizes', 'allocations')
                 ->orderBy('created_at', 'desc')
                 ->get();
 

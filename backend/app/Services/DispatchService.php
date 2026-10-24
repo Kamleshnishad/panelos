@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Dispatch;
 use App\Models\DispatchItem;
+use App\Models\DispatchItemSize;
 use App\Models\ProductionBatch;
 use App\Models\QualityControl;
 use App\Models\StockAllocation;
@@ -13,10 +14,42 @@ use Illuminate\Support\Facades\DB;
 class DispatchService
 {
     protected $stockService;
+    protected $plans;
 
-    public function __construct(StockService $stockService)
+    public function __construct(StockService $stockService, DispatchPlanService $plans)
     {
         $this->stockService = $stockService;
+        $this->plans = $plans;
+    }
+
+    /** What is left to dispatch for a batch, per order line and size row (FT-03). */
+    public function planFor($batchId, $companyId = null): array
+    {
+        $companyId = $companyId ?? auth()->user()->company_id;
+
+        $batch = ProductionBatch::where('company_id', $companyId)->with('order')->findOrFail($batchId);
+
+        return $this->plans->plan($batch);
+    }
+
+    /**
+     * The batch is `dispatched` only when every piece has gone out AND arrived: nothing left to send and no dispatch still
+     * pending. Otherwise it stays `qc_passed` (ready to send more), and falls back to it when a delivered dispatch is cancelled.
+     */
+    public function syncBatchStatus(?ProductionBatch $batch): void
+    {
+        if (!$batch || !in_array($batch->status, ['qc_passed', 'completed', 'dispatched'], true)) {
+            return;
+        }
+
+        $plan = $this->plans->plan($batch->loadMissing('order'));
+        $pending = Dispatch::where('batch_id', $batch->id)->whereIn('status', ['pending', 'in_transit'])->exists();
+
+        if ($plan['fully_dispatched'] && !$pending) {
+            $batch->update(['status' => 'dispatched']);
+        } elseif ($batch->status === 'dispatched') {
+            $batch->update(['status' => 'qc_passed']);
+        }
     }
 
     public function createDispatch($batchId, $data = [], $companyId = null)
@@ -24,7 +57,10 @@ class DispatchService
         return DB::transaction(function () use ($batchId, $data, $companyId) {
             $companyId = $companyId ?? auth()->user()->company_id;
 
+            // Locked for the rest of the transaction: two clicks on 'dispatch' must not both read the same pieces as still free
+            // (the unique index that used to stop that is gone now that a batch may have several dispatches).
             $batch = ProductionBatch::where('company_id', $companyId)
+                ->lockForUpdate()
                 ->findOrFail($batchId);
 
             // Stricter precondition: an APPROVED 'pass' QC must exist for the batch.
@@ -39,9 +75,9 @@ class DispatchService
                 throw new \Exception('Batch must be qc_passed or completed before dispatch.');
             }
 
-            if (Dispatch::where('batch_id', $batchId)->exists()) {
-                throw new \Exception('Batch has already been dispatched');
-            }
+            // Which pieces this dispatch takes (everything still to send unless `items` says otherwise). Throws when there is
+            // nothing left, so a batch can have several dispatches but never sends a piece twice.
+            $lines = $this->plans->lines($batch->loadMissing('order'), $data['items'] ?? null);
 
             $dispatch = Dispatch::create([
                 'company_id' => $companyId,
@@ -58,20 +94,32 @@ class DispatchService
                 'notes' => $data['notes'] ?? null
             ]);
 
-            // Copy panel items from the batch's underlying order
-            $orderItems = $batch->orderItems()->get();
-            foreach ($orderItems as $item) {
-                DispatchItem::create([
+            foreach ($lines as $line) {
+                $oi = $line['item'];
+                $item = DispatchItem::create([
                     'dispatch_id'   => $dispatch->id,
-                    'panel_type_id' => $item->panel_type_id,
-                    'quantity'      => $item->total_sqm ?: $item->quantity,
-                    'unit_price'    => $item->rate_per_sqm ?: $item->unit_price,
-                    'amount'        => $item->amount,
+                    'order_item_id' => $oi->id,
+                    'panel_type_id' => $oi->panel_type_id,
+                    'quantity'      => $line['quantity'],
+                    'unit_price'    => $oi->rate_per_sqm ?: $oi->unit_price,
+                    'amount'        => $line['amount'],
                     'created_at'    => now(),
                 ]);
+                foreach ($line['sizes'] as $sz) {
+                    DispatchItemSize::create([
+                        'dispatch_item_id'   => $item->id,
+                        'order_item_size_id' => $sz['size']->id,
+                        'length_mm'          => $sz['size']->length_mm,
+                        'width_mm'           => $sz['size']->width_mm,
+                        'nos'                => $sz['nos'],
+                        'sqm'                => $sz['sqm'],
+                        'amount'             => $sz['amount'],
+                        'created_at'         => now(),
+                    ]);
+                }
             }
 
-            return $dispatch->load('items.panelType', 'batch');
+            return $dispatch->load('items.panelType', 'items.sizes', 'batch');
         });
     }
 
@@ -126,6 +174,7 @@ class DispatchService
                 ->each(fn($allocation) => $allocation->markAsUsed());
 
             $dispatch->markAsCompleted($data['actual_delivery_date'] ?? now());
+            $this->syncBatchStatus($dispatch->batch);
 
             // WhatsApp/SMS notification — silent on failure
             try {
@@ -146,10 +195,8 @@ class DispatchService
 
             $dispatch->cancel();
 
-            // Revert batch status if needed
-            if ($dispatch->batch) {
-                $dispatch->batch->update(['status' => 'qc_passed']);
-            }
+            // Its pieces become available again; a batch that had been fully delivered is no longer.
+            $this->syncBatchStatus($dispatch->batch);
 
             return $dispatch;
         });
@@ -160,7 +207,7 @@ class DispatchService
         $companyId = $companyId ?? auth()->user()->company_id;
 
         return Dispatch::where('company_id', $companyId)
-            ->with('batch', 'items.panelType', 'allocations')
+            ->with('batch', 'items.panelType', 'items.sizes', 'allocations')
             ->findOrFail($dispatchId);
     }
 
@@ -234,7 +281,8 @@ class DispatchService
                     'panel_type' => $item->panelType?->name,
                     'quantity' => $item->quantity,
                     'unit_price' => $item->unit_price,
-                    'amount' => $item->amount
+                    'amount' => $item->amount,
+                    'sizes' => $item->sizes->map(fn ($z) => ['length_mm' => $z->length_mm, 'width_mm' => $z->width_mm, 'nos' => $z->nos, 'sqm' => $z->sqm])->values(),
                 ];
             }),
             'total' => $dispatch->total_amount,

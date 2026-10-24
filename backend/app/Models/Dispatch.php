@@ -118,10 +118,8 @@ class Dispatch extends BaseModel
             'actual_delivery_date' => $actualDeliveryDate ?? now()
         ]);
 
-        if ($this->batch) {
-            $this->batch->update(['status' => 'dispatched']);
-        }
-
+        // The batch becomes `dispatched` only when every piece has been delivered: DispatchService::completeDispatch decides
+        // (a partial dispatch must not mark the whole batch as gone).
         return $this;
     }
 
