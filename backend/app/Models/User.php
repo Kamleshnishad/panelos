@@ -15,6 +15,9 @@ use Laravel\Sanctum\HasApiTokens;
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
+    use \App\Traits\Auditable;
+    // Changes to these are not events anyone needs to read: a login stamps last_login_at, and the 2FA code is a secret.
+    protected array $auditAlsoExclude = ['last_login_at', 'two_factor_code', 'two_factor_expires_at'];
     use HasFactory, Notifiable, HasApiTokens, SoftDeletes;
 
     // is_super_admin is intentionally NOT fillable. Set it only via forceFill()

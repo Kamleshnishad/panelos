@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Dispatch extends BaseModel
 {
+    use \App\Traits\Auditable;
     use HasFactory;
     use SoftDeletes;
 

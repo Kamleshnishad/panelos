@@ -44,7 +44,7 @@ trait Auditable
         try {
             $user = auth()->user();
             AuditLog::create([
-                'company_id'     => $this->company_id ?? ($user->company_id ?? null),
+                'company_id'     => $this->auditCompanyId(),
                 'user_id'        => $user?->id,
                 'user_name'      => $user?->name ?? 'system',
                 'action'         => $action,
@@ -63,13 +63,24 @@ trait Auditable
 
     protected function cleanAudit(array $attrs): array
     {
-        foreach ($this->auditExclude as $f) unset($attrs[$f]);
+        // A model can add to the exclusions with `protected array $auditAlsoExclude` (a trait cannot be redeclared).
+        $skip = array_merge($this->auditExclude, property_exists($this, 'auditAlsoExclude') ? $this->auditAlsoExclude : []);
+        foreach ($skip as $f) unset($attrs[$f]);
         return $attrs;
+    }
+
+    /** The tenant a change belongs to. A Company row is its own tenant, so a super admin editing it is logged against it. */
+    protected function auditCompanyId(): ?int
+    {
+        if ($this instanceof \App\Models\Company) {
+            return $this->getKey();
+        }
+        return $this->company_id ?? (auth()->user()->company_id ?? null);
     }
 
     protected function auditLabel(): string
     {
-        foreach (['quotation_no', 'order_no', 'invoice_no', 'lead_no', 'po_no', 'run_no', 'batch_no', 'dispatch_no', 'name'] as $f) {
+        foreach (['quotation_no', 'order_no', 'invoice_no', 'lead_no', 'po_no', 'run_no', 'batch_no', 'dispatch_no', 'reference_no', 'name', 'email'] as $f) {
             if (!empty($this->{$f})) return (string) $this->{$f};
         }
         return '#' . $this->getKey();

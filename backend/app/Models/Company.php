@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 // directly (companies has deleted_at).
 class Company extends Model
 {
+    use \App\Traits\Auditable;
     use HasFactory, SoftDeletes, HasImageDataUri;
 
     protected $imageField = 'logo';
