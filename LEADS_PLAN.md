@@ -38,7 +38,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 
 | Sub-phase | What | Status |
 |---|---|---|
-| 0.1 | Lead lifecycle tests | not started |
+| 0.1 | Lead lifecycle tests | PR open (25 tests) |
 | 1.1 | Lists as data (sources, lost reasons) | not started |
 | 1.2 | Status engine | not started |
 | 1.3 | Automatic won, lost-reason dialog | not started |
@@ -87,6 +87,11 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Goal:** pin what the lead module does today so later changes cannot break it unnoticed. No behaviour change.
 - **Build:** feature tests for create, assign, status moves with the timeline entry, activities, convert (customer created or linked), quotation link flips to quoted, dashboard figures, follow-up badge count, soft delete, lead numbering, and "company B cannot see or touch company A's leads" on every endpoint.
 - **Live check:** none needed (tests only). **Size:** S. **Needs from client:** nothing.
+- **Result:** `tests/Feature/LeadLifecycleTest.php`, 25 tests. Seven are marked `CURRENT`: they pin a behaviour the audit calls a fault, and the sub-phase that fixes it
+  flips that test on purpose: `the_lead_number_keeps_counting_across_a_new_year` (1.6), `the_same_phone_number_can_be_entered_again` (1.4),
+  `any_status_move_is_allowed_and_editing_can_change_the_status_without_a_trace` (1.2), `convert_leaves_the_state_blank_and_does_not_look_for_an_existing_customer` (1.5),
+  `a_won_lead_goes_back_to_quoted_when_another_quotation_is_made` (1.2), `accepting_the_quotation_does_not_mark_the_lead_won` (1.3), and the fixed source list rejecting
+  TradeIndia inside `source_is_a_fixed_list_matched_without_regard_to_case` (1.1). Writing them confirmed each of those audit findings against the running code.
 
 ## Phase 1: make the numbers true
 
