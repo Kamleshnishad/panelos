@@ -112,6 +112,7 @@ class NotificationSettingsController extends Controller
      */
     public function testEmail(Request $r)
     {
+        $r->validate(['mailbox' => 'nullable|in:main,notifications', 'to' => 'nullable|email|max:190']);
         $kind = $r->input('mailbox') === 'notifications' ? \App\Support\CompanyMailbox::NOTIFICATIONS : \App\Support\CompanyMailbox::MAIN;
         $status = \App\Support\MailStatus::describe($r->user()->company_id);
         // The test uses exactly the mailbox whose button was pressed. For the main one, no mailbox of its own means the server's mailer.
@@ -123,7 +124,14 @@ class NotificationSettingsController extends Controller
             return $this->errorResponse(['mail' => $status], $status['headline'], 'MAIL_NOT_SET_UP', 422);
         }
 
-        $to = $r->user()->email;
+        // The test goes to the address typed on the screen, so nobody's real inbox is disturbed; blank = the admin's own login address.
+        // Another recipient is allowed only through the company's OWN mailbox: through the PanelOS server's mailer it would let any
+        // tenant send mail from our address to anyone.
+        $custom = trim((string) $r->input('to'));
+        if ($custom !== '' && !$own) {
+            return $this->errorResponse([], 'Testing another address needs your own mailbox switched on and saved. Without it, the test can only go to your own login address.', 'MAIL_TEST_TARGET_NOT_ALLOWED', 422);
+        }
+        $to = $custom !== '' ? $custom : $r->user()->email;
         $company = $r->user()->company?->name ?? 'PanelOS';
         try {
             $body = "This is a test e-mail from {$company} on PanelOS.\n\nIf you can read it, e-mail is working: invoice, payment and reminder e-mails will be delivered.";

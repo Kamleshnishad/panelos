@@ -56,18 +56,23 @@
       </div>
     </div>
 
+    <div class="form-group test-to">
+      <label>Send the test to</label>
+      <input v-model.trim="testTo" type="email" autocomplete="off" placeholder="any address you can check, e.g. your own e-mail" />
+      <span class="hint">Leave blank to send to your own login address. Type another address so nobody else's inbox is disturbed.</span>
+    </div>
     <div class="test-row">
-      <button type="button" class="btn btn-secondary" :disabled="testing" @click="$emit('test', kind)">
-        {{ testing ? 'Sending…' : '📤 Send me a test e-mail from this mailbox' }}
+      <button type="button" class="btn btn-secondary" :disabled="testing" @click="$emit('test', kind, testTo)">
+        {{ testing ? 'Sending…' : '📤 Send a test e-mail from this mailbox' }}
       </button>
       <span v-if="result" :class="result.ok ? 'test-ok' : 'test-err'">{{ result.msg }}</span>
     </div>
-    <p class="hint" style="margin-top:8px">Save first, then test. The test goes to your own login address, and if the password is wrong the mail server's own answer is shown here.</p>
+    <p class="hint" style="margin-top:8px">Save first, then test. If the password is wrong, the mail server's own answer is shown here.</p>
   </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps({
   form: { type: Object, required: true },
@@ -78,6 +83,8 @@ const props = defineProps({
   result: { type: Object, default: null },
 })
 defineEmits(['test', 'clear-password'])
+
+const testTo = ref('')   // where the test e-mail goes; blank = the admin's own login address
 
 // Column prefix: the main mailbox is smtp_*, the notifications mailbox notif_smtp_*.
 const p = computed(() => (props.kind === 'notifications' ? 'notif_smtp_' : 'smtp_'))
@@ -109,6 +116,7 @@ function onEncryptionChange() {
 .toggle input:checked + .slider { background: var(--primary); }
 .toggle input:checked + .slider::after { transform: translateX(16px); }
 .toggle-label { font-size: 13px; font-weight: 600; color: #444; }
+.test-to { max-width: 520px; margin-top: 14px; }
 .test-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
 .btn { padding: 8px 16px; border-radius: 7px; border: 1px solid #ccd; background: #f4f6fb; cursor: pointer; font-weight: 600; font-size: 13px; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
