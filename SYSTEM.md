@@ -69,8 +69,9 @@ router dependency: `src/services/routes.js` maps a section key to `/<key>` (dash
 orders, batches and dispatches, a record to `/<key>/<id>`. `go('orders', 42)` sets `:open-id="42"` *and* pushes
 `/orders/42`; a manager that opens a record from its own list emits `detail` so the address follows; `popstate`
 (Back/Forward) and first load go through `applyUrl()`, which remounts the screen so it reads the address afresh.
-Unknown paths, bad ids and screens the user may not open fall back to the dashboard. The frontend nginx already answers
-every unknown path with `index.html`. Records of invoices, customers, leads and BOQ have no address yet.
+Unknown paths, bad ids and screens the user may not open fall back to the dashboard.
+**Header search (UX-04, PB-061):** `GlobalSearch.vue` calls `GET /api/search?q=` (debounced 250 ms, stale answers dropped) and also matches screen names for "Go to"; the server side is `GlobalSearchService` (quotations, orders, invoices, customers, batches, dispatches; 5 per kind; each kind needs its own `*.view` permission; always filtered by `company_id`). The frontend nginx already answers
+every unknown path with `index.html`. Invoices and customers have record addresses too; leads and BOQ records do not yet.
 
 Each manager component calls one `frontend/src/services/*.js` module, which wraps the shared `api.js`
 axios instance (`baseURL: '/api'`, bearer token from `localStorage`).

@@ -82,11 +82,7 @@
         </div>
         <div class="tb-right">
           <template v-if="!isSuperAdmin">
-            <div class="search">
-              <svg class="s-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              <input v-model="searchQ" aria-label="Jump to a section" placeholder="Jump to a section…" @keyup.enter="quickJump" />
-              <span class="kbd">↵</span>
-            </div>
+            <global-search :sections="jumpItems" @section="go" @open="(section, id) => go(section, id)" />
             <notification-bell @navigate="go" />
             <button class="btn-primary" @click="go('quotations')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
@@ -99,7 +95,7 @@
       <main class="content">
         <home-dashboard        v-if="active === 'dashboard'"   @navigate="go" />
         <lead-manager          v-else-if="active === 'leads'" @convert="onLeadConvert" />
-        <customer-manager      v-else-if="active === 'customers'" @open-quotation="openQuotation" @view-orders="go('orders')" />
+        <customer-manager      v-else-if="active === 'customers'" :key="navNonce" :open-id="customerOpenId" @detail="(id) => onDetail('customers', id)" @open-quotation="openQuotation" @view-orders="go('orders')" />
         <quotation-manager     v-else-if="active === 'quotations'" :key="navNonce" :open-id="quotationOpenId" :prefill="quotationPrefill" @detail="(id) => onDetail('quotations', id)" @order-created="go('orders')" />
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />
         <order-manager         v-else-if="active === 'orders'"      :key="navNonce" :open-id="orderOpenId"     @detail="(id) => onDetail('orders', id)" @view-quotation="(id) => go('quotations', id)" @view-batch="(id) => go('batches', id)" />
@@ -110,7 +106,7 @@
         <stock-manager         v-else-if="active === 'stock'" />
         <procurement-manager   v-else-if="active === 'procurement'" />
         <dispatch-manager      v-else-if="active === 'dispatches'"  :key="navNonce" :open-id="dispatchOpenId"  @detail="(id) => onDetail('dispatches', id)" @view-batch="(id) => go('batches', id)" />
-        <invoice-manager       v-else-if="active === 'invoices'" />
+        <invoice-manager       v-else-if="active === 'invoices'" :key="navNonce" :open-id="invoiceOpenId" @detail="(id) => onDetail('invoices', id)" />
         <accounts-receivable   v-else-if="active === 'receivables'" @view-invoice="go('invoices')" />
         <business-reports      v-else-if="active === 'reports'" />
         <company-settings      v-else-if="active === 'company'" />
@@ -134,6 +130,7 @@ import authService from '../services/authService.js'
 import { useSessionGuard } from '../composables/useSessionGuard.js'
 import SessionWarning from './SessionWarning.vue'
 import NotificationBell from './NotificationBell.vue'
+import GlobalSearch from './GlobalSearch.vue'
 import dashboardService from '../services/dashboardService.js'
 import companyService from '../services/companyService.js'
 import productionService from '../services/productionService.js'
@@ -247,6 +244,8 @@ const quotationPrefill = ref(null)
 const orderOpenId    = ref(null)
 const batchOpenId    = ref(null)
 const dispatchOpenId = ref(null)
+const invoiceOpenId  = ref(null)
+const customerOpenId = ref(null)
 
 function onLeadConvert(payload) {
   quotationPrefill.value = payload   // { customer_id, lead_id }
@@ -257,7 +256,6 @@ function onLeadConvert(payload) {
 }
 const mobileOpen  = ref(false)
 const navNonce    = ref(0)   // bumped when the open section's own menu item is clicked again: its manager remounts on its list
-const searchQ     = ref('')
 
 function openQuotation(id) {
   go('quotations', id)
@@ -353,12 +351,16 @@ function show(key, id = null) {
   orderOpenId.value      = null
   batchOpenId.value      = null
   dispatchOpenId.value   = null
+  invoiceOpenId.value    = null
+  customerOpenId.value   = null
   if (id != null) {
     const numId = typeof id === 'object' ? id?.id : id
     if (key === 'quotations') quotationOpenId.value = numId
     else if (key === 'orders') orderOpenId.value    = numId
     else if (key === 'batches') batchOpenId.value   = numId
     else if (key === 'dispatches') dispatchOpenId.value = numId
+    else if (key === 'invoices') invoiceOpenId.value = numId
+    else if (key === 'customers') customerOpenId.value = numId
   }
   active.value = key
   mobileOpen.value = false
@@ -408,13 +410,8 @@ watch([activeLabel, companyName], () => {
   document.title = activeLabel.value ? `${activeLabel.value} · ${companyName.value}` : companyName.value
 }, { immediate: true })
 
-// Quick-jump: match the typed text against nav labels and navigate.
-function quickJump() {
-  const q = searchQ.value.trim().toLowerCase()
-  if (!q) return
-  const hit = allItems.find(i => i.label.toLowerCase().includes(q)) || allItems.find(i => i.key.includes(q))
-  if (hit) { go(hit.key); searchQ.value = '' }
-}
+// Screens the user may open, offered by the header search as "Go to".
+const jumpItems = computed(() => allItems.filter(i => allowed(i.key)).map(i => ({ key: i.key, label: i.label })))
 
 
 onBeforeUnmount(() => window.removeEventListener('popstate', applyUrl))

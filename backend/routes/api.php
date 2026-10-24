@@ -110,6 +110,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     // Audit Log (admin only)
     Route::get('/audit-logs', [\App\Http\Controllers\Api\AuditLogController::class, 'index'])->name('audit.index');
 
+    // Header search (UX-04). Unmapped in perm.module on purpose: the service checks each kind's own view permission.
+    Route::get('/search', [\App\Http\Controllers\Api\SearchController::class, 'index'])->name('search');
+
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     Route::get('/leads/dashboard', [\App\Http\Controllers\Api\LeadController::class, 'dashboard'])->name('leads.dashboard');

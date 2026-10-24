@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildPath, parsePath, DETAIL_SECTIONS } from './routes.js'
 
-const KEYS = ['dashboard', 'quotations', 'orders', 'batches', 'dispatches', 'invoices', 'company', 'superadmin']
+const KEYS = ['dashboard', 'quotations', 'orders', 'batches', 'dispatches', 'invoices', 'customers', 'company', 'superadmin']
 
 test('the dashboard lives at the root and every other screen at /<section>', () => {
   assert.equal(buildPath('dashboard'), '/')
@@ -11,10 +11,12 @@ test('the dashboard lives at the root and every other screen at /<section>', () 
 })
 
 test('a record has its own address on the four screens that open one', () => {
-  assert.deepEqual(DETAIL_SECTIONS, ['quotations', 'orders', 'batches', 'dispatches'])
+  assert.deepEqual(DETAIL_SECTIONS, ['quotations', 'orders', 'batches', 'dispatches', 'invoices', 'customers'])
   assert.equal(buildPath('quotations', 17), '/quotations/17')
   assert.equal(buildPath('dispatches', 3), '/dispatches/3')
-  assert.equal(buildPath('invoices', 9), '/invoices', 'a screen without record pages ignores the id')
+  assert.equal(buildPath('invoices', 9), '/invoices/9')
+  assert.equal(buildPath('customers', 4), '/customers/4')
+  assert.equal(buildPath('company', 9), '/company', 'a screen without record pages ignores the id')
 })
 
 test('every address the app writes reads back to the same screen and record', () => {
@@ -45,7 +47,7 @@ test('anything that is not a screen of this app is rejected', () => {
 })
 
 test('a record address on a screen without record pages opens that screen', () => {
-  assert.deepEqual(parsePath('/invoices/5', KEYS), { key: 'invoices', id: null })
+  assert.deepEqual(parsePath('/company/5', KEYS), { key: 'company', id: null })
 })
 
 test('a screen the user cannot see is not a valid address', () => {

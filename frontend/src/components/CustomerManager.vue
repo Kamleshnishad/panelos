@@ -4,7 +4,7 @@
       v-if="view === 'profile'"
       :key="profileId"
       :customer-id="profileId"
-      @back="view = 'list'"
+      @back="backToList"
       @open-quotation="$emit('open-quotation', $event)"
       @view-orders="$emit('view-orders')"
     />
@@ -59,13 +59,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import customerService from '../services/customerService.js'
 import { toastError } from '../services/ui.js'
 import CustomerProfile from './CustomerProfile.vue'
 import CustomerEditModal from './CustomerEditModal.vue'
 
-defineEmits(['open-quotation', 'view-orders'])
+const props = defineProps({ openId: { type: Number, default: null } })
+const emit = defineEmits(['open-quotation', 'view-orders', 'detail'])
 
 const showAdd = ref(false)
 const editing = ref(null)          // null = creating, a customer = editing
@@ -97,9 +98,12 @@ async function load(page = 1) {
 
 function goPage(p) { if (p < 1 || p > pagination.last_page) return; load(p) }
 
-function open(c) { profileId.value = c.id; view.value = 'profile' }
+function open(c) { profileId.value = c.id; view.value = 'profile'; emit('detail', c.id) }
+function backToList() { view.value = 'list'; profileId.value = null; emit('detail', null) }
 
-onMounted(load)
+// Deep-link (search result, page address): open a profile by id; no id means the list.
+watch(() => props.openId, (id) => { if (id) open({ id }); else if (view.value === 'profile') backToList() })
+onMounted(() => { load(); if (props.openId) open({ id: props.openId }) })
 </script>
 
 <style scoped>
