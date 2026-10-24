@@ -1595,11 +1595,7 @@ as live defects; what is listed below is what is still true of the code today.
 
 ### Real inconsistencies that remain
 
-10. **Fixed transport is never invoiced.** The quotation adds `transport_amount` *after* tax and leaves it
-    untaxed (§21.2); a per-line invoice cannot express an untaxed line today, because `TaxService` applies
-    one rate across the whole subtotal. So `InvoiceService::addNonPanelLines()` deliberately skips it and
-    an order with fixed transport invoices short by that amount. Needs a business decision on whether
-    transport should be taxed; once decided, the fix is one line plus a quotation-side change to match.
+10. *(Fixed, PB-021: freight is settled at dispatch — amount, transporter and vehicle live on the dispatch and are billed as an invoice line with the same GST as the goods; the quoted figure is the fallback. Worth confirming the composite-supply treatment with the client's accountant.)*
 11. **Quotation GST is hard-coded at 18%** in `QuotationService::recalculate()`, while invoices read
     `TaxConfiguration.default_tax_rate`. They agree out of the box (both 18%) but will diverge the moment
     a tenant changes the invoice rate.
@@ -1616,19 +1612,13 @@ as live defects; what is listed below is what is still true of the code today.
 
 17. **Live GSP e-invoicing is stubbed.** IRN/e-way generation returns "not enabled" until the GSP env vars
     are set; manual entry is the shipped path.
-18. *(Fixed 2026-10-23: `routes/console.php` now schedules reminders, SMS reminders, backups, token pruning and notification scans.)* **No scheduled jobs are registered.** `routes/console.php` contains only the stock `inspire` command, so
-    reminder ladders, low-stock sweeps (`checkLowStock`) and forecast refreshes must currently be triggered
-    by API calls, not cron.
+18. *(Fixed 2026-10-23, PB-030: `routes/console.php` schedules reminders, SMS reminders, backups, token pruning, notification scans and the health heartbeat.)*
 19. **The dashboard is cached for 60 s per company** — a freshly created record may not appear in KPIs
     immediately. This is expected, not a bug.
 20. **`StockService::getStockLevel/getStockHistory` query legacy columns** (`coil_id` / `chemical_id`) that
     the current tables do not use. The live code paths go through the controller endpoints instead.
-21. **Generated PDFs are ~1 MB each** — mostly fonts, not the logo. DomPDF defaults font subsetting to
-    on, but the Laravel wrapper's bundled config turns it off and the app never published its own, so two
-    whole DejaVu files (717 KB) ride in every PDF; the logo adds a further 173 KB because it is stored at
-    3381×1085 px and shown at 200×46. Correct output, just heavy. See PB-022 in `BUGS.md` for the measured
-    breakdown and the two-line fix (97% smaller).
-22. **The test suite is fully green** (546 of 546 on 2026-10-24, up from 191 failing). The CI gate
+21. *(Fixed, PB-022: font subsetting is on and the logo is shrunk before embedding; PDFs are ~97% smaller.)*
+22. **The test suite is fully green** (572 of 572 on 2026-10-24, up from 191 failing). The CI gate
     (`backend/tests/ci/known-failures.txt`, now empty) blocks any new failure. The suite runs against
     **MySQL/MariaDB** (`phpunit.xml` forces `DB_DATABASE=panelos_test`), matching production — see `CLAUDE.md`.
 

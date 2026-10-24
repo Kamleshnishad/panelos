@@ -47,7 +47,7 @@ Rules:
   are involved. MySQL/MariaDB refuses to redefine a column an FK points at, so such migrations must drop
   the constraint, change the column, and re-add it (see
   `2026_10_23_000001_fix_invoice_dispatch_item_precision_and_non_panel_lines.php`).
-* **The suite is green (546 of 546 on 2026-10-24) and must stay green.** Before 24 Oct 2026 about 190 legacy tests
+* **The suite is green (572 of 572 on 2026-10-24) and must stay green.** Before 24 Oct 2026 about 190 legacy tests
   failed on stale payloads (`items` instead of `panel_rows`), removed routes and models; porting them exposed real
   production bugs (see BUGS.md PB-048 to PB-052). Do not skip, delete or loosen a test to make it pass — if a test
   disagrees with the code, one of them is wrong, and finding out which is the point.
