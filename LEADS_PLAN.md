@@ -5,16 +5,22 @@ Goal: leads arrive by themselves (IndiaMART first), nothing is lost or duplicate
 
 ## How we work through it
 
-**"next" means: build the next sub-phase.** Each sub-phase is one small pull request that is useful on its own, tested (backend suite
-on MySQL, schema check, a browser run for screens) and safe to deploy without the later ones. For each one I will:
+**Decision (24 Oct 2026): everything stays local until the whole plan is complete.** No push, no pull request and no deploy per sub-phase.
+All the work lives on one local branch, `leads-program`, one commit per sub-phase. When the last sub-phase is finished we push once,
+let CI run on MySQL 8, review, merge and deploy together.
 
-1. build it and open the PR, CI green;
-2. tell you in plain words what changed, what it cannot break, what I verified and what I could not;
-3. **wait for your "merge"** (every merge deploys to production; an earlier yes never carries over);
-4. after the deploy, check it on the live site and update this file, `BUGS.md`, `SYSTEM.md` and the lead audit page.
+**"next" means: build the next sub-phase.** Each sub-phase is one local commit that is useful on its own and passes the local gates:
+the whole backend suite, the schema check where the schema changed, the frontend build and unit tests, and a browser run for screens.
+For each one I will tell you in plain words what changed, what it cannot break, and what I verified and could not.
+I update the progress table below, `SYSTEM.md` and `BUGS.md` in the same commit, so the branch always describes itself.
 
-If you want it faster, say "next and merge as you go" once and I will merge each PR when CI is green and then verify live. Say "stop merging" to go back.
-A sub-phase that needs something from the client says so first; where there is a sensible default I use it and say so, so "next" never blocks.
+What this changes, honestly:
+- **No live check per sub-phase.** Nothing is on the server until the end, so each sub-phase is verified locally (tests, browser run with a mocked API, schema on MySQL). The live checks listed under each sub-phase move to the release step.
+- **CI only runs at the end.** CI uses MySQL 8, local uses whatever is installed here; the two differ in small ways (for example JSON key order). Expect to fix a few small things when CI first sees the whole branch.
+- **The release is bigger.** Many migrations and screens deploy at once. To keep that safe, when we get there I will recommend releasing in a few batches (for example Phase 0 to 1, then 2 to 3, then the rest) instead of one jump, but that is your call at that point.
+- **The IndiaMART go-live (3.4) and anything needing a real key or account waits for the release.** The connector is built and tested against a fake.
+- Pull request #16 (sub-phase 0.1, tests only) is already on GitHub, open and unmerged. It stays untouched; its commit is the base of `leads-program`.
+- Other work (partial dispatch PR #12, anything else) is separate and unaffected.
 
 Rules for every sub-phase: additive migrations only (no data loss, rollback possible), tests first for anything that moves money or status,
 production commands as `panelos`, no e-mail or message sent to real customers by a build or a test.
@@ -38,7 +44,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 
 | Sub-phase | What | Status |
 |---|---|---|
-| 0.1 | Lead lifecycle tests | PR open (25 tests) |
+| 0.1 | Lead lifecycle tests | done, local (also PR #16, unmerged) |
 | 1.1 | Lists as data (sources, lost reasons) | not started |
 | 1.2 | Status engine | not started |
 | 1.3 | Automatic won, lost-reason dialog | not started |
