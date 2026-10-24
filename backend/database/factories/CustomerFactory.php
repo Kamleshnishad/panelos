@@ -28,8 +28,10 @@ class CustomerFactory extends Factory
             'address_line1' => $this->faker->streetAddress(),
             'address_line2' => $this->faker->optional()->buildingNumber(),
             'city' => $this->faker->city(),
-            'state' => $this->faker->state(),
-            'state_code' => strtoupper($this->faker->regexify('[A-Z]{2}')),
+            // Fixed, not random: two random letters sometimes spell a real state code, which flipped intra/inter-state
+            // GST in tests by chance (it broke a deploy). A test that cares about the state sets its own.
+            'state' => 'Gujarat',
+            'state_code' => '24',
             'pincode' => $this->faker->postcode(),
             'country' => 'India',
             // 0 = no limit. Random limits made every order test pass or fail by chance; credit tests set their own.
