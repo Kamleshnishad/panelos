@@ -82,6 +82,70 @@
         <p class="hint" style="margin-top:8px">The test goes to your own login address. Save settings first if you just changed the switch.</p>
       </section>
 
+      <!-- Own mailbox -->
+      <section class="card">
+        <div class="card-head">
+          <h3>📬 Send customer e-mail from your own mailbox</h3>
+          <label class="toggle">
+            <input type="checkbox" v-model="form.smtp_enabled" />
+            <span class="slider"></span>
+            <span class="toggle-label">{{ form.smtp_enabled ? 'Own mailbox on' : 'Own mailbox off' }}</span>
+          </label>
+        </div>
+        <p class="card-hint">
+          Invoices, payment reminders and receipts to your customers go out from <b>your</b> address instead of PanelOS's.
+          Log-in codes and system alerts are not affected. <b>Zoho example:</b> server <code>smtppro.zoho.in</code>
+          (or <code>smtp.zoho.in</code> / <code>smtp.zoho.com</code>, whichever region your account is in), port 465 with SSL or 587 with TLS,
+          your full e-mail address as user name, and an <b>app password</b> from Zoho (not your normal password).
+        </p>
+        <div class="form-grid" :class="{ dimmed: !form.smtp_enabled }">
+          <div class="form-group">
+            <label>Mail server</label>
+            <input v-model="form.smtp_host" placeholder="smtppro.zoho.in" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label>Security</label>
+            <select v-model="form.smtp_encryption" @change="onEncryptionChange">
+              <option value="ssl">SSL (port 465)</option>
+              <option value="tls">TLS / STARTTLS (port 587)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Port</label>
+            <select v-model.number="form.smtp_port">
+              <option :value="465">465</option>
+              <option :value="587">587</option>
+              <option :value="2525">2525</option>
+              <option :value="25">25</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>User name</label>
+            <input v-model="form.smtp_username" placeholder="accounts@yourcompany.com" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input v-model="form.smtp_password" type="password" autocomplete="new-password"
+                   :placeholder="form.smtp_password_set ? 'saved — leave blank to keep' : 'app password'" />
+            <span class="hint">
+              <template v-if="form.smtp_password_set">✓ A password is saved (stored encrypted, never shown again).
+                <button type="button" class="link" @click="clearMailboxPassword">Remove it</button></template>
+              <template v-else>Stored encrypted. It cannot be read back, only replaced.</template>
+            </span>
+          </div>
+          <div class="form-group">
+            <label>Send as (From address)</label>
+            <input v-model="form.smtp_from_address" placeholder="accounts@yourcompany.com" autocomplete="off" />
+            <span class="hint">Most providers only accept the address of the mailbox you log in with.</span>
+          </div>
+          <div class="form-group">
+            <label>Sender name</label>
+            <input v-model="form.smtp_from_name" placeholder="Your Company Name" autocomplete="off" />
+          </div>
+        </div>
+        <p class="hint">Save, then press <b>Send me a test e-mail</b> in the E-mail card above. If the password is wrong, the mail server's own answer is shown there.</p>
+      </section>
+
       <!-- SMS -->
       <section class="card">
         <div class="card-head">
@@ -261,6 +325,9 @@ async function load() {
     // Keep the token field empty (real token is masked server-side); token_is_set
     // drives the "✓ saved" badge. Leaving it blank on save keeps the stored token.
     d.twilio_auth_token = ''
+    d.smtp_password = ''                       // never sent back by the server; blank on save keeps the saved one
+    if (!d.smtp_encryption) d.smtp_encryption = 'ssl'
+    if (!d.smtp_port) d.smtp_port = 465
     form.value = d
     loadLogs()
   } catch (e) {
@@ -281,6 +348,22 @@ async function save() {
     await load()   // reload to get updated sms_ready / whatsapp_ready
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Save failed.'
+  } finally { saving.value = false }
+}
+
+function onEncryptionChange() {
+  form.value.smtp_port = form.value.smtp_encryption === 'ssl' ? 465 : 587
+}
+
+async function clearMailboxPassword() {
+  if (!window.confirm('Remove the saved mailbox password? E-mail will go back to the PanelOS server until you enter a new one.')) return
+  saving.value = true; error.value = null; success.value = null
+  try {
+    await notificationService.save({ clear_smtp_password: true })
+    success.value = 'Mailbox password removed.'
+    await load()
+  } catch (e) {
+    error.value = e?.response?.data?.message ?? 'Could not remove the password.'
   } finally { saving.value = false }
 }
 
@@ -325,6 +408,9 @@ onMounted(load)
 .status-cell.ok  .status-dot { background: #2e7d32; }
 .status-cell.off .status-dot { background: #ccc; }
 .status-dot { width: 9px; height: 9px; border-radius: 50%; }
+.form-group select { padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fff; }
+.dimmed .link { pointer-events: auto; opacity: 1; }
+.link { background: none; border: none; color: var(--primary); cursor: pointer; padding: 0 4px; text-decoration: underline; font-size: inherit; }
 .mail-status { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 8px; margin: 4px 0 12px; line-height: 1.45; }
 .mail-status .status-dot { margin-top: 5px; flex-shrink: 0; }
 .mail-status.ok  { background: #e8f5e9; color: #1b5e20; }
