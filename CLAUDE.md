@@ -47,19 +47,22 @@ Rules:
   are involved. MySQL/MariaDB refuses to redefine a column an FK points at, so such migrations must drop
   the constraint, change the column, and re-add it (see
   `2026_10_23_000001_fix_invoice_dispatch_item_precision_and_non_panel_lines.php`).
-* When fixing a bug, **capture a baseline first** (`git stash` → run suite → `git stash pop`) and compare
-  the failing *set*, not just the count. ~190 tests in the legacy suite (191 on 2026-10-24) already fail because they post
-  long-superseded payloads (`items` instead of `panel_rows`) or call routes that no longer exist; they are
-  unrelated to current work. A fix is clean when it adds zero newly-broken tests.
+* **The suite is green (546 of 546 on 2026-10-24) and must stay green.** Before 24 Oct 2026 about 190 legacy tests
+  failed on stale payloads (`items` instead of `panel_rows`), removed routes and models; porting them exposed real
+  production bugs (see BUGS.md PB-048 to PB-052). Do not skip, delete or loosen a test to make it pass — if a test
+  disagrees with the code, one of them is wrong, and finding out which is the point.
+* Writing tests against the current API: build quotations with `panelRows()` (HasDatabaseTestHelpers), stock with
+  `MakesStockRows`, a dispatchable batch with `ProductionBatch::factory()->qcPassed()` (it also creates the approved
+  QC record dispatch requires), the real UMA quotation with `BuildsUmaQuotation`. Customers default to *no credit
+  limit*; set one explicitly in a credit test. Test users need `is_company_admin` (or `createAdminUser()`), or the
+  permission layer answers 403.
 
 **The build enforces this.** `.github/workflows/tests.yml` runs the whole suite on MySQL 8 before every deploy
-(`deploy.yml` waits for it) and on pull requests. It is a *ratchet*, not "all tests pass":
-`backend/tests/ci/ratchet.php` fails the build on any failure that is **not** listed in
-`backend/tests/ci/known-failures.txt` (the legacy 191). So:
+(`deploy.yml` waits for it) and on pull requests. `backend/tests/ci/ratchet.php` fails the build on any failure that
+is not listed in `backend/tests/ci/known-failures.txt`. **That list is empty**, so any failing test blocks the deploy.
+The mechanism stays so a deliberate, temporary exception is visible in a diff, but:
 
-* A new failure blocks the deploy. Fix the code or the test; **never add a line to `known-failures.txt` to get a
-  build through.**
-* When you fix a known-failing test, delete its line (the build output lists the ones that now pass).
+* **Never add a line to `known-failures.txt` to get a build through.** A new failure is a regression.
 * To run the same check locally: `php -d memory_limit=1G vendor/bin/phpunit --no-coverage --log-junit /tmp/j.xml`
   then `php tests/ci/ratchet.php /tmp/j.xml tests/ci/known-failures.txt`.
 * CI uses MySQL 8 and many developers use MariaDB. They differ: MySQL 8 sorts the keys inside a JSON column and

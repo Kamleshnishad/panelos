@@ -52,7 +52,7 @@ class PaymentControllerTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.amount', 100.00);
+            ->assertJsonPath('data.amount', '100.00');   // money is returned as a decimal string
     }
 
     public function test_get_payment_history()

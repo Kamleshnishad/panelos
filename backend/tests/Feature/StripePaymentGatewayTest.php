@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\User;
 use App\Services\PaymentGatewayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\FakeStripeHttpClient;
 use Tests\TestCase;
 
 class StripePaymentGatewayTest extends TestCase
@@ -18,10 +19,16 @@ class StripePaymentGatewayTest extends TestCase
     protected $user;
     protected $dispatch;
     protected $invoice;
+    protected FakeStripeHttpClient $stripe;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        // The gateway is exercised against a fake of Stripe's HTTP layer: no network, no real keys.
+        config(['services.stripe.secret' => 'sk_test_fake', 'services.stripe.webhook_secret' => 'whsec_test_fake']);
+        $this->stripe = new FakeStripeHttpClient();
+        \Stripe\ApiRequestor::setHttpClient($this->stripe);
 
         $this->company = Company::create(['name' => 'Test Company']);
         $this->user = User::create([
@@ -41,18 +48,32 @@ class StripePaymentGatewayTest extends TestCase
         $this->invoice = $this->company->invoices()->first();
     }
 
+    protected function tearDown(): void
+    {
+        \Stripe\ApiRequestor::setHttpClient(null);   // back to the real client for anything else in this process
+        parent::tearDown();
+    }
+
     public function test_create_checkout_session_endpoint()
     {
         $response = $this->postJson("/api/invoices/{$this->invoice->id}/payment/checkout-session");
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true)
+            ->assertJsonPath('session_id', 'cs_test_1')
             ->assertJsonStructure([
                 'success',
                 'session_id',
                 'payment_url',
                 'expires_at'
             ]);
+
+        // What we asked Stripe to charge: rupees, in paise, tagged with the invoice and company.
+        $sent = $this->stripe->last('/v1/checkout/sessions')['params'];
+        $this->assertSame('inr', $sent['line_items'][0]['price_data']['currency']);
+        $this->assertSame((int) round($this->invoice->getTotal() * 100), (int) $sent['line_items'][0]['price_data']['unit_amount']);
+        $this->assertEquals($this->invoice->id, $sent['metadata']['invoice_id']);
+        $this->assertEquals($this->company->id, $sent['metadata']['company_id']);
     }
 
     public function test_create_payment_intent_endpoint()
@@ -69,7 +90,7 @@ class StripePaymentGatewayTest extends TestCase
             ]);
 
         $this->assertIsString($response['client_secret']);
-        $this->assertIsString($response['intent_id']);
+        $this->assertSame('pi_test_1', $response['intent_id']);
         $this->assertEquals($this->invoice->getTotal(), $response['amount']);
     }
 
@@ -115,7 +136,7 @@ class StripePaymentGatewayTest extends TestCase
         $response = $this->postJson("/api/invoices/{$this->invoice->id}/payment/intent");
         $intentId = $response['intent_id'];
 
-        $confirmResponse = $this->postJson('/payments/intent/confirm', [
+        $confirmResponse = $this->postJson('/api/payments/intent/confirm', [
             'intent_id' => $intentId,
             'payment_method_id' => 'pm_test'
         ]);
@@ -124,12 +145,23 @@ class StripePaymentGatewayTest extends TestCase
             ->assertJsonStructure([
                 'success',
                 'status'
-            ]);
+            ])
+            ->assertJsonPath('status', 'paid');
+    }
+
+    public function test_a_stripe_outage_is_reported_as_a_failure_not_a_crash()
+    {
+        $this->stripe->fail = true;
+
+        $response = $this->postJson("/api/invoices/{$this->invoice->id}/payment/checkout-session");
+
+        $response->assertStatus(400)->assertJsonPath('success', false);
     }
 
     public function test_non_authenticated_webhook_access()
     {
-        $this->actingAs(null);
+        // The webhook is public (Stripe calls it, not a user); an unsigned call is refused by its signature check.
+        $this->app['auth']->forgetGuards();
 
         $response = $this->postJson('/api/webhooks/stripe', [
             'type' => 'payment_intent.succeeded',

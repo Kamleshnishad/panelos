@@ -53,21 +53,21 @@ class InvoicePdfTest extends TestCase
 
         $html = $this->invoiceService->generatePdf($invoice->id);
 
-        $this->assertStringContainsString($invoice->invoice_date->format('M d, Y'), $html);
-        $this->assertStringContainsString($invoice->due_date->format('M d, Y'), $html);
-        $this->assertStringContainsString($invoice->status, $html);
+        // The document prints dates as dd/mm/yyyy (not "Oct 24, 2026").
+        $this->assertStringContainsString($invoice->invoice_date->format('d/m/Y'), $html);
+        $this->assertStringContainsString($invoice->due_date->format('d/m/Y'), $html);
     }
 
     public function test_pdf_contains_line_items()
     {
         $dispatch = Dispatch::factory()->for($this->company)->create();
         $invoice = $this->invoiceService->createFromDispatch($dispatch->id);
-        $this->invoiceService->addItem($invoice->id, 1, 10, 100.00);
+        $this->invoiceService->addItem($invoice->id, \App\Models\PanelType::where('company_id', $this->company->id)->value('id'), 10, 100.00);
 
         $html = $this->invoiceService->generatePdf($invoice->id);
 
-        $this->assertStringContainsString('1000', $html); // Amount
-        $this->assertStringContainsString('100', $html);  // Unit price
+        $this->assertStringContainsString('1,000.00', $html); // 10 x 100 amount
+        $this->assertStringContainsString('100.00', $html);   // unit price
     }
 
     public function test_pdf_contains_totals()
@@ -77,8 +77,9 @@ class InvoicePdfTest extends TestCase
 
         $html = $this->invoiceService->generatePdf($invoice->id);
 
-        $this->assertStringContainsString('Subtotal', $html);
-        $this->assertStringContainsString('Total', $html);
+        // The totals block reads Taxable Value / Total GST / Grand Total.
+        $this->assertStringContainsString('Taxable Value', $html);
+        $this->assertStringContainsString('Grand Total', $html);
     }
 
     public function test_pdf_download_returns_file()

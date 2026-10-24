@@ -277,6 +277,8 @@ class InvoiceController extends Controller
     {
         try {
             return $this->invoiceService->downloadPdf($invoiceId, auth()->user()->company_id);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return response()->json(['success' => false, 'message' => 'Invoice not found'], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -294,6 +296,8 @@ class InvoiceController extends Controller
                 'success' => true,
                 'html' => $html
             ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return response()->json(['success' => false, 'message' => 'Invoice not found'], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

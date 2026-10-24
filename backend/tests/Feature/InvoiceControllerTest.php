@@ -89,7 +89,7 @@ class InvoiceControllerTest extends TestCase
         $invoice = $this->company->invoices()->first();
 
         $response = $this->postJson("/api/invoices/{$invoice->id}/items", [
-            'panel_type_id' => 1,
+            'panel_type_id' => \App\Models\PanelType::where('company_id', $this->company->id)->value('id'),
             'quantity' => 10,
             'unit_price' => 100.00
         ]);
@@ -98,7 +98,26 @@ class InvoiceControllerTest extends TestCase
             ->assertJsonPath('success', true);
     }
 
-    public function test_mark_invoice_paid()
+    public function test_recording_the_full_payment_marks_the_invoice_paid()
+    {
+        $dispatch = Dispatch::factory()->for($this->company)->create();
+        $this->postJson('/api/invoices/from-dispatch', ['dispatch_id' => $dispatch->id]);
+        $invoice = $this->company->invoices()->first();
+        $this->postJson("/api/invoices/{$invoice->id}/send");
+
+        // An invoice is paid when nothing is left to pay: recording the full amount settles it.
+        $this->postJson('/api/payments/record', [
+            'invoice_id' => $invoice->id, 'amount' => $invoice->fresh()->remaining_due, 'payment_method' => 'bank_transfer',
+        ])->assertStatus(201);
+
+        $this->assertSame('paid', $invoice->fresh()->status);
+        $this->assertNotNull($invoice->fresh()->paid_date);
+        // ...and the manual shortcut then has nothing left to do.
+        $this->postJson("/api/invoices/{$invoice->id}/mark-paid")->assertStatus(400);
+    }
+
+    /** The old test marked an unpaid invoice paid. That loophole is closed on purpose: record the payment instead. */
+    public function test_cannot_mark_an_invoice_paid_while_money_is_outstanding()
     {
         $dispatch = Dispatch::factory()->for($this->company)->create();
         $this->postJson('/api/invoices/from-dispatch', ['dispatch_id' => $dispatch->id]);
@@ -107,8 +126,9 @@ class InvoiceControllerTest extends TestCase
 
         $response = $this->postJson("/api/invoices/{$invoice->id}/mark-paid");
 
-        $response->assertStatus(200)
-            ->assertJsonPath('data.status', 'paid');
+        $response->assertStatus(400);
+        $this->assertStringContainsString('still outstanding', $response->json('message'));
+        $this->assertSame('sent', $invoice->fresh()->status);
     }
 
     public function test_cancel_invoice()

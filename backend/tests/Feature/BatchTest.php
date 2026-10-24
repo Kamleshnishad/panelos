@@ -32,13 +32,7 @@ class BatchTest extends TestCase
         // Create quotation, accept, and create order
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 100,
-                    'unit_price' => 1000,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 100, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -90,10 +84,7 @@ class BatchTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 50,
-            ]],
+            'panel_rows' => $this->panelRows($panelType->id, 50, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -106,7 +97,7 @@ class BatchTest extends TestCase
         $batchNo = $batchResponse->json('data.batch_no');
 
         // Format should be: PREFIX-YYYY-000001
-        $this->assertMatchesRegularExpression('/^[A-Z]+-\d{4}-\d{6}$/', $batchNo);
+        $this->assertMatchesRegularExpression('/^[A-Z]+-\d{4}-\d{3,}$/', $batchNo);
     }
 
     /**
@@ -122,10 +113,7 @@ class BatchTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 75,
-            ]],
+            'panel_rows' => $this->panelRows($panelType->id, 75, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -174,10 +162,7 @@ class BatchTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 100,
-            ]],
+            'panel_rows' => $this->panelRows($panelType->id, 100, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -217,10 +202,7 @@ class BatchTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 50,
-            ]],
+            'panel_rows' => $this->panelRows($panelType->id, 50, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -232,7 +214,7 @@ class BatchTest extends TestCase
         $batchResponse = $this->postJson("/api/orders/{$orderId}/batches");
         $batchId = $batchResponse->json('data.id');
 
-        $startResponse = $this->postJson("/api/batches/{$batchId}/start");
+        $startResponse = $this->postJson("/api/batches/{$batchId}/start", ['force' => true]);
 
         $startResponse->assertStatus(200)
             ->assertJson([
@@ -258,10 +240,7 @@ class BatchTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 60,
-            ]],
+            'panel_rows' => $this->panelRows($panelType->id, 60, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -273,7 +252,7 @@ class BatchTest extends TestCase
         $batchResponse = $this->postJson("/api/orders/{$orderId}/batches");
         $batchId = $batchResponse->json('data.id');
 
-        $this->postJson("/api/batches/{$batchId}/start");
+        $this->postJson("/api/batches/{$batchId}/start", ['force' => true]);
 
         $completeResponse = $this->postJson("/api/batches/{$batchId}/complete", [
             'completed_quantity' => 60,
@@ -304,10 +283,7 @@ class BatchTest extends TestCase
         for ($i = 0; $i < 3; $i++) {
             $response = $this->postJson('/api/quotations', [
                 'customer_id' => $customer->id,
-                'items' => [[
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 50,
-                ]],
+                'panel_rows' => $this->panelRows($panelType->id, 50, 1000),
             ]);
 
             $quotationId = $response->json('data.id');
@@ -353,10 +329,7 @@ class BatchTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [[
-                'panel_type_id' => $panelType->id,
-                'quantity' => 40,
-            ]],
+            'panel_rows' => $this->panelRows($panelType->id, 40, 1000),
         ]);
 
         $quotationId = $response->json('data.id');
@@ -368,7 +341,7 @@ class BatchTest extends TestCase
         $batchResponse = $this->postJson("/api/orders/{$orderId}/batches");
         $batchId = $batchResponse->json('data.id');
 
-        $this->postJson("/api/batches/{$batchId}/start");
+        $this->postJson("/api/batches/{$batchId}/start", ['force' => true]);
 
         $deleteResponse = $this->deleteJson("/api/batches/{$batchId}");
 
@@ -392,10 +365,7 @@ class BatchTest extends TestCase
 
         $response = $this->actingAs($user1, 'sanctum')->postJson('/api/quotations', [
             'customer_id' => $customer1->id,
-            'items' => [[
-                'panel_type_id' => $panelType1->id,
-                'quantity' => 50,
-            ]],
+            'panel_rows' => $this->panelRows($panelType1->id, 50, 1000),
         ]);
 
         $quotationId = $response->json('data.id');

@@ -1607,7 +1607,7 @@ as live defects; what is listed below is what is still true of the code today.
 
 17. **Live GSP e-invoicing is stubbed.** IRN/e-way generation returns "not enabled" until the GSP env vars
     are set; manual entry is the shipped path.
-18. **No scheduled jobs are registered.** `routes/console.php` contains only the stock `inspire` command, so
+18. *(Fixed 2026-10-23: `routes/console.php` now schedules reminders, SMS reminders, backups, token pruning and notification scans.)* **No scheduled jobs are registered.** `routes/console.php` contains only the stock `inspire` command, so
     reminder ladders, low-stock sweeps (`checkLowStock`) and forecast refreshes must currently be triggered
     by API calls, not cron.
 19. **The dashboard is cached for 60 s per company** — a freshly created record may not appear in KPIs
@@ -1619,11 +1619,9 @@ as live defects; what is listed below is what is still true of the code today.
     whole DejaVu files (717 KB) ride in every PDF; the logo adds a further 173 KB because it is stored at
     3381×1085 px and shown at 200×46. Correct output, just heavy. See PB-022 in `BUGS.md` for the measured
     breakdown and the two-line fix (97% smaller).
-22. **Much of the legacy test suite is stale.** 191 tests fail (the earlier note said 24). They are recorded in `backend/tests/ci/known-failures.txt` and the CI ratchet blocks any failure not on that list (see `CLAUDE.md`). They fail against the current API because they post
-    long-superseded payloads (e.g. `items` instead of `panel_rows`) or call routes that no longer exist.
-    They were failing before the October 2026 fixes and are unrelated to them. The suite runs against
-    **MySQL/MariaDB** (`phpunit.xml` forces `DB_DATABASE=panelos_test`), matching production — see
-    `CLAUDE.md`.
+22. **The test suite is fully green** (546 of 546 on 2026-10-24, up from 191 failing). The CI gate
+    (`backend/tests/ci/known-failures.txt`, now empty) blocks any new failure. The suite runs against
+    **MySQL/MariaDB** (`phpunit.xml` forces `DB_DATABASE=panelos_test`), matching production — see `CLAUDE.md`.
 
 ### Fixed on 2026-10-23 (do not re-report)
 

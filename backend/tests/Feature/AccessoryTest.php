@@ -257,13 +257,7 @@ class AccessoryTest extends TestCase
 
         $response = $this->postJson('/api/quotations', [
             'customer_id' => $customer->id,
-            'items' => [
-                [
-                    'panel_type_id' => $panelType->id,
-                    'quantity' => 10,
-                    'unit_price' => 100,
-                ]
-            ],
+            'panel_rows' => $this->panelRows($panelType->id, 10, 100),
         ]);
 
         $quotationId = $response->json('data.id');
