@@ -54,7 +54,7 @@ class EmailService
                 throw new \Exception('Customer email not found');
             }
 
-            $daysOverdue = now()->diffInDays($invoice->due_date);
+            $daysOverdue = max(0, \App\Support\Days::overdue($invoice->due_date));
 
             Mail::to($customerEmail)
                 ->queue(new PaymentReminderMailable($invoice, $daysOverdue));
@@ -151,7 +151,7 @@ class EmailService
                     'preview' => 'Your invoice ' . $invoice->invoice_no . ' for $' . number_format($total, 2) . ' is ready.',
                 ];
             case 'payment_reminder':
-                $daysOverdue = now()->diffInDays($invoice->due_date);
+                $daysOverdue = \App\Support\Days::overdue($invoice->due_date);
                 return [
                     'subject' => $daysOverdue > 0
                         ? 'Payment Reminder: Invoice ' . $invoice->invoice_no . ' is ' . $daysOverdue . ' days overdue'

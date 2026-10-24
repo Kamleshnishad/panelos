@@ -27,7 +27,7 @@ class PaymentReminderService
     public function scheduleRemindersForInvoice(Invoice $invoice, $companyId)
     {
         try {
-            $daysOverdue = max(0, now()->diffInDays($invoice->due_date, false));
+            $daysOverdue = max(0, \App\Support\Days::overdue($invoice->due_date));
 
             if ($daysOverdue < $this->reminderSchedule['first']) {
                 return ['scheduled' => false, 'message' => 'Invoice not yet due'];
@@ -89,7 +89,7 @@ class PaymentReminderService
                 }
 
                 try {
-                    $daysOverdue = now()->diffInDays($invoice->due_date, false);
+                    $daysOverdue = \App\Support\Days::overdue($invoice->due_date);
 
                     $this->emailService->sendPaymentReminder($invoice, $invoice->company_id);
 
@@ -155,7 +155,7 @@ class PaymentReminderService
         }
 
         $invoice = $reminder->invoice;
-        $daysOverdue = now()->diffInDays($invoice->due_date, false);
+        $daysOverdue = \App\Support\Days::overdue($invoice->due_date);
 
         return [
             'reminder_id' => $reminder->id,

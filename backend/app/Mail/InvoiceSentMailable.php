@@ -13,9 +13,9 @@ class InvoiceSentMailable extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public Invoice $invoice;
-    public string $pdfPath;
+    public ?string $pdfPath;
 
-    public function __construct(Invoice $invoice, string $pdfPath = null)
+    public function __construct(Invoice $invoice, ?string $pdfPath = null)
     {
         $this->invoice = $invoice;
         $this->pdfPath = $pdfPath;
@@ -31,7 +31,7 @@ class InvoiceSentMailable extends Mailable implements ShouldQueue
     public function content()
     {
         return new \Illuminate\Mail\Mailables\Content(
-            view: 'emails.invoice-sent',
+            markdown: 'emails.invoice-sent',
             with: [
                 'invoice' => $this->invoice,
                 'customerName' => $this->invoice->dispatch?->batch?->order?->customer?->name ?? 'Customer',

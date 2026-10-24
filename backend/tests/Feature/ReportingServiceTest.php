@@ -32,7 +32,8 @@ class ReportingServiceTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
-            'company_id' => $this->company->id
+            'company_id' => $this->company->id,
+            'is_company_admin' => true,
         ]);
 
         $this->actingAs($this->user);

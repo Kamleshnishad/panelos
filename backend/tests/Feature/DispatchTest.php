@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\User;
-use App\Models\Coil;
 use App\Models\PanelType;
 use App\Models\ProductionBatch;
 use App\Models\Dispatch;
@@ -17,6 +16,7 @@ use Tests\TestCase;
 class DispatchTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Traits\MakesStockRows;
 
     protected $company;
     protected $user;
@@ -86,49 +86,13 @@ class DispatchTest extends TestCase
         $this->assertEquals(5000, $item->amount);
     }
 
-    public function test_allocate_stock_for_dispatch()
-    {
-        $batch = ProductionBatch::factory()->for($this->company)->create(['status' => 'qc_passed']);
-        $dispatch = $this->dispatchService->createDispatch($batch->id, [], $this->company->id);
-        $panelType = PanelType::factory()->create();
-        $coil = Coil::factory()->create();
-        $panelType->update(['coil_id' => $coil->id]);
-
-        $this->dispatchService->addDispatchItem($dispatch->id, $panelType->id, 100, 500, $this->company->id);
-        $this->stockService->addCoilStock($coil->id, 500, 'Stock', $this->company->id);
-
-        $allocations = $this->dispatchService->allocateStockForDispatch($dispatch->id, $this->company->id);
-
-        $this->assertNotEmpty($allocations);
-        $this->assertEquals('allocated', $allocations[0]->status);
-    }
-
-    public function test_cannot_allocate_insufficient_stock()
-    {
-        $batch = ProductionBatch::factory()->for($this->company)->create(['status' => 'qc_passed']);
-        $dispatch = $this->dispatchService->createDispatch($batch->id, [], $this->company->id);
-        $panelType = PanelType::factory()->create();
-        $coil = Coil::factory()->create();
-        $panelType->update(['coil_id' => $coil->id]);
-
-        $this->dispatchService->addDispatchItem($dispatch->id, $panelType->id, 100, 500, $this->company->id);
-        $this->stockService->addCoilStock($coil->id, 50, 'Insufficient stock', $this->company->id);
-
-        $this->expectException(\Exception::class);
-        $this->dispatchService->allocateStockForDispatch($dispatch->id, $this->company->id);
-    }
-
     public function test_complete_dispatch()
     {
         $batch = ProductionBatch::factory()->for($this->company)->create(['status' => 'qc_passed']);
         $dispatch = $this->dispatchService->createDispatch($batch->id, [], $this->company->id);
         $panelType = PanelType::factory()->create();
-        $coil = Coil::factory()->create();
-        $panelType->update(['coil_id' => $coil->id]);
 
         $this->dispatchService->addDispatchItem($dispatch->id, $panelType->id, 100, 500, $this->company->id);
-        $this->stockService->addCoilStock($coil->id, 500, 'Stock', $this->company->id);
-        $this->dispatchService->allocateStockForDispatch($dispatch->id, $this->company->id);
 
         $completedDispatch = $this->dispatchService->completeDispatch($dispatch->id, [], $this->company->id);
 
@@ -136,22 +100,25 @@ class DispatchTest extends TestCase
         $this->assertNotNull($completedDispatch->actual_delivery_date);
     }
 
-    public function test_cancel_dispatch_releases_allocations()
+    /**
+     * Raw coil is consumed when production starts, not at dispatch (SYSTEM.md, design decision 6).
+     * The old tests asserted that dispatch allocated and released coil stock; that behaviour was removed
+     * on purpose because it double-counted. This pins the current rule instead.
+     */
+    public function test_dispatch_neither_reserves_nor_deducts_coil_stock()
     {
+        $stock = $this->coil(['quantity_in_stock' => 500]);
         $batch = ProductionBatch::factory()->for($this->company)->create(['status' => 'qc_passed']);
         $dispatch = $this->dispatchService->createDispatch($batch->id, [], $this->company->id);
         $panelType = PanelType::factory()->create();
-        $coil = Coil::factory()->create();
-        $panelType->update(['coil_id' => $coil->id]);
-
         $this->dispatchService->addDispatchItem($dispatch->id, $panelType->id, 100, 500, $this->company->id);
-        $this->stockService->addCoilStock($coil->id, 500, 'Stock', $this->company->id);
-        $this->dispatchService->allocateStockForDispatch($dispatch->id, $this->company->id);
 
-        $this->dispatchService->cancelDispatch($dispatch->id, $this->company->id);
+        $this->assertSame([], $this->dispatchService->allocateStockForDispatch($dispatch->id, $this->company->id));
+        $this->dispatchService->completeDispatch($dispatch->id, [], $this->company->id);
 
-        $allocation = StockAllocation::where('dispatch_id', $dispatch->id)->first();
-        $this->assertEquals('released', $allocation->status);
+        $this->assertEquals(500, $stock->fresh()->quantity_in_stock, 'Dispatch must not deduct coil.');
+        $this->assertSame(0, StockAllocation::where('dispatch_id', $dispatch->id)->count(), 'Dispatch must not reserve coil.');
+        $this->assertSame(0, $stock->transactions()->count(), 'No stock movement may be recorded at dispatch.');
     }
 
     public function test_cannot_dispatch_twice()

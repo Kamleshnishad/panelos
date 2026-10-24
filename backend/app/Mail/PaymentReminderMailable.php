@@ -37,7 +37,7 @@ class PaymentReminderMailable extends Mailable implements ShouldQueue
         $remainingDue = max(0, $remaining - $paid);
 
         return new \Illuminate\Mail\Mailables\Content(
-            view: 'emails.payment-reminder',
+            markdown: 'emails.payment-reminder',
             with: [
                 'invoice' => $this->invoice,
                 'customerName' => $this->invoice->dispatch?->batch?->order?->customer?->name ?? 'Customer',

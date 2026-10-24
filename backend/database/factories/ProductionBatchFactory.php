@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Company;
 use App\Models\Order;
 use App\Models\ProductionBatch;
+use App\Models\QualityControl;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ProductionBatchFactory extends Factory
@@ -25,6 +26,24 @@ class ProductionBatchFactory extends Factory
             'planned_quantity'   => $this->faker->numberBetween(20, 200),
             'completed_quantity' => 0,
         ];
+    }
+
+    /**
+     * A batch whose status says QC passed must also HAVE the approved-pass QC record that dispatch
+     * requires (DispatchService checks the record, not the status). Without it, every test that
+     * dispatches such a batch dies on "Batch must have an approved-pass QC record".
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (ProductionBatch $batch) {
+            if ($batch->status !== 'qc_passed' || QualityControl::where('batch_id', $batch->id)->exists()) {
+                return;
+            }
+            QualityControl::create([
+                'batch_id' => $batch->id, 'company_id' => $batch->company_id, 'status' => 'pass',
+                'inspected_at' => now(), 'approved_at' => now(),
+            ]);
+        });
     }
 
     public function qcPassed(): static
