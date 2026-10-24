@@ -4,7 +4,7 @@
 // its section keys as the route names and only mirrors them into the address bar.
 
 /** Sections whose records have their own address. */
-export const DETAIL_SECTIONS = ['quotations', 'orders', 'batches', 'dispatches']
+export const DETAIL_SECTIONS = ['quotations', 'orders', 'batches', 'dispatches', 'invoices', 'customers']
 
 export function buildPath(key, id = null) {
   if (key === 'dashboard') return '/'
