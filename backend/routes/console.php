@@ -58,3 +58,6 @@ Schedule::command('db:backup --keep=14')
 Schedule::command('sanctum:prune-expired --hours=24')
     ->dailyAt('02:15')
     ->withoutOverlapping(10);
+
+// One beat a minute: /api/health reports the scheduler as STALE when these stop (backups and reminders ride on it).
+Schedule::call(fn () => \App\Support\SystemHealth::heartbeat())->everyMinute()->name('health-heartbeat');

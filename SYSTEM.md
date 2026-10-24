@@ -126,7 +126,9 @@ Common list params: `page`, `per_page` (default 20), `search`, `status`, `from_d
 layers 404 any URI ending in an image extension before PHP sees it, so the path travels in the query
 string (`PublicFileController` validates and streams it).
 
-**Health** — `GET /api/health` returns `{status: OK|DEGRADED, database: OK|DOWN}`, 503 when the DB is down.
+**Health & alerts** (EN-03/EN-04) — `GET /api/health` returns `{status OK|DEGRADED, database, scheduler OK|STALE|UNKNOWN, errors_last_hour, failed_jobs}`; 503 when the database is down, the scheduler has not beaten for 5 minutes (`health-heartbeat` task, every minute, in `routes/console.php`) or there were 25+ server errors this hour. `.github/workflows/uptime.yml` probes `/up` and `/api/health` every 10 minutes from GitHub and fails (GitHub e-mails the owner) after 3 tries. Every real server error (the exception `report` hook in `bootstrap/app.php`: never 401/403/404/422) is counted and `AlertService` e-mails the operator, at most once per 15 minutes, only when the platform switch is on and the mailer can deliver. Recipient: `platform_settings.alert_email`, else every super admin's e-mail. Super Admin → Settings → *Server alerts* has the on/off switch, the address, live health and *Send test alert*. The alert path never throws.
+
+**Backups** (EN-05) — `db:backup` (scheduler, 01:30) keeps 14 dumps in the `storage` volume on the server. `.github/workflows/offsite-backup.yml` (02:45 UTC) is the off-server copy: fresh dump over SSH → restore check in a throwaway MySQL 8 → AES-256 gpg with repo secret `BACKUP_PASSPHRASE` → artifact kept 30 days. Restore: `gpg --decrypt panelos-YYYYMMDD.sql.gz.gpg | gunzip | mysql …`. The passphrase must be stored outside GitHub.
 
 ---
 
@@ -1366,6 +1368,8 @@ on MySQL.
 
 Hit one of these and the message tells you exactly which invariant you tripped.
 
+**What never reaches the browser (PB-043).** The `RedactErrorLeaks` API middleware replaces any error text that looks like SQL, a database host, a file path or an internal class name with a reference id (the original is in the server log), so the messages below are the only wording a user sees. Domain messages and 422 validation errors are never rewritten. List screens take `sort_by`/`sort_order` through `App\Support\SafeSort`: an unknown column or direction falls back to the default order.
+
 | Message | Where | Why |
 |---|---|---|
 | `Rates are pending. Enter rates for all panel rows before sending.` | quotation send | An item still has `rate_per_sqm <= 0` |
@@ -1593,11 +1597,7 @@ as live defects; what is listed below is what is still true of the code today.
 
 ### Real inconsistencies that remain
 
-10. **Fixed transport is never invoiced.** The quotation adds `transport_amount` *after* tax and leaves it
-    untaxed (§21.2); a per-line invoice cannot express an untaxed line today, because `TaxService` applies
-    one rate across the whole subtotal. So `InvoiceService::addNonPanelLines()` deliberately skips it and
-    an order with fixed transport invoices short by that amount. Needs a business decision on whether
-    transport should be taxed; once decided, the fix is one line plus a quotation-side change to match.
+10. *(Fixed, PB-021: freight is settled at dispatch — amount, transporter and vehicle live on the dispatch and are billed as an invoice line with the same GST as the goods; the quoted figure is the fallback. Worth confirming the composite-supply treatment with the client's accountant.)*
 11. **Quotation GST is hard-coded at 18%** in `QuotationService::recalculate()`, while invoices read
     `TaxConfiguration.default_tax_rate`. They agree out of the box (both 18%) but will diverge the moment
     a tenant changes the invoice rate.
@@ -1614,19 +1614,13 @@ as live defects; what is listed below is what is still true of the code today.
 
 17. **Live GSP e-invoicing is stubbed.** IRN/e-way generation returns "not enabled" until the GSP env vars
     are set; manual entry is the shipped path.
-18. *(Fixed 2026-10-23: `routes/console.php` now schedules reminders, SMS reminders, backups, token pruning and notification scans.)* **No scheduled jobs are registered.** `routes/console.php` contains only the stock `inspire` command, so
-    reminder ladders, low-stock sweeps (`checkLowStock`) and forecast refreshes must currently be triggered
-    by API calls, not cron.
+18. *(Fixed 2026-10-23, PB-030: `routes/console.php` schedules reminders, SMS reminders, backups, token pruning, notification scans and the health heartbeat.)*
 19. **The dashboard is cached for 60 s per company** — a freshly created record may not appear in KPIs
     immediately. This is expected, not a bug.
 20. **`StockService::getStockLevel/getStockHistory` query legacy columns** (`coil_id` / `chemical_id`) that
     the current tables do not use. The live code paths go through the controller endpoints instead.
-21. **Generated PDFs are ~1 MB each** — mostly fonts, not the logo. DomPDF defaults font subsetting to
-    on, but the Laravel wrapper's bundled config turns it off and the app never published its own, so two
-    whole DejaVu files (717 KB) ride in every PDF; the logo adds a further 173 KB because it is stored at
-    3381×1085 px and shown at 200×46. Correct output, just heavy. See PB-022 in `BUGS.md` for the measured
-    breakdown and the two-line fix (97% smaller).
-22. **The test suite is fully green** (546 of 546 on 2026-10-24, up from 191 failing). The CI gate
+21. *(Fixed, PB-022: font subsetting is on and the logo is shrunk before embedding; PDFs are ~97% smaller.)*
+22. **The test suite is fully green** (572 of 572 on 2026-10-24, up from 191 failing). The CI gate
     (`backend/tests/ci/known-failures.txt`, now empty) blocks any new failure. The suite runs against
     **MySQL/MariaDB** (`phpunit.xml` forces `DB_DATABASE=panelos_test`), matching production — see `CLAUDE.md`.
 

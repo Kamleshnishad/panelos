@@ -240,6 +240,33 @@
           </div>
         </div>
 
+        <div class="panel">
+          <h3 class="sec-h">🚨 Server alerts</h3>
+          <p class="hint-line">
+            When the server hits an error nobody saw, PanelOS e-mails you (at most one e-mail every 15 minutes).
+            Health right now: <b>{{ settings.health?.status }}</b>
+            (database {{ settings.health?.database }}, scheduler {{ settings.health?.scheduler }},
+            {{ settings.health?.errors_last_hour }} errors in the last hour, {{ settings.health?.failed_jobs }} failed jobs).
+          </p>
+          <label class="sw">
+            <input type="checkbox" v-model="settings.alerts_enabled" />
+            <span>{{ settings.alerts_enabled ? 'Alerts on' : 'Alerts off' }}</span>
+          </label>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Send alerts to</label>
+              <input v-model="settings.alert_email" type="email" placeholder="blank = every super admin's own e-mail" />
+            </div>
+          </div>
+          <p class="hint-line" v-if="settings.alerts_enabled">Currently going to: {{ settings.alert_recipients?.join(', ') || 'nobody (no address and no super admin e-mail)' }}</p>
+          <p class="hint-line err-t" v-if="settings.mail && !settings.mail.delivers">{{ settings.mail.headline }}</p>
+          <div class="row-actions">
+            <button class="btn btn-primary" :disabled="saving" @click="saveSettings(false)">{{ saving ? 'Saving…' : 'Save' }}</button>
+            <button class="btn btn-ghost" :disabled="alertTesting" @click="testAlertMail">{{ alertTesting ? 'Sending…' : 'Send test alert' }}</button>
+            <span v-if="alertMsg" :class="alertOk ? 'ok-t' : 'err-t'">{{ alertMsg }}</span>
+          </div>
+        </div>
+
         <div class="panel" v-if="settings.plan_prices">
           <h3 class="sec-h">💵 Plan Prices (₹/month, GST-inclusive)</h3>
           <p class="hint-line">Editable — overrides the defaults. Affects checkout, MRR &amp; the trial-gate cards.</p>
@@ -419,6 +446,9 @@ const saving = ref(false)
 const testing = ref(false)
 const testMsg = ref('')
 const testOk = ref(false)
+const alertTesting = ref(false)
+const alertMsg = ref('')
+const alertOk = ref(false)
 const admins = ref([])
 const admLoading = ref(false)
 const showAddAdmin = ref(false)
@@ -551,6 +581,15 @@ async function saveSettings() {
     await loadSettings()
   } catch (e) { toastError(e?.response?.data?.message ?? 'Save failed.') }
   finally { saving.value = false }
+}
+async function testAlertMail() {
+  alertTesting.value = true; alertMsg.value = ''
+  try {
+    const r = await superAdminService.testAlert()
+    alertOk.value = true; alertMsg.value = r?.message ?? '✓ Test alert sent.'
+  } catch (e) {
+    alertOk.value = false; alertMsg.value = e?.response?.data?.message ?? 'Could not send the test alert.'
+  } finally { alertTesting.value = false }
 }
 async function testRzp() {
   testing.value = true; testMsg.value = ''

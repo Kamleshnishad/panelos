@@ -63,9 +63,7 @@ class AccessoryService
             });
         }
 
-        $sortBy = $filters['sort_by'] ?? 'name';
-        $sortOrder = $filters['sort_order'] ?? 'asc';
-        $query->orderBy($sortBy, $sortOrder);
+        \App\Support\SafeSort::apply($query, $filters, 'name', 'asc');
 
         return $query;
     }

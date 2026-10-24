@@ -31,6 +31,7 @@ export default {
   getSettings()               { return api('get',  '/api/admin/settings') },
   saveSettings(data)          { return api('put',  '/api/admin/settings', data) },
   testRazorpay()              { return api('post', '/api/admin/settings/test-razorpay') },
+  testAlert()                 { return api('post', '/api/admin/settings/test-alert') },
   downloadInvoice(paymentId, invoiceNo) {
     return downloadFile(`/api/admin/payments/${paymentId}/invoice`, `${invoiceNo || 'invoice'}.pdf`, { label: `Invoice ${invoiceNo || ''}`.trim(), kind: 'sa-invoice-pdf' })
   },

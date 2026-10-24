@@ -14,6 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // No SQL / host / class-name text in any API error body (PB-043).
+        $middleware->api(append: [\App\Http\Middleware\RedactErrorLeaks::class]);
+
         $middleware->alias([
             'tenant.active' => \App\Http\Middleware\EnsureActiveTenant::class,
             'perm.module'   => \App\Http\Middleware\EnforceModulePermissions::class,
@@ -21,6 +24,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Only exceptions Laravel would log reach here (not 401/403/404/422): real server errors. Count them for
+        // /api/health and e-mail the operator (EN-03). Reporting continues to the normal log afterwards.
+        $exceptions->report(function (\Throwable $e) {
+            \App\Services\AlertService::serverError($e);
+        });
+
         $exceptions->render(function (AuthenticationException $e, $request) {
             if ($request->expectsJson()) {
                 return response()->json([

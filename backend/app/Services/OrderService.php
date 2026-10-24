@@ -154,9 +154,7 @@ class OrderService
             });
         }
 
-        $sortBy    = $filters['sort_by']    ?? 'created_at';
-        $sortOrder = $filters['sort_order'] ?? 'desc';
-        $query->orderBy($sortBy, $sortOrder);
+        \App\Support\SafeSort::apply($query, $filters, 'created_at', 'desc');
 
         return $query;
     }

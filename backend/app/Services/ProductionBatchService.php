@@ -63,9 +63,7 @@ class ProductionBatchService
             $query->where('batch_no', 'like', "%{$filters['search']}%");
         }
 
-        $sortBy = $filters['sort_by'] ?? 'created_at';
-        $sortOrder = $filters['sort_order'] ?? 'desc';
-        $query->orderBy($sortBy, $sortOrder);
+        \App\Support\SafeSort::apply($query, $filters, 'created_at', 'desc');
 
         return $query->with('order', 'items', 'stageLogs', 'qualityControl');
     }

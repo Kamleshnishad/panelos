@@ -273,6 +273,9 @@ class SuperAdminController extends Controller
         $data['secret_is_set']           = !empty($s->getAttribute('razorpay_key_secret'));
         $data['razorpay_ready']          = $s->rzpReady();
         $data['plan_prices']             = $s->planPrices();   // merged (config + override)
+        $data['alert_recipients']        = \App\Services\AlertService::recipients();
+        $data['mail']                    = \App\Support\MailStatus::describe();
+        $data['health']                  = \App\Support\SystemHealth::check();
         return $this->successResponse($data, 'Platform settings');
     }
 
@@ -293,6 +296,8 @@ class SuperAdminController extends Controller
             'platform_email'           => 'nullable|email|max:120',
             'platform_phone'           => 'nullable|string|max:20',
             'platform_sac'             => 'nullable|string|max:12',
+            'alerts_enabled'           => 'nullable|boolean',
+            'alert_email'              => 'nullable|email|max:120',
             'plan_prices'              => 'nullable|array',
             'plan_prices.*'            => 'nullable|integer|min:0',
         ]);
@@ -309,6 +314,26 @@ class SuperAdminController extends Controller
         $this->audit($r, $r->user()->company_id, 'platform_settings_updated', 'Platform settings updated');
 
         return $this->successResponse(['razorpay_ready' => $s->fresh()->rzpReady()], 'Settings saved');
+    }
+
+    /** Send a test alert now (ignores the throttle) so the operator can see the e-mail path works end to end. */
+    public function testAlert(Request $r)
+    {
+        $this->requireSuperAdmin($r);
+        $mail = \App\Support\MailStatus::describe();
+        if (!$mail['delivers']) {
+            return $this->errorResponse(['mail' => $mail], $mail['headline'], 'MAIL_NOT_SET_UP', 422);
+        }
+        try {
+            \App\Services\AlertService::send('PanelOS test alert', "This is a test alert from PanelOS.
+
+If you can read it, server-error alerts will reach you.");
+        } catch (\Throwable $e) {
+            return $this->errorResponse([], 'Could not send: ' . $e->getMessage(), 'ALERT_SEND_FAILED', 422);
+        }
+
+        $to = \App\Services\AlertService::recipients();
+        return $this->successResponse(['to' => $to], 'Test alert sent to ' . implode(', ', $to) . '.');
     }
 
     /** Send a tiny Razorpay test order to confirm credentials work. */
