@@ -14,10 +14,10 @@ class PlatformSetting extends Model
         'razorpay_enabled', 'razorpay_key_id', 'razorpay_key_secret', 'razorpay_webhook_secret',
         'platform_name', 'platform_gstin', 'platform_pan', 'platform_address',
         'platform_state', 'platform_state_code', 'platform_email', 'platform_phone', 'platform_sac',
-        'plan_prices',
+        'plan_prices', 'alerts_enabled', 'alert_email',
     ];
 
-    protected $casts = ['razorpay_enabled' => 'boolean', 'plan_prices' => 'array'];
+    protected $casts = ['razorpay_enabled' => 'boolean', 'plan_prices' => 'array', 'alerts_enabled' => 'boolean'];
 
     protected $hidden = ['razorpay_key_secret', 'razorpay_webhook_secret'];
 
@@ -28,7 +28,7 @@ class PlatformSetting extends Model
      */
     public static function current(): self
     {
-        return static::query()->orderBy('id')->first() ?? static::forceCreate([]);
+        return static::query()->orderBy('id')->first() ?? static::forceCreate([])->refresh();   // refresh: pick up column defaults (alerts_enabled)
     }
 
     /** Plan prices: DB override merged over config defaults. */

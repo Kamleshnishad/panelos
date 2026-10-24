@@ -699,7 +699,9 @@
         "platform_sac": "varchar(12)",
         "plan_prices": "json/longtext",
         "created_at": "timestamp",
-        "updated_at": "timestamp"
+        "updated_at": "timestamp",
+        "alerts_enabled": "tinyint",
+        "alert_email": "varchar(120)"
     },
     "production_batches": {
         "id": "bigint unsigned",

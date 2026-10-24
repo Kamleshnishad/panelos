@@ -436,6 +436,7 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
         Route::get('/settings',              [\App\Http\Controllers\Api\SuperAdminController::class, 'getSettings'])->name('admin.settings.get');
         Route::put('/settings',              [\App\Http\Controllers\Api\SuperAdminController::class, 'updateSettings'])->name('admin.settings.update');
         Route::post('/settings/test-razorpay', [\App\Http\Controllers\Api\SuperAdminController::class, 'testRazorpay'])->name('admin.settings.test');
+        Route::post('/settings/test-alert',    [\App\Http\Controllers\Api\SuperAdminController::class, 'testAlert'])->name('admin.settings.test-alert');
         Route::get('/payments/{id}/invoice', [\App\Http\Controllers\Api\SuperAdminController::class, 'invoicePdf'])->name('admin.payment.invoice');
         Route::get('/announcements',         [\App\Http\Controllers\Api\SuperAdminController::class, 'announcements'])->name('admin.ann');
         Route::post('/announcements',        [\App\Http\Controllers\Api\SuperAdminController::class, 'createAnnouncement'])->name('admin.ann.create');
@@ -476,16 +477,6 @@ Route::post('/webhooks/razorpay', [\App\Http\Controllers\Api\BillingController::
 // Health check endpoint — also verifies DB connectivity so a downed database
 // reports DEGRADED (503) instead of falsely staying "OK" (OPS-M3).
 Route::get('/health', function () {
-    try {
-        \Illuminate\Support\Facades\DB::select('select 1');
-        $db = 'OK';
-    } catch (\Throwable $e) {
-        $db = 'DOWN';
-    }
-    $ok = $db === 'OK';
-    return response()->json([
-        'status'    => $ok ? 'OK' : 'DEGRADED',
-        'database'  => $db,
-        'timestamp' => now(),
-    ], $ok ? 200 : 503);
+    $h = \App\Support\SystemHealth::check();
+    return response()->json($h, $h['status'] === 'OK' ? 200 : 503);
 });

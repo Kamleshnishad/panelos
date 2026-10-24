@@ -126,7 +126,7 @@ Common list params: `page`, `per_page` (default 20), `search`, `status`, `from_d
 layers 404 any URI ending in an image extension before PHP sees it, so the path travels in the query
 string (`PublicFileController` validates and streams it).
 
-**Health** — `GET /api/health` returns `{status: OK|DEGRADED, database: OK|DOWN}`, 503 when the DB is down.
+**Health & alerts** (EN-03/EN-04) — `GET /api/health` returns `{status OK|DEGRADED, database, scheduler OK|STALE|UNKNOWN, errors_last_hour, failed_jobs}`; 503 when the database is down, the scheduler has not beaten for 5 minutes (`health-heartbeat` task, every minute, in `routes/console.php`) or there were 25+ server errors this hour. `.github/workflows/uptime.yml` probes `/up` and `/api/health` every 10 minutes from GitHub and fails (GitHub e-mails the owner) after 3 tries. Every real server error (the exception `report` hook in `bootstrap/app.php`: never 401/403/404/422) is counted and `AlertService` e-mails the operator, at most once per 15 minutes, only when the platform switch is on and the mailer can deliver. Recipient: `platform_settings.alert_email`, else every super admin's e-mail. Super Admin → Settings → *Server alerts* has the on/off switch, the address, live health and *Send test alert*. The alert path never throws.
 
 ---
 
