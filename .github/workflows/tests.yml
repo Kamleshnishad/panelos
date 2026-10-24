@@ -1,0 +1,101 @@
+# ═══════════════════════════════════════════════════════════════
+#  PanelOS — backend test suite (reusable)
+#  Called by ci.yml (pull requests) and deploy.yml (every push to main,
+#  BEFORE anything is built or shipped). Can also be run by hand.
+#
+#  Runs the whole PHPUnit suite on MySQL 8 — the engine production uses.
+#
+#  The gate is a ratchet (backend/tests/ci/ratchet.php), not "all tests pass":
+#  about 190 legacy tests already fail because they post long-superseded
+#  payloads (BUGS.md EN-02). Those are listed in backend/tests/ci/known-failures.txt.
+#  The build fails on any failure NOT on that list, so a new regression stops a
+#  deploy today, and the list can only shrink as the old tests are fixed.
+# ═══════════════════════════════════════════════════════════════
+
+name: Backend tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phpunit:
+    name: PHPUnit on MySQL 8
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: panelos_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, bcmath, intl, gd, exif, zip, opcache, pcntl
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/vendor
+            ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      # phpunit.xml forces DB_DATABASE=panelos_test; the host and credentials come from .env.
+      - name: Configure the test environment
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+          sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/'       .env
+          sed -i 's/^DB_USERNAME=.*/DB_USERNAME=root/'      .env
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=root/'      .env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=panelos_test/' .env
+
+      # PHPUnit exits 1 or 2 when tests fail, which is expected here (the known list).
+      # The ratchet below decides pass or fail. A crash gives no report, and the ratchet fails on that.
+      - name: Run the suite
+        working-directory: backend
+        run: |
+          set +e
+          php -d memory_limit=1G vendor/bin/phpunit --no-coverage --log-junit "$RUNNER_TEMP/junit.xml"
+          echo "phpunit exit code: $?"
+          exit 0
+
+      - name: Fail on any failure that is not already known
+        working-directory: backend
+        run: php tests/ci/ratchet.php "$RUNNER_TEMP/junit.xml" tests/ci/known-failures.txt
+
+      # Kept so a failure can be read without re-running.
+      - name: Keep the JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-report
+          path: ${{ runner.temp }}/junit.xml
+          retention-days: 7
+          if-no-files-found: ignore

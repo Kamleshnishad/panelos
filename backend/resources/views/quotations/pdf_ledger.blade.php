@@ -17,12 +17,7 @@
 <meta charset="utf-8">
 <title>{{ $m['no'] }}</title>
 <style>
-@@page { margin: 34px 40px 62px 40px; }
-body { margin: 0; font-family: 'DejaVu Sans', sans-serif; font-size: 10.5px; line-height: 1.45; color: #1c1f26; }
-table { border-collapse: collapse; width: 100%; }
-td, th { vertical-align: top; padding: 0; }
-.r { text-align: right; }
-.b { font-weight: bold; }
+@include('quotations.partials._pdf_base')
 .lab { font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #59616f; font-weight: bold; }
 .val { font-size: 11px; font-weight: bold; }
 .sub { font-size: 9.5px; color: #454c59; line-height: 1.5; }
@@ -69,19 +64,11 @@ td, th { vertical-align: top; padding: 0; }
 .ex td.n { width: 20px; color: {{ $a }}; font-weight: bold; }
 .acc td.box2 { border: 1px solid #c9ced6; height: 132px; padding: 9px 11px; }
 .sig { border-top: 1px solid #1c1f26; margin-top: 50px; padding-top: 4px; font-size: 9px; color: #454c59; }
-.avoid { page-break-inside: avoid; }
-#ftr { position: fixed; left: 0; right: 0; bottom: -44px; border-top: 1px solid #c9ced6; padding-top: 6px; font-size: 8.5px; color: #59616f; }
 </style>
 </head>
 <body>
 
-<div id="ftr">
-    <table><tr>
-        <td style="width: 40%">{{ $m['no'] }} &nbsp;·&nbsp; {{ $by['name'] }}</td>
-        <td style="width: 20%"></td>
-        <td class="r">Generated {{ now()->format('d M Y, H:i') }} &nbsp;·&nbsp; {{ config('app.name', 'PanelOS') }}</td>
-    </tr></table>
-</div>
+@include('quotations.partials._pdf_footer', ['reference' => $m['no'], 'buyer' => $by['name']])
 
 {{-- ── Letterhead ───────────────────────────────────────────── --}}
 <table>

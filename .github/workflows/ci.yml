@@ -1,8 +1,9 @@
 # ═══════════════════════════════════════════════════════════════
 #  PanelOS — CI workflow
 #  Runs on: every push to main + every Pull Request targeting main.
-#  Three parallel jobs check that the code compiles and builds cleanly.
-#  Test running is deliberately omitted for now (see "future" note below).
+#  Backend lint + frontend build run on every push and PR. The backend test
+#  suite (tests.yml) runs on pull requests here; on a push to main it runs as
+#  the first job of deploy.yml, which waits for it before shipping anything.
 # ═══════════════════════════════════════════════════════════════
 
 name: CI
@@ -69,40 +70,13 @@ jobs:
             -exec php -l {} \; \
           | grep -v "No syntax errors detected" || echo "All PHP files have valid syntax"
 
-      # ── Future: enable PHPUnit tests when the suite is MySQL-compatible ──
-      # The audit found some migrations use MySQL-only ALTER TABLE MODIFY
-      # ENUM syntax that SQLite (the test default) can't parse. Once that's
-      # fixed (or once the in-memory SQLite tests are migrated to a MySQL
-      # service container), uncomment the block below.
-      #
-      # services:
-      #   mysql:
-      #     image: mysql:8.0
-      #     env:
-      #       MYSQL_ROOT_PASSWORD: root
-      #       MYSQL_DATABASE: panelos_test
-      #     ports: [3306:3306]
-      #     options: >-
-      #       --health-cmd="mysqladmin ping -h localhost"
-      #       --health-interval=10s
-      #       --health-timeout=5s
-      #       --health-retries=10
-      #
-      # - name: Setup .env for tests
-      #   working-directory: backend
-      #   run: |
-      #     cp .env.example .env
-      #     php artisan key:generate
-      #     sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/'   .env
-      #     sed -i 's/^DB_DATABASE=.*/DB_DATABASE=panelos_test/' .env
-      #     sed -i 's/^DB_USERNAME=.*/DB_USERNAME=root/'         .env
-      #     sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=root/'         .env
-      # - name: Run migrations
-      #   working-directory: backend
-      #   run: php artisan migrate --force
-      # - name: Run tests
-      #   working-directory: backend
-      #   run: php artisan test --without-tty
+  # ─────────────────────────────────────────────────────────────
+  # Job: Backend tests — pull requests only (a push to main is tested by deploy.yml)
+  # ─────────────────────────────────────────────────────────────
+  tests:
+    name: Backend tests
+    if: github.event_name != 'push'
+    uses: ./.github/workflows/tests.yml
 
   # ─────────────────────────────────────────────────────────────
   # Job 2: Frontend — verify it compiles cleanly

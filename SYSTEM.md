@@ -1138,6 +1138,12 @@ HSN/SAC, amount in words, payment schedule and resolved terms (`config/quotation
 filled and HTML-escaped). DomPDF limits for any template: tables only, no flex/grid/`calc()`/CSS variables
 (inject colours with Blade), `<thead>` repeats across pages, a `position: fixed` element repeats on every page.
 The accent colour comes from `companies.primary_color` and is only used if it is a plain `#rrggbb`.
+Shared layout for flowing templates lives in `resources/views/quotations/partials/` (`_pdf_base` — page margins,
+base table rules, `.avoid`; `_pdf_footer` — running footer). `QuotationTemplateHarnessTest` loops over every
+quotation template in the registry and enforces: valid PDF, under 400 KB, under 8 s, the facts every quotation must
+show (number, buyer, totals, GST, installation, bank, seller GSTIN, terms), a bare quotation, a 45-line quotation
+that flows across pages, IGST + discount, and markup injection. **A new template is covered by adding its registry
+line — no new test needed.** Fixture: `Tests\Traits\BuildsUmaQuotation`.
 Company settings that drive these templates (all optional, Settings → Company → *Quotation Document*):
 `legal_name` ("pay to", "in favour of", signature block; blank = `name`), `quotation_title` (`PROFORMA INVOICE` or
 `QUOTATION`; also changes "against {document}" and the footer note), `certification_line` (printed only when
@@ -1613,7 +1619,7 @@ as live defects; what is listed below is what is still true of the code today.
     whole DejaVu files (717 KB) ride in every PDF; the logo adds a further 173 KB because it is stored at
     3381×1085 px and shown at 200×46. Correct output, just heavy. See PB-022 in `BUGS.md` for the measured
     breakdown and the two-line fix (97% smaller).
-22. **Much of the legacy test suite is stale.** 24 tests fail against the current API because they post
+22. **Much of the legacy test suite is stale.** 191 tests fail (the earlier note said 24). They are recorded in `backend/tests/ci/known-failures.txt` and the CI ratchet blocks any failure not on that list (see `CLAUDE.md`). They fail against the current API because they post
     long-superseded payloads (e.g. `items` instead of `panel_rows`) or call routes that no longer exist.
     They were failing before the October 2026 fixes and are unrelated to them. The suite runs against
     **MySQL/MariaDB** (`phpunit.xml` forces `DB_DATABASE=panelos_test`), matching production — see
