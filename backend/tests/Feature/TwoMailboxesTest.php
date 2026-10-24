@@ -260,4 +260,49 @@ class TwoMailboxesTest extends TestCase
         $this->assertNull(CompanyMail::activeFor($b->company_id, CompanyMailbox::NOTIFICATIONS));
         $this->assertSame('notifications', CompanyMail::kindFor($b->company_id, 'payment_reminder'), 'B has the defaults, not A\'s choices.');
     }
+
+    public function test_the_test_e_mail_goes_to_the_address_typed_not_to_the_tenant(): void
+    {
+        $admin = $this->createAdminUser(['email' => 'tenant.owner@signature.test']);
+        $this->actingAs($admin, 'sanctum');
+        $this->save($this->main() + $this->notifications())->assertOk();
+        $this->useInMemoryMailboxes();
+
+        $res = $this->postJson('/api/settings/notifications/test-email', ['mailbox' => 'notifications', 'to' => 'krish@checker.test'])->assertOk();
+
+        $this->assertStringContainsString('krish@checker.test', $res->json('message'));
+        $msg = $this->boxes['notifications@signature.test']->messages()[0]->getOriginalMessage();
+        $this->assertSame('krish@checker.test', $msg->getTo()[0]->getAddress());
+        $this->assertCount(1, $msg->getTo(), 'Only the typed address, not the tenant owner as well.');
+
+        // Blank means the admin's own login address, as before.
+        $this->postJson('/api/settings/notifications/test-email', ['mailbox' => 'main', 'to' => ''])->assertOk();
+        $this->assertSame('tenant.owner@signature.test', $this->boxes['accounts@signature.test']->messages()[0]->getOriginalMessage()->getTo()[0]->getAddress());
+    }
+
+    public function test_another_recipient_needs_the_companys_own_mailbox_so_the_server_is_not_a_relay(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');            // no mailbox of its own: the test would go through the PanelOS server
+        $this->useInMemoryMailboxes();
+
+        $this->postJson('/api/settings/notifications/test-email', ['to' => 'someone@elsewhere.test'])
+            ->assertStatus(422)->assertJsonPath('error_code', 'MAIL_TEST_TARGET_NOT_ALLOWED');
+        $this->assertCount(0, Mail::mailer('array')->getSymfonyTransport()->messages(), 'Nothing may leave through the server mailer.');
+    }
+
+    public function test_the_test_address_must_be_an_email_and_tests_are_rate_limited(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin, 'sanctum');
+        $this->save($this->main())->assertOk();
+        $this->useInMemoryMailboxes();
+
+        $this->postJson('/api/settings/notifications/test-email', ['to' => 'not-an-email'])->assertStatus(422);
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson('/api/settings/notifications/test-email', ['to' => 'a@b.test']);
+        }
+        $this->postJson('/api/settings/notifications/test-email', ['to' => 'a@b.test'])->assertStatus(429);
+    }
 }

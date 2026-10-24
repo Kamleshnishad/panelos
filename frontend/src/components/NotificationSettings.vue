@@ -362,10 +362,10 @@ async function testSend(channel) {
   } finally { testing.value = null }
 }
 
-async function testMailbox(kind) {
+async function testMailbox(kind, to = '') {
   testingMail.value = kind; mailResult[kind] = null
   try {
-    const r = await notificationService.testEmail(kind)
+    const r = await notificationService.testEmail(kind, to)
     mailResult[kind] = { ok: true, msg: '✓ ' + (r?.message ?? 'Test e-mail sent.') }
   } catch (e) {
     mailResult[kind] = { ok: false, msg: e?.response?.data?.message ?? 'Could not send the test e-mail.' }
