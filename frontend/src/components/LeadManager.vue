@@ -221,6 +221,13 @@
           <div :class="followClass(detail)"><label>Follow-up</label><span>{{ detail.next_follow_up_date ? fmtDate(detail.next_follow_up_date) : '—' }}</span></div>
         </div>
         <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
+        <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.first_seen_at">
+          <label>Where it came from</label>
+          <p>{{ detail.source }}<template v-if="detail.external_id"> · ref {{ detail.external_id }}</template><template v-if="detail.campaign"> · {{ detail.campaign }}</template><template v-if="utmText"> · {{ utmText }}</template><template v-if="detail.first_seen_at"> · first seen {{ fmtDateTime(detail.first_seen_at) }}</template></p>
+          <button class="link-btn" @click="togglePayload">{{ rawMsg.open ? 'Hide' : 'Show' }} original message</button>
+          <p v-if="rawMsg.open && !rawMsg.items.length" class="tl-empty">{{ rawMsg.loading ? 'Loading…' : 'No original message was kept.' }}</p>
+          <pre v-for="m in (rawMsg.open ? rawMsg.items : [])" :key="m.id" class="raw-msg">{{ JSON.stringify(m.payload, null, 2) }}</pre>
+        </div>
         <div class="d-req" v-if="detail.lost_reason"><label>Lost reason</label><p>{{ detail.lost_reason }}<template v-if="detail.lost_note"> — {{ detail.lost_note }}</template></p></div>
 
         <div class="d-section">
@@ -431,7 +438,20 @@ async function save() {
   } finally { saving.value = false }
 }
 
+// Campaign / UTM line and the raw message of an imported lead (kept out of the normal view; support reads it here)
+const utmText = computed(() => ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].map(k => detail.value?.[k]).filter(Boolean).join(' / '))
+const rawMsg = reactive({ open: false, loading: false, items: [] })
+async function togglePayload() {
+  rawMsg.open = !rawMsg.open
+  if (!rawMsg.open || rawMsg.items.length) return
+  rawMsg.loading = true
+  try { const r = await leadService.payloads(detail.value.id); rawMsg.items = r?.data ?? [] }
+  catch { rawMsg.items = [] }
+  finally { rawMsg.loading = false }
+}
+
 async function openDetail(l) {
+  Object.assign(rawMsg, { open: false, loading: false, items: [] })
   Object.assign(actForm, { type: 'note', description: '' })
   try { const res = await leadService.get(l.id); detail.value = res?.data ?? res }
   catch { detail.value = l }
@@ -642,6 +662,8 @@ onMounted(() => { load(); loadOptions() })
 .cv-note { font-size: 13px; color: #455a64; margin: 0 0 10px; }
 .cv-matches { list-style: none; margin: 0 0 8px; padding: 0; }
 .cv-matches li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #eceff1; font-size: 13px; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--primary); font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.raw-msg { margin: 6px 0 0; padding: 8px 10px; background: #f5f7f9; border-radius: 6px; font-size: 11px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
 .sd-error { color: #c62828; font-size: 13px; margin: 8px 0 0; }
 .form-grid.one { grid-template-columns: 1fr; }
 

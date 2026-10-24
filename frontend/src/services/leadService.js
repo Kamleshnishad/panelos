@@ -13,6 +13,7 @@ export default {
   dashboard()              { return api('get',  '/api/leads/dashboard') },
   options()                { return api('get',  '/api/leads/options') },
   get(id)                  { return api('get',  `/api/leads/${id}`) },
+  payloads(id)             { return api('get',  `/api/leads/${id}/payloads`) },
   create(data)             { return api('post', '/api/leads', data) },
   update(id, data)         { return api('put',  `/api/leads/${id}`, data) },
   changeStatus(id, data)   { return api('post', `/api/leads/${id}/status`, data) },

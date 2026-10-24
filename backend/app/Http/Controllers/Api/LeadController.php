@@ -80,6 +80,17 @@ class LeadController extends Controller
         }
     }
 
+    /** The raw message(s) this lead arrived as, for support. Kept out of the lead itself on purpose. */
+    public function payloads(Request $r, int $id)
+    {
+        try {
+            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            return $this->successResponse($lead->payloads()->get(['id', 'source', 'external_id', 'payload', 'received_at']), 'Original messages retrieved');
+        } catch (\Exception $e) {
+            return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);
+        }
+    }
+
     /** The matches, unless the caller has already seen them and sent allow_duplicate. */
     private function duplicatesToWarnAbout(Request $r, array $data, ?int $exceptId = null): array
     {

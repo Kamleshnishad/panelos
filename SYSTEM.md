@@ -371,6 +371,13 @@ revisions) is linked, so ordering an older, separate quotation does not win the 
 them and changes nothing unless `--apply` is given; closed leads are listed as left alone. Marking a lead lost on the screen is a dialog with the company's lost-reason list (a reason is required there)
 and a note; the API still accepts a free-text `lost_reason`.
 
+**Source detail and raw messages (LEADS_PLAN 2.1).** A lead that came through a channel records where from: `external_id` (the channel's own id for the enquiry; **unique per company and source**
+`leads_company_source_external_unique`, so the same enquiry can never become two leads; empty for manual leads, of which there can be any number), `campaign`, `utm_source/medium/campaign/term/content`,
+`first_seen_at` (when it first reached the channel; `created_at` is when we stored it). These are set by the intake service (2.2) and importers only: the lead form and `PUT /api/leads/{id}` cannot write them.
+`lead_payloads` (`LeadPayload`, tenant-scoped, soft-deleted) keeps the raw message exactly as received (`payload` JSON, `source`, `external_id`, `received_at`) with an optional `lead_id` (null when a message was
+rejected before a lead existed; set null, not cascaded, if a lead is ever hard-deleted; a soft-deleted lead keeps its payloads). `GET /api/leads/{id}/payloads` returns them for support; the lead detail and list never
+carry them. Intake must check for an existing `(company, source, external_id)` before inserting: a clash is a database error, and `LeadService::create` would retry it pointlessly.
+
 **Follow-up reminders (LEADS_PLAN 1.7).** `notifications:scan` (hourly) calls `LeadReminderService::sync($companyId)`, which keeps two kinds of *standing* bell notifications in step with the leads
 (re-running changes nothing; an entry disappears when its condition clears): `lead_follow_up`, one per lead for its **assignee only** (open or on-hold lead, `next_follow_up_date` today or earlier; "Follow up today: LEAD-..."
 becomes "Overdue follow-up" in red and unread again the day after, but does not turn unread again every morning because the text carries the due date, not a day count; unassigned leads get no personal entry), and

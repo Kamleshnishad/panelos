@@ -52,7 +52,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 1.5 | Convert fixes | done, local |
 | 1.6 | Numbering race and small hardening | done, local |
 | 1.7 | Follow-up reminders | done, local |
-| 2.1 | Source detail and raw payload | not started |
+| 2.1 | Source detail and raw payload | done, local |
 | 2.2 | Lead intake service | not started |
 | 2.3 | Inbound API, tokens, import log | not started |
 | 2.4 | Assignment rules and instant alert | not started |
@@ -167,6 +167,8 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 ### 2.1 Where did it come from (LC-11)
 - **Build:** columns `external_id` (unique per company and source), `campaign`, `utm_*`, `first_seen_at`; table `lead_payloads` keeping the raw incoming message out of the main screens.
 - **Tests:** uniqueness, nullable for manual leads. **Size:** S. **Needs from client:** nothing.
+- **Result:** migration `2026_10_25_000004` (leads columns, unique key, `lead_payloads`), `LeadPayload` model, `GET /api/leads/{id}/payloads`, drawer line and toggle, `LeadSourceDetailTest` (12). Not yet written by anything:
+  the intake service in 2.2 is the writer; until then the columns stay empty. The payload read endpoint is the support view promised by the plan.
 
 ### 2.2 Lead intake service (LE-01 core)
 - **Goal:** one function every channel calls.

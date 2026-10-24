@@ -20,7 +20,7 @@ class Lead extends BaseModel
 
     protected $fillable = [
         'company_id', 'lead_no', 'contact_name', 'company_name', 'phone', 'email', 'city',
-        'source', 'requirement', 'application', 'est_qty_sqm', 'est_value', 'status',
+        'source', 'external_id', 'campaign', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'first_seen_at', 'requirement', 'application', 'est_qty_sqm', 'est_value', 'status',
         'assigned_to_user_id', 'next_follow_up_date', 'lost_reason', 'lost_reason_id', 'lost_note', 'customer_id', 'quotation_id', 'notes',
     ];
 
@@ -28,6 +28,7 @@ class Lead extends BaseModel
         'est_qty_sqm'         => 'decimal:2',
         'est_value'           => 'decimal:2',
         'next_follow_up_date' => 'date',
+        'first_seen_at'       => 'datetime',
     ];
 
     /**
@@ -80,5 +81,6 @@ class Lead extends BaseModel
     public function assignedUser() { return $this->belongsTo(User::class, 'assigned_to_user_id'); }
     public function customer()     { return $this->belongsTo(Customer::class); }
     public function quotation()    { return $this->belongsTo(Quotation::class); }
+    public function payloads()     { return $this->hasMany(LeadPayload::class)->orderByDesc('received_at')->orderByDesc('id'); }
     public function activities()   { return $this->hasMany(LeadActivity::class)->orderByDesc('activity_date')->orderByDesc('id'); }
 }
