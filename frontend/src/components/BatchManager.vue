@@ -33,7 +33,7 @@ import BatchDetail from './BatchDetail.vue'
 import BatchCreate from './BatchCreate.vue'
 
 const props = defineProps({ openId: { type: Number, default: null } })
-const emit = defineEmits(['view-order'])
+const emit = defineEmits(['view-order', 'detail'])
 
 const view       = ref('list')
 const detailId   = ref(null)
@@ -41,11 +41,12 @@ const showCreate = ref(false)
 const listRef    = ref(null)
 
 // Deep-link from another module: jump straight into the detail view.
-watch(() => props.openId, (id) => { if (id) openDetail(id) })
+watch(() => props.openId, (id) => { if (id) openDetail(id); else if (view.value === 'detail') backToList() })
 onMounted(() => { if (props.openId) openDetail(props.openId) })
 
 function openDetail(id) {
   detailId.value = id
+  emit('detail', id)
   view.value     = 'detail'
 }
 
@@ -53,6 +54,7 @@ function backToList() {
   view.value     = 'list'
   detailId.value = null
   listRef.value?.reload()
+  emit('detail', null)
 }
 
 function onCreated(batchId) {

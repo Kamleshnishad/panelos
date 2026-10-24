@@ -44,7 +44,7 @@ const props = defineProps({
   openId: { type: Number, default: null },
   prefill: { type: Object, default: null },   // { customer_id, lead_id } from a converted Lead
 })
-const emit = defineEmits(['order-created'])
+const emit = defineEmits(['order-created', 'detail'])
 
 const view = ref('list')
 const editId = ref(null)
@@ -53,7 +53,7 @@ const listRef = ref(null)
 const createPrefill = ref({ customer_id: null, lead_id: null })
 
 // Deep-link: open a specific quotation when navigated here (e.g. from BOQ Register)
-watch(() => props.openId, (id) => { if (id) openDetail(id) })
+watch(() => props.openId, (id) => { if (id) openDetail(id); else if (view.value === 'detail') backToList() })
 // Lead → quotation: open a prefilled create form
 watch(() => props.prefill, (p) => { if (p && p.customer_id) openCreate(p) }, { immediate: true })
 onMounted(() => { if (props.openId) openDetail(props.openId) })
@@ -71,6 +71,7 @@ function openEdit(id) {
 
 function openDetail(id) {
   detailId.value = id
+  emit('detail', id)
   view.value = 'detail'
 }
 
@@ -78,6 +79,7 @@ function backToList() {
   view.value = 'list'
   editId.value = null
   detailId.value = null
+  emit('detail', null)
 }
 
 function onSaved(id) {

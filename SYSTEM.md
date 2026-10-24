@@ -64,8 +64,13 @@ service. To understand a rule, read the service.
 
 `App.vue` picks one of four screens: `Landing` → `LoginScreen` → `SubscriptionGate` → `AppShell`.
 `AppShell.vue` *is* the authenticated app: a sidebar of ~25 keys plus a `v-if` chain that mounts one
-manager component at a time. There is **no URL routing** — navigation is the `active` ref, and deep links
-are props (`go('orders', 42)` → `:open-id="42"`).
+manager component at a time. Navigation is the `active` ref, mirrored into the address bar (UX-01, PB-060) with no
+router dependency: `src/services/routes.js` maps a section key to `/<key>` (dashboard = `/`) and, for quotations,
+orders, batches and dispatches, a record to `/<key>/<id>`. `go('orders', 42)` sets `:open-id="42"` *and* pushes
+`/orders/42`; a manager that opens a record from its own list emits `detail` so the address follows; `popstate`
+(Back/Forward) and first load go through `applyUrl()`, which remounts the screen so it reads the address afresh.
+Unknown paths, bad ids and screens the user may not open fall back to the dashboard. The frontend nginx already answers
+every unknown path with `index.html`. Records of invoices, customers, leads and BOQ have no address yet.
 
 Each manager component calls one `frontend/src/services/*.js` module, which wraps the shared `api.js`
 axios instance (`baseURL: '/api'`, bearer token from `localStorage`).

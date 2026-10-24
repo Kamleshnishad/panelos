@@ -100,16 +100,16 @@
         <home-dashboard        v-if="active === 'dashboard'"   @navigate="go" />
         <lead-manager          v-else-if="active === 'leads'" @convert="onLeadConvert" />
         <customer-manager      v-else-if="active === 'customers'" @open-quotation="openQuotation" @view-orders="go('orders')" />
-        <quotation-manager     v-else-if="active === 'quotations'" :open-id="quotationOpenId" :prefill="quotationPrefill" @order-created="go('orders')" />
+        <quotation-manager     v-else-if="active === 'quotations'" :key="navNonce" :open-id="quotationOpenId" :prefill="quotationPrefill" @detail="(id) => onDetail('quotations', id)" @order-created="go('orders')" />
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />
-        <order-manager         v-else-if="active === 'orders'"      :open-id="orderOpenId"     @view-quotation="(id) => go('quotations', id)" @view-batch="(id) => go('batches', id)" />
-        <batch-manager         v-else-if="active === 'batches'"     :open-id="batchOpenId"     @view-order="(id) => go('orders', id)" />
+        <order-manager         v-else-if="active === 'orders'"      :key="navNonce" :open-id="orderOpenId"     @detail="(id) => onDetail('orders', id)" @view-quotation="(id) => go('quotations', id)" @view-batch="(id) => go('batches', id)" />
+        <batch-manager         v-else-if="active === 'batches'"     :key="navNonce" :open-id="batchOpenId"     @detail="(id) => onDetail('batches', id)" @view-order="(id) => go('orders', id)" />
         <production-planner     v-else-if="active === 'planner'"     @view-order="(id) => go('orders', id)" @view-runs="go('runs')" />
         <production-runs        v-else-if="active === 'runs'"        @view-order="(id) => go('orders', id)" @go-planner="go('planner')" />
         <qc-dashboard          v-else-if="active === 'qc'"          @view-batch="(id) => go('batches', id)" />
         <stock-manager         v-else-if="active === 'stock'" />
         <procurement-manager   v-else-if="active === 'procurement'" />
-        <dispatch-manager      v-else-if="active === 'dispatches'"  :open-id="dispatchOpenId"  @view-batch="(id) => go('batches', id)" />
+        <dispatch-manager      v-else-if="active === 'dispatches'"  :key="navNonce" :open-id="dispatchOpenId"  @detail="(id) => onDetail('dispatches', id)" @view-batch="(id) => go('batches', id)" />
         <invoice-manager       v-else-if="active === 'invoices'" />
         <accounts-receivable   v-else-if="active === 'receivables'" @view-invoice="go('invoices')" />
         <business-reports      v-else-if="active === 'reports'" />
@@ -128,7 +128,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, h } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent, h } from 'vue'
 import axios from 'axios'
 import authService from '../services/authService.js'
 import { useSessionGuard } from '../composables/useSessionGuard.js'
@@ -138,6 +138,7 @@ import dashboardService from '../services/dashboardService.js'
 import companyService from '../services/companyService.js'
 import productionService from '../services/productionService.js'
 import leadService from '../services/leadService.js'
+import { buildPath, parsePath } from '../services/routes.js'
 
 // Each screen is its own chunk, fetched on first visit (keeps the initial bundle small);
 // a spinner shows if the chunk takes more than 150ms.
@@ -251,14 +252,15 @@ function onLeadConvert(payload) {
   quotationPrefill.value = payload   // { customer_id, lead_id }
   quotationOpenId.value = null
   active.value = 'quotations'
+  syncUrl('quotations')
   mobileOpen.value = false
 }
 const mobileOpen  = ref(false)
+const navNonce    = ref(0)   // bumped when the open section's own menu item is clicked again: its manager remounts on its list
 const searchQ     = ref('')
 
 function openQuotation(id) {
-  quotationOpenId.value = id
-  active.value = 'quotations'
+  go('quotations', id)
 }
 
 const ic = {
@@ -342,7 +344,8 @@ function can(key) {
   return p.includes('*') || p.includes(key)
 }
 
-function go(key, id = null) {
+/** Show a screen (and optionally one record) without touching the address bar. */
+function show(key, id = null) {
   // Reset every per-module openId, then set the one for the target module so
   // the manager's openId watcher fires fresh (re-firing even on same id).
   quotationOpenId.value  = null
@@ -361,6 +364,50 @@ function go(key, id = null) {
   mobileOpen.value = false
 }
 
+// Page addresses (UX-01): the address bar mirrors the screen, so refresh, bookmarks, links and the Back button work.
+function syncUrl(key, id = null) {
+  const target = buildPath(key, id)
+  if (window.location.pathname !== target) history.pushState({}, '', target)
+}
+
+function go(key, id = null) {
+  const numId = typeof id === 'object' ? id?.id : id
+  if (numId == null && key === active.value) navNonce.value++
+  show(key, numId)
+  syncUrl(key, numId)
+}
+
+// A manager opened or closed a record on its own (a click in its list): put the record in the address.
+function onDetail(section, id) {
+  if (active.value === section) syncUrl(section, id)
+}
+
+function allowed(key) {
+  const it = allItems.find(i => i.key === key)
+  if (!it) return false
+  if (isSuperAdmin.value) return key === 'superadmin'
+  return (!it.admin || isAdmin.value) && (!it.superadmin || isSuperAdmin.value) && (!it.perm || can(it.perm))
+}
+
+// Address -> screen, on first load and on Back/Forward. An address that is not a screen, or not one this user may open, goes home.
+function applyUrl() {
+  const r = parsePath(window.location.pathname, allItems.map(i => i.key))
+  if (r && allowed(r.key)) {
+    // Same screen as before (Back from a record to its list, or Forward into one): remount it so it reads the address afresh.
+    if (r.key === active.value) navNonce.value++
+    show(r.key, r.id)
+    return
+  }
+  const home = isSuperAdmin.value ? 'superadmin' : 'dashboard'
+  show(home)
+  if (window.location.pathname !== buildPath(home)) history.replaceState({}, '', buildPath(home))
+}
+applyUrl()
+
+watch([activeLabel, companyName], () => {
+  document.title = activeLabel.value ? `${activeLabel.value} · ${companyName.value}` : companyName.value
+}, { immediate: true })
+
 // Quick-jump: match the typed text against nav labels and navigate.
 function quickJump() {
   const q = searchQ.value.trim().toLowerCase()
@@ -370,7 +417,10 @@ function quickJump() {
 }
 
 
+onBeforeUnmount(() => window.removeEventListener('popstate', applyUrl))
+
 onMounted(async () => {
+  window.addEventListener('popstate', applyUrl)
   // Refresh the user so permissions/is_admin are current (drives nav gating).
   try { const u = await authService.me(); if (u) user.value = u } catch { /* ignore */ }
 
