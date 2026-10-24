@@ -50,7 +50,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 1.3 | Automatic won, lost-reason dialog | done, local |
 | 1.4 | Duplicate detection | done, local |
 | 1.5 | Convert fixes | done, local |
-| 1.6 | Numbering race and small hardening | not started |
+| 1.6 | Numbering race and small hardening | done, local |
 | 1.7 | Follow-up reminders | not started |
 | 2.1 | Source detail and raw payload | not started |
 | 2.2 | Lead intake service | not started |
@@ -148,6 +148,8 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Goal:** two leads created at the same instant never fail.
 - **Build:** the same retry-on-conflict helper as quotations and invoices; decide whether the sequence restarts each year (default: keep counting, as now, so existing numbers are untouched).
 - **Tests:** a simulated collision. **Size:** S. **Needs from client:** nothing.
+- **Result:** `LeadService::create` retries on a number clash (`DocNumber::retry`, 5 tries); `generateLeadNumber` is now `protected` so the collision can be simulated; the sequence keeps counting across years (default kept).
+  `LeadNumberingTest` (4). The year test lost its `CURRENT` prefix. No `CURRENT` test remains.
 
 ### 1.7 Follow-up reminders (LD-06)
 - **Goal:** a follow-up date that actually tells someone.

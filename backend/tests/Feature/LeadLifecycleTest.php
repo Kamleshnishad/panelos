@@ -79,9 +79,9 @@ class LeadLifecycleTest extends TestCase
         $this->assertSame('0001', substr($this->newLead()->json('data.lead_no'), -4), 'Another company starts at 0001.');
     }
 
-    public function test_CURRENT_the_lead_number_keeps_counting_across_a_new_year(): void
+    public function test_the_lead_number_keeps_counting_across_a_new_year(): void
     {
-        // LD-07 (decided in 1.6). Today LEAD-2027-0002 follows LEAD-2026-0001: the year changes, the sequence does not.
+        // LD-07, decided in 1.6: LEAD-2027-0002 follows LEAD-2026-0001. The year changes, the sequence does not, so numbers already issued are untouched.
         Carbon::setTestNow('2026-12-30');
         $first = $this->newLead()->json('data.lead_no');
         Carbon::setTestNow('2027-01-02');

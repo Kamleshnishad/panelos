@@ -371,6 +371,10 @@ revisions) is linked, so ordering an older, separate quotation does not win the 
 them and changes nothing unless `--apply` is given; closed leads are listed as left alone. Marking a lead lost on the screen is a dialog with the company's lost-reason list (a reason is required there)
 and a note; the API still accepts a free-text `lost_reason`.
 
+**Lead numbers (LEADS_PLAN 1.6).** `LEAD-<year>-<n>`: the year is the year the lead was made, `<n>` is the company's running count and **keeps counting across years** (LEAD-2027-0002 follows LEAD-2026-0001), a deleted
+lead's number is never reused, each company counts on its own. `LeadService::create` takes the next number inside `DocNumber::retry(DB::transaction(...), 5)`: if two requests read the same last number, the unique
+`(company_id, lead_no)` key rejects the loser, which re-reads and takes the next one.
+
 **Duplicates (LEADS_PLAN 1.4).** `App\Services\LeadMatcher` is the one definition of "the same buyer": same phone (compared on the last 10 digits) or same e-mail (lower case) within the company.
 The keys live on the lead (`phone_key`, `email_key`, set by the `Lead` model on every save, indexed), so the check is a lookup. `POST /api/leads` answers **409 `DUPLICATE_LEAD`** with
 `errors.duplicates` (up to 10 leads: id, lead_no, contact_name, company_name, status, assigned_to, created_at, matched_on) unless the request carries `allow_duplicate: true`; `PUT /api/leads/{id}`

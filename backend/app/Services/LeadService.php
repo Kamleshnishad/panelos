@@ -61,9 +61,14 @@ class LeadService
     public function create(int $companyId, array $data): Lead
     {
         $data['company_id'] = $companyId;
-        $data['lead_no'] = $this->generateLeadNumber($companyId);
         $data['status'] = $data['status'] ?? 'new';
-        return Lead::create($data);
+
+        // Two leads made at the same moment read the same "last number". The unique (company_id, lead_no) key makes the loser fail,
+        // so it runs again, reads the new last number and takes the next one (same helper as quotations and invoices; LD-07).
+        return \App\Support\DocNumber::retry(
+            fn () => DB::transaction(fn () => Lead::create($data + ['lead_no' => $this->generateLeadNumber($companyId)])),
+            5
+        );
     }
 
     public function update(Lead $lead, array $data): Lead
@@ -484,7 +489,8 @@ class LeadService
         ];
     }
 
-    private function generateLeadNumber(int $companyId): string
+    /** LEAD-<year>-<n>. The year is the year it was made; <n> keeps counting across years (decided in 1.6: existing numbers stay as they are). */
+    protected function generateLeadNumber(int $companyId): string
     {
         $year = now()->format('Y');
         $last = Lead::withTrashed()->where('company_id', $companyId)->orderByDesc('id')->value('lead_no');
