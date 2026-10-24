@@ -371,6 +371,16 @@ revisions) is linked, so ordering an older, separate quotation does not win the 
 them and changes nothing unless `--apply` is given; closed leads are listed as left alone. Marking a lead lost on the screen is a dialog with the company's lost-reason list (a reason is required there)
 and a note; the API still accepts a free-text `lost_reason`.
 
+**Lead intake (LEADS_PLAN 2.2).** `LeadIntakeService::ingest(int $companyId, string $source, array $data, ?array $raw = null): LeadIntakeResult` is the one door for every channel; a connector maps its own message to the
+common keys (`contact_name, company_name, phone, email, city, requirement, application, est_qty_sqm, est_value, external_id, campaign, utm_*, first_seen_at`) and calls it. It runs from jobs and webhooks: no signed-in
+user, every query scoped to the company given. Order of decisions: (1) the same `(company, source, external_id)` already became a lead (deleted ones count) or was added to one -> `already_received`, nothing changes; a *rejected* message
+does not count, so a corrected resend with the same id gets through; (2) no name/company/phone/e-mail, or neither a 10-digit phone nor a valid e-mail -> `rejected`, the raw message is stored with `lead_id` null; (3) `LeadMatcher` finds the buyer
+and one of the matches is open or on hold -> `merged`: note "Enquired again on <source> (ref ...): <requirement>", blanks on the lead filled (never overwritten), `next_follow_up_date` set to today unless already due, raw message kept against the lead;
+(4) otherwise `created` (status new, `first_seen_at` = the channel's date, clamped to now if in the future); if only closed leads matched, a new lead is made and its first timeline note names them ("Same buyer as LEAD-... (lost)"); old leads are never reopened.
+Values are trimmed, capped to column sizes, numbers parsed (commas, rupee sign), unreadable dates become now, non-scalar values dropped; an unusable phone is not stored (the raw message keeps it). The source is the company's own spelling when it is
+in the list, otherwise the channel's name as given. Two deliveries at the same instant: the unique key stops the second and it is reported as `already_received`. Assignment (2.4) and the inbound API (2.3) are not part of it. The seen-before lookup uses
+`lead_payloads (company_id, source, external_id)`.
+
 **Source detail and raw messages (LEADS_PLAN 2.1).** A lead that came through a channel records where from: `external_id` (the channel's own id for the enquiry; **unique per company and source**
 `leads_company_source_external_unique`, so the same enquiry can never become two leads; empty for manual leads, of which there can be any number), `campaign`, `utm_source/medium/campaign/term/content`,
 `first_seen_at` (when it first reached the channel; `created_at` is when we stored it). These are set by the intake service (2.2) and importers only: the lead form and `PUT /api/leads/{id}` cannot write them.

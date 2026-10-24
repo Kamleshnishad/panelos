@@ -53,7 +53,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 1.6 | Numbering race and small hardening | done, local |
 | 1.7 | Follow-up reminders | done, local |
 | 2.1 | Source detail and raw payload | done, local |
-| 2.2 | Lead intake service | not started |
+| 2.2 | Lead intake service | done, local |
 | 2.3 | Inbound API, tokens, import log | not started |
 | 2.4 | Assignment rules and instant alert | not started |
 | 2.5 | Lead sources screen | not started |
@@ -175,6 +175,9 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Build:** `LeadIntakeService::ingest($company, $source, $payload)`: normalise, match (1.4), then either create a lead or add an activity to the existing one ("enquired again on IndiaMART about …"); idempotent on `external_id`; keeps the raw payload; returns what it did. The manual form keeps its own path but shares the matcher.
 - **Tests:** new, repeat, same id twice, malformed payload, other company's data never touched.
 - **Size:** M. **Needs from client:** nothing.
+- **Result:** `LeadIntakeService` and `LeadIntakeResult`, `LeadIntakeTest` (23); an index on `lead_payloads (company, source, external)` added to the 2.1 migration (still local). Decisions made on the way: a repeat enquiry brings the open lead's follow-up to today
+  (so the 1.7 reminders surface it); a buyer whose leads are all closed gets a **new** lead (a new opportunity) that names the old ones, instead of reopening; a message with no usable phone or e-mail is rejected and kept, not guessed at.
+  Nothing calls the service yet: 2.3 (inbound API) and 3.x (IndiaMART) do.
 
 ### 2.3 Inbound API with tokens and an import log (LC-02, LE-02, LE-03, LC-12 part)
 - **Goal:** anything outside can create a lead safely.

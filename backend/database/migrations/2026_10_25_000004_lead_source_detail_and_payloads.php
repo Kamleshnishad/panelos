@@ -42,6 +42,7 @@ return new class extends Migration {
                 $t->timestamps();
                 $t->softDeletes();                      // like every BaseModel table
                 $t->index(['company_id', 'lead_id']);
+                $t->index(['company_id', 'source', 'external_id'], 'lead_payloads_company_source_external_idx');   // "have we seen this enquiry" (2.2)
             });
         }
     }
