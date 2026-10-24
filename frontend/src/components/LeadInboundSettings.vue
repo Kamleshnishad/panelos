@@ -39,6 +39,15 @@
       </form>
     </section>
 
+    <section class="li-card" aria-label="Example request">
+      <h3>Example request</h3>
+      <p class="li-note2">Paste this into a terminal, or give it to whoever builds the form. Replace the address with one of yours{{ fresh ? ' (the one you just made is filled in)' : '' }}.</p>
+      <pre class="li-code" aria-label="curl example">{{ example }}</pre>
+      <button class="btn btn-primary" @click="copyExample">{{ copiedExample ? 'Copied' : 'Copy example' }}</button>
+    </section>
+
+    <slot />
+
     <section class="li-card" aria-label="Import log">
       <h3>What arrived <span class="li-sub">last 7 days</span></h3>
       <div class="li-chips">
@@ -63,7 +72,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { api } from '../services/api.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 
@@ -80,10 +89,15 @@ const sources = ref([])
 const form = reactive({ name: '', source: '' })
 const fresh = ref(null)       // the token just made, shown once
 const copied = ref(false)
+const copiedExample = ref(false)
 const busy = ref(false)
 const error = ref('')
 
 const fullUrl = (t) => `${window.location.origin}${t.path}`
+const example = computed(() => {
+  const url = fresh.value ? fullUrl(fresh.value) : `${window.location.origin}/api/inbound/leads/YOUR_ADDRESS_TOKEN`
+  return `curl -X POST "${url}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name": "Ravi Patel", "mobile": "9876543210", "message": "Need 300 sqm PUF wall panel", "city": "Rajkot", "id": "form-123"}'`
+})
 const when = (d) => new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 const body = (res) => res?.data?.data ?? res?.data ?? {}
 
@@ -131,6 +145,10 @@ async function copy(t) {
   try { await navigator.clipboard.writeText(fullUrl(t)); copied.value = true } catch { toastError('Could not copy. Select the address and copy it by hand.') }
 }
 
+async function copyExample() {
+  try { await navigator.clipboard.writeText(example.value); copiedExample.value = true } catch { toastError('Could not copy. Select the text and copy it by hand.') }
+}
+
 onMounted(load)
 </script>
 
@@ -168,4 +186,6 @@ onMounted(load)
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 code { font-size: 12px; }
+.li-note2 { margin: 0 0 8px; font-size: 12.5px; color: #666; }
+.li-code { background: #263238; color: #eceff1; padding: 12px 14px; border-radius: 8px; font-size: 12px; overflow-x: auto; margin: 0 0 10px; white-space: pre; }
 </style>

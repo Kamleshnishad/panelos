@@ -276,7 +276,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
-import leadService from '../services/leadService.js'
+import leadService, { LEAD_APPLICATIONS } from '../services/leadService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 import FormInput from './Form/FormInput.vue'
 import FormSelect from './Form/FormSelect.vue'
@@ -285,7 +285,7 @@ const emit = defineEmits(['convert'])
 
 // The company's own list (Master Data -> Lead lists). The fallback below only shows if the options call fails.
 const sources = ref(['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other'])
-const applications = ['Wall', 'Roof', 'Cold Room', 'Partition', 'Clean Room', 'Ceiling', 'PEB Shade', 'Architectural']
+const applications = LEAD_APPLICATIONS
 const statusTabs = [
   { key: '', label: 'All' }, { key: 'new', label: 'New' }, { key: 'contacted', label: 'Contacted' },
   { key: 'qualified', label: 'Qualified' }, { key: 'quoted', label: 'Quoted' }, { key: 'on_hold', label: 'On hold' },

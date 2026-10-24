@@ -56,7 +56,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 2.2 | Lead intake service | done, local |
 | 2.3 | Inbound API, tokens, import log | done, local |
 | 2.4 | Assignment rules and instant alert | done, local (no screen yet: 2.5) |
-| 2.5 | Lead sources screen | not started |
+| 2.5 | Lead sources screen | done, local |
 | 3.1 | IndiaMART settings and connection test | not started |
 | 3.2 | IndiaMART pull job | not started |
 | 3.3 | Connector health and alerts | not started |
@@ -196,6 +196,8 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 
 ### 2.5 Lead sources screen (UI for 2.1 to 2.4)
 - **Build:** Settings page: sources list, inbound token (copy, regenerate), a ready-to-copy example request, assignment rules, the import log. **Size:** S to M. **Live check:** screenshot walk-through.
+- **Result:** the screens were built with their sub-phases (sources in 1.1, addresses and log in 2.3); 2.5 added the assignment rules screen (`LeadAssignmentSettings.vue`) and the example request, and placed them together in Master Data -> Lead intake
+  (sources stay in the neighbouring Lead lists tab). Browser run of the rules screen (11 checks). **Phase 2 is complete.** The live screenshot walk-through moves to the release.
 
 **Release point:** the door exists and is protected; no channel is connected yet except manual and API tests.
 

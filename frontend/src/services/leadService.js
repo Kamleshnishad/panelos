@@ -8,6 +8,9 @@ function api(method, url, data = null, params = null) {
   return axios({ method, url, data, params, headers: authHeaders() }).then(r => r.data)
 }
 
+// The products a lead can be about. One list, used by the lead form and by the assignment rules.
+export const LEAD_APPLICATIONS = ['Wall', 'Roof', 'Cold Room', 'Partition', 'Clean Room', 'Ceiling', 'PEB Shade', 'Architectural']
+
 export default {
   list(params = {})        { return api('get',  '/api/leads', null, params) },
   dashboard()              { return api('get',  '/api/leads/dashboard') },

@@ -17,7 +17,7 @@
     <tax-configuration       v-else-if="tab === 'tax'" />
     <gst-config-manager      v-else-if="tab === 'gst'" />
     <lead-lists-settings     v-else-if="tab === 'leadlists'" />
-    <lead-inbound-settings   v-else-if="tab === 'leadintake'" />
+    <lead-inbound-settings   v-else-if="tab === 'leadintake'"><lead-assignment-settings /></lead-inbound-settings>
   </div>
 </template>
 
@@ -30,6 +30,7 @@ import TaxConfiguration      from './TaxConfiguration.vue'
 import GstConfigManager      from './GstConfigManager.vue'
 import LeadListsSettings     from './LeadListsSettings.vue'
 import LeadInboundSettings   from './LeadInboundSettings.vue'
+import LeadAssignmentSettings from './LeadAssignmentSettings.vue'
 
 const tab = ref('panels')
 </script>
