@@ -21,9 +21,11 @@ class ClassicTemplateIsTenantNeutralTest extends TestCase
     private function classicFor(array $company): array
     {
         $admin = $this->createAdminUser();
-        $admin->company->update($company);
+        // The template prints these names in capitals, so a random faker name such as "Harrison Group" contains "ISO" and failed the
+        // "no certification claimed" check about one run in ten. Fixed names keep the check strict and the test steady (PB-064).
+        $admin->company->update($company + ['name' => 'Cold Chain Panels Pvt Ltd']);
         $customer = Customer::factory()->create(['company_id' => $admin->company_id]);
-        $pt = PanelType::factory()->create(['company_id' => $admin->company_id]);
+        $pt = PanelType::factory()->create(['company_id' => $admin->company_id, 'name' => 'Wall Panel']);
         $res = $this->actingAs($admin, 'sanctum')->postJson('/api/quotations', [
             'customer_id' => $customer->id, 'panel_rows' => $this->panelRows($pt->id, 5, 900),
         ])->assertStatus(201);

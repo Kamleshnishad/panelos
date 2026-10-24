@@ -31,9 +31,9 @@ The owner says **"next"**. Each "next" = build the next sub-phase from `LEADS_PL
 suite (`cd backend; php -d memory_limit=1G vendor/bin/phpunit --no-coverage`), `DB_DATABASE=panelos_test php artisan schema:check` when the schema changed, frontend `npm run build`
 and `npm test`, a headless-browser run for screens (see "Tools"), and update `LEADS_PLAN.md` progress, `SYSTEM.md`, `BUGS.md` (row **FR-009** is the programme row) in the same commit.
 
-**Done locally:** 0.1, 1.1 lists as data, 1.2 status engine, 1.3 automatic won + lost dialog, 1.4 duplicate detection, **1.5 convert fixes** (state/GSTIN, look-alike customers, `Customer::nextCode`, PB-063), 1.6 numbering race, **1.7 follow-up reminders**. **Phase 1 is complete**, then 2.1 source detail and raw payload, **2.2 lead intake service** (backend suite 775/775, browser runs for 1.2 to 1.5, 1.7 and 2.1).
+**Done locally:** 0.1, 1.1 lists as data, 1.2 status engine, 1.3 automatic won + lost dialog, 1.4 duplicate detection, **1.5 convert fixes** (state/GSTIN, look-alike customers, `Customer::nextCode`, PB-063), 1.6 numbering race, **1.7 follow-up reminders**. **Phase 1 is complete**, then 2.1 source detail and raw payload, 2.2 lead intake service, **2.3 inbound API with tokens and import log** (backend suite 799/799, browser runs for 1.2 to 1.5, 1.7, 2.1 and 2.3).
 
-**Next sub-phase:** see the progress table in `LEADS_PLAN.md` (2.3 inbound API with tokens and an import log, Phase 2, the inbound door). Use the `sd` dialog pattern in `LeadManager.vue` for any screen that needs a reason or date.
+**Next sub-phase:** see the progress table in `LEADS_PLAN.md` (2.4 assignment rules and instant alert, Phase 2). Open items found on the way: PB-065 (client address behind the proxy: verify an `audit_logs.ip` value on the live server). Use the `sd` dialog pattern in `LeadManager.vue` for any screen that needs a reason or date.
 
 Defaults agreed unless the client says otherwise: "won" = an order was created from the lead's quotation (1.3); no automatic assignment until they choose a rule (2.4);
 the IndiaMART connector is built against a fake until the client's CRM key exists (3.x). Needs from the client are listed in the lead audit page:

@@ -54,7 +54,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 1.7 | Follow-up reminders | done, local |
 | 2.1 | Source detail and raw payload | done, local |
 | 2.2 | Lead intake service | done, local |
-| 2.3 | Inbound API, tokens, import log | not started |
+| 2.3 | Inbound API, tokens, import log | done, local |
 | 2.4 | Assignment rules and instant alert | not started |
 | 2.5 | Lead sources screen | not started |
 | 3.1 | IndiaMART settings and connection test | not started |
@@ -184,6 +184,8 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Build:** `POST /api/inbound/leads/{token}` (token is long and random, only its hash is stored, shown once, can be regenerated); tenant comes from the token only; rate limit per token, size cap, hidden spam field, clear 4xx and 429 answers; `lead_import_logs` (time, source, created, duplicates, errors) written for every request; a simple log screen.
 - **Tests:** a token for A cannot create or read anything in B; wrong, revoked and rate-limited tokens; payload too large; idempotent retry.
 - **Live check:** post a test lead with curl to the live URL, see it, delete it. **Size:** M. **Needs from client:** nothing.
+- **Result:** `LeadInboundService`, `InboundLeadController`, `LeadInboundTokenController`, models `LeadInboundToken` / `LeadImportLog`, migration `2026_10_25_000005`, screen `LeadInboundSettings.vue` (Master Data -> Lead intake), `LeadInboundTest` (24).
+  Differences on purpose: no per-IP limit on valid traffic (the client address may be the proxy's, PB-065); wrong-token guesses are counted per address instead. CORS for browser forms is left to 4.1. The log rows are per request, summarised by the screen.
 
 ### 2.4 Assignment rules and instant alert (LC-10, LD-08 part)
 - **Build:** rules in Settings (default: none, leads stay unassigned as today): round-robin over chosen people, or by city, product or source; the assignee gets a bell notification and, if enabled, a WhatsApp message with name, product and a call link; reassign with history.

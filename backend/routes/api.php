@@ -57,6 +57,17 @@ RateLimiter::for('signup', function (Request $request) {
     ];
 });
 
+// Inbound lead address (LEADS_PLAN 2.3): 60 messages a minute per token. There is deliberately no per-address limit here: behind the proxies the
+// address may be the proxy's, shared by everyone, so a limit on it would let one noisy sender block all real ones. Wrong-token guesses are
+// counted per address inside LeadInboundService instead (valid tokens never count against it).
+RateLimiter::for('inbound-leads', function (Request $request) {
+    return Limit::perMinute(60)->by('token:' . sha1((string) $request->route('token')))->response(
+        fn (Request $r, array $headers) => response()->json(
+            ['success' => false, 'error_code' => 'RATE_LIMITED', 'message' => 'Too many messages. Wait a minute and try again.'], 429, $headers
+        )
+    );
+});
+
 // Publicly-readable uploaded files (logos, product images). The path goes
 // in the query string, not the URI: both nginx layers in front of this app
 // grab any URI ending in an image extension and 404 it before it reaches
@@ -128,6 +139,12 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
 
     // The company's lead lists (sources, lost reasons). /settings is read-open and write-guarded by settings.manage.
     Route::get('/settings/lead-lists', [\App\Http\Controllers\Api\LeadListController::class, 'index'])->name('leadlists.index');
+    Route::get('/settings/lead-inbound-tokens', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'index'])->name('leadinbound.index');
+    Route::post('/settings/lead-inbound-tokens', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'store'])->name('leadinbound.store');
+    Route::put('/settings/lead-inbound-tokens/{id}', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'update'])->name('leadinbound.update');
+    Route::post('/settings/lead-inbound-tokens/{id}/regenerate', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'regenerate'])->name('leadinbound.regenerate');
+    Route::delete('/settings/lead-inbound-tokens/{id}', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'destroy'])->name('leadinbound.destroy');
+    Route::get('/settings/lead-import-logs', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'logs'])->name('leadinbound.logs');
     Route::post('/settings/lead-sources', [\App\Http\Controllers\Api\LeadListController::class, 'storeSource'])->name('leadlists.sources.store');
     Route::put('/settings/lead-sources/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'updateSource'])->name('leadlists.sources.update');
     Route::delete('/settings/lead-sources/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'destroySource'])->name('leadlists.sources.destroy');
@@ -485,6 +502,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
 });
 
 // Public routes
+// Enquiries from outside (website form, partners): no login, the token in the address is the credential. See LeadInboundService.
+Route::post('/inbound/leads/{token}', [\App\Http\Controllers\Api\InboundLeadController::class, 'store'])
+    ->middleware('throttle:inbound-leads')->name('inbound.leads');
 Route::post('/webhooks/stripe', [PaymentController::class, 'handleStripeWebhook'])->name('webhooks.stripe');
 Route::post('/webhooks/razorpay', [\App\Http\Controllers\Api\BillingController::class, 'webhook'])->name('billing.webhook');
 

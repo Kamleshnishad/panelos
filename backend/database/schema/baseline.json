@@ -486,6 +486,32 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "lead_inbound_tokens": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "name": "varchar(100)",
+        "source": "varchar(60)",
+        "token_hash": "char(64)",
+        "token_hint": "varchar(8)",
+        "is_active": "tinyint",
+        "last_used_at": "timestamp",
+        "created_by_user_id": "bigint unsigned",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
+    "lead_import_logs": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "token_id": "bigint unsigned",
+        "source": "varchar(60)",
+        "outcome": "varchar(20)",
+        "lead_id": "bigint unsigned",
+        "reason": "varchar(255)",
+        "external_id": "varchar(120)",
+        "ip": "varchar(45)",
+        "created_at": "timestamp"
+    },
     "lead_sources": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

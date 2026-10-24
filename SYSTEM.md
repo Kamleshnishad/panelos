@@ -371,6 +371,17 @@ revisions) is linked, so ordering an older, separate quotation does not win the 
 them and changes nothing unless `--apply` is given; closed leads are listed as left alone. Marking a lead lost on the screen is a dialog with the company's lost-reason list (a reason is required there)
 and a note; the API still accepts a free-text `lost_reason`.
 
+**Inbound lead address (LEADS_PLAN 2.3).** `POST /api/inbound/leads/{token}` lets a website form, a partner or Zapier create leads with no login. Public route, no tenant middleware: the **token is the only credential and the only thing
+that picks the company**. `LeadInboundService`: a token is `lt_` + 48 random characters; `lead_inbound_tokens` stores only `sha256(token)` (unique), the last four characters as a hint, the `source` its leads are recorded under (one of the company's own sources),
+`is_active`, `last_used_at`; the plain token is returned once, by create and regenerate, and never again (regenerate replaces the hash, so the old address dies at once; a deleted, switched-off or inactive-company token is the same 401). Order of checks:
+token (malformed or unknown -> 401 `INVALID_TOKEN`; wrong guesses are counted per address and after 30 a minute answer 429, valid tokens never count) -> size over 64 KB -> 413 `PAYLOAD_TOO_LARGE` -> the hidden field `_hp` filled -> 200 as if it worked, nothing created
+(logged `spam`) -> `LeadIntakeService::ingest` (the body is mapped: `name`->contact_name, `mobile`->phone, `message`->requirement, `company`->company_name, `id`->external_id; the intake names always win) -> 201 created / 200 merged / 200 already_received
+(so a retry with the same id is safe) / 422 `REJECTED` with the reason; an exception is a plain 500 `SERVER_ERROR` with nothing internal in it (logged `error`). 60 requests a minute per token (429 `RATE_LIMITED` with Retry-After). There is **no per-address
+limit** on valid traffic on purpose: behind the proxies the address may be the proxy's (see PB-065), so such a limit could let one noisy sender block everyone. `lead_import_logs` gets one row per request that reached a valid token
+(`created | merged | already_received | rejected | spam | too_large | error`, lead id, reason, external id, ip); the hourly `notifications:scan` deletes rows older than 90 days. Management: `GET/POST /api/settings/lead-inbound-tokens`,
+`PUT|DELETE /api/settings/lead-inbound-tokens/{id}`, `POST .../{id}/regenerate`, `GET /api/settings/lead-import-logs` (7-day summary + newest first; reads open, changes need `settings.manage`), screen Master Data -> Lead intake.
+Browsers posting from a website will need CORS allowed for this route (LEADS_PLAN 4.1).
+
 **Lead intake (LEADS_PLAN 2.2).** `LeadIntakeService::ingest(int $companyId, string $source, array $data, ?array $raw = null): LeadIntakeResult` is the one door for every channel; a connector maps its own message to the
 common keys (`contact_name, company_name, phone, email, city, requirement, application, est_qty_sqm, est_value, external_id, campaign, utm_*, first_seen_at`) and calls it. It runs from jobs and webhooks: no signed-in
 user, every query scoped to the company given. Order of decisions: (1) the same `(company, source, external_id)` already became a lead (deleted ones count) or was added to one -> `already_received`, nothing changes; a *rejected* message

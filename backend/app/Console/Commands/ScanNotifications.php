@@ -30,6 +30,7 @@ class ScanNotifications extends Command
 
         $pruned = AppNotification::withoutGlobalScope('tenant')
             ->where('read_at', '<', now()->subDays(30))->delete();
+        app(\App\Services\LeadInboundService::class)->pruneLogs();      // inbound lead log rows older than 90 days
         $this->info("Scan complete; pruned {$pruned} old read notification(s).");
 
         return 0;

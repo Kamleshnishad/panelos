@@ -8,6 +8,7 @@
       <button :class="['md-tab', { active: tab === 'tax' }]"         @click="tab = 'tax'">Tax / GST</button>
       <button :class="['md-tab', { active: tab === 'gst' }]"         @click="tab = 'gst'">GST Compliance</button>
       <button :class="['md-tab', { active: tab === 'leadlists' }]"   @click="tab = 'leadlists'">Lead lists</button>
+      <button :class="['md-tab', { active: tab === 'leadintake' }]"  @click="tab = 'leadintake'">Lead intake</button>
     </div>
 
     <panel-type-master       v-if="tab === 'panels'" />
@@ -16,6 +17,7 @@
     <tax-configuration       v-else-if="tab === 'tax'" />
     <gst-config-manager      v-else-if="tab === 'gst'" />
     <lead-lists-settings     v-else-if="tab === 'leadlists'" />
+    <lead-inbound-settings   v-else-if="tab === 'leadintake'" />
   </div>
 </template>
 
@@ -27,6 +29,7 @@ import ProductionStageMaster from './ProductionStageMaster.vue'
 import TaxConfiguration      from './TaxConfiguration.vue'
 import GstConfigManager      from './GstConfigManager.vue'
 import LeadListsSettings     from './LeadListsSettings.vue'
+import LeadInboundSettings   from './LeadInboundSettings.vue'
 
 const tab = ref('panels')
 </script>
