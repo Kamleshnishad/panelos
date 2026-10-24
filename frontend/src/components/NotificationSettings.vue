@@ -229,6 +229,16 @@
               <div class="trigger-sub">Notify customer when goods are dispatched</div>
             </div>
           </label>
+          <label class="trigger-row">
+            <input type="checkbox" v-model="form.notify_lead_followups" />
+            <div>
+              <div class="trigger-label">Lead follow-ups</div>
+              <div class="trigger-sub">Bell reminder for the assignee when a follow-up is due or overdue; the owner gets a summary of leads overdue for more than the days below</div>
+            </div>
+            <div v-if="form.notify_lead_followups" class="trigger-days">
+              <input v-model.number="form.lead_overdue_alert_days" type="number" min="1" max="60" class="days-input" aria-label="Days overdue before the owner is told" /> days
+            </div>
+          </label>
         </div>
       </section>
 

@@ -51,7 +51,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 1.4 | Duplicate detection | done, local |
 | 1.5 | Convert fixes | done, local |
 | 1.6 | Numbering race and small hardening | done, local |
-| 1.7 | Follow-up reminders | not started |
+| 1.7 | Follow-up reminders | done, local |
 | 2.1 | Source detail and raw payload | not started |
 | 2.2 | Lead intake service | not started |
 | 2.3 | Inbound API, tokens, import log | not started |
@@ -156,6 +156,9 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Build:** the hourly scan creates a bell notification for the assignee when a follow-up is due today and again when it is overdue; the owner is told about leads overdue for more than N days (N set in Settings, default 3); optional WhatsApp or e-mail through the existing channels, off by default and switchable.
 - **Tests:** one notification per lead per day, none for won or lost or on-hold leads, assignee only.
 - **Live check:** a test lead with today's date shows in the bell. **Size:** M. **Needs from client:** whether WhatsApp reminders should be on.
+- **Result:** `LeadReminderService` (hooked into `notifications:scan`), settings `notify_lead_followups` and `lead_overdue_alert_days` (screen: Customer Messaging -> When to Notify), `LeadRemindersTest` (17).
+  Differences from the plan, on purpose: a lead **on hold is reminded on its return date** (that is what the hold date is for; the plan said none for on-hold); **WhatsApp and e-mail reminders are not built**, they wait for the client's answer,
+  and the in-app bell needs neither. Unassigned leads only appear in the owner's summary. **Phase 1 is complete.**
 
 **Release point:** after 1.7 the lead module is trustworthy. Nothing outside has been connected yet.
 

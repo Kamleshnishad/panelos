@@ -371,6 +371,14 @@ revisions) is linked, so ordering an older, separate quotation does not win the 
 them and changes nothing unless `--apply` is given; closed leads are listed as left alone. Marking a lead lost on the screen is a dialog with the company's lost-reason list (a reason is required there)
 and a note; the API still accepts a free-text `lost_reason`.
 
+**Follow-up reminders (LEADS_PLAN 1.7).** `notifications:scan` (hourly) calls `LeadReminderService::sync($companyId)`, which keeps two kinds of *standing* bell notifications in step with the leads
+(re-running changes nothing; an entry disappears when its condition clears): `lead_follow_up`, one per lead for its **assignee only** (open or on-hold lead, `next_follow_up_date` today or earlier; "Follow up today: LEAD-..."
+becomes "Overdue follow-up" in red and unread again the day after, but does not turn unread again every morning because the text carries the due date, not a day count; unassigned leads get no personal entry), and
+`lead_follow_up_digest`, one summary for every active company admin when any open lead is overdue by **more than `lead_overdue_alert_days`** (default 3, unassigned leads included). Won, lost and invalid leads are never
+reminded; a lead on hold is reminded on its return date. `notification_settings.notify_lead_followups` (default on) switches it off and clears what is showing. WhatsApp and e-mail reminders are **not built** (pending the client).
+The bell links to the Leads section (it does not open the single lead yet; `/leads/12` addresses are LEADS_PLAN 5.1).
+`AppNotificationService::syncStanding` items may carry their own `to` recipients.
+
 **Lead numbers (LEADS_PLAN 1.6).** `LEAD-<year>-<n>`: the year is the year the lead was made, `<n>` is the company's running count and **keeps counting across years** (LEAD-2027-0002 follows LEAD-2026-0001), a deleted
 lead's number is never reused, each company counts on its own. `LeadService::create` takes the next number inside `DocNumber::retry(DB::transaction(...), 5)`: if two requests read the same last number, the unique
 `(company_id, lead_no)` key rejects the loser, which re-reads and takes the next one.

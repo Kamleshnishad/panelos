@@ -73,5 +73,12 @@ class ScanNotifications extends Command
                 'severity' => 'danger',
             ],
         ] : []);
+
+        // Lead follow-ups due or overdue (LEADS_PLAN 1.7). A problem here must not stop the other scans.
+        try {
+            app(\App\Services\LeadReminderService::class)->sync($companyId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

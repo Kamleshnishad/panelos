@@ -562,6 +562,8 @@
         "created_at": "timestamp",
         "updated_at": "timestamp",
         "email_payment_reminders": "tinyint",
+        "notify_lead_followups": "tinyint",
+        "lead_overdue_alert_days": "tinyint unsigned",
         "smtp_enabled": "tinyint",
         "smtp_host": "varchar(150)",
         "smtp_port": "smallint unsigned",
