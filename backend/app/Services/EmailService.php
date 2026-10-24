@@ -148,7 +148,7 @@ class EmailService
             case 'invoice_sent':
                 return [
                     'subject' => 'Invoice ' . $invoice->invoice_no . ' - Payment Due ' . $invoice->due_date->format('M d, Y'),
-                    'preview' => 'Your invoice ' . $invoice->invoice_no . ' for $' . number_format($total, 2) . ' is ready.',
+                    'preview' => 'Your invoice ' . $invoice->invoice_no . ' for ₹' . \App\Support\Inr::fmt($total, 2) . ' is ready.',
                 ];
             case 'payment_reminder':
                 $daysOverdue = \App\Support\Days::overdue($invoice->due_date);
@@ -156,7 +156,7 @@ class EmailService
                     'subject' => $daysOverdue > 0
                         ? 'Payment Reminder: Invoice ' . $invoice->invoice_no . ' is ' . $daysOverdue . ' days overdue'
                         : 'Payment Due Soon: Invoice ' . $invoice->invoice_no,
-                    'preview' => 'Please remit payment of $' . number_format($total, 2) . ' by ' . $invoice->due_date->format('F d, Y'),
+                    'preview' => 'Please remit payment of ₹' . \App\Support\Inr::fmt($total, 2) . ' by ' . $invoice->due_date->format('F d, Y'),
                 ];
             case 'payment_received':
                 return [

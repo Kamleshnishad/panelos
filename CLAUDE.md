@@ -91,6 +91,7 @@ npm run build    # always run this before calling a frontend change done
   are not `$fillable` and must be written with `forceFill()->save()`, only from
   `TenantProvisioningService`, `SubscriptionService` or `SuperAdminController`. `update()` is
   mass-assignment and will silently drop them.
+* **Printing amounts:** always `App\Support\Inr::fmt($n, 2)` (9,11,476.00), never `number_format()` — a test fails the build if it comes back in `app/` or `resources/views/`.
 * **Money:** copy a stored `amount` rather than recomputing `quantity × unit_price` — rates are weighted
   averages and recomputation drifts by paise. Quantities carrying square metres are `decimal(12,4)`.
 * **GST:** one helper, `App\Support\GstState`, decides intra- vs inter-state, and both `QuotationService`

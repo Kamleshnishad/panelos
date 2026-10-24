@@ -8,7 +8,7 @@ We have received your payment. Thank you for your prompt payment!
 ## Payment Confirmation
 
 - **Invoice Number:** {{ $invoiceNo }}
-- **Amount Received:** ${{ number_format($paymentAmount, 2) }}
+- **Amount Received:** ₹{{ \App\Support\Inr::fmt($paymentAmount, 2) }}
 - **Payment Method:** {{ $paymentMethod }}
 - **Date Received:** {{ $paymentDate }}
 - **Payment Status:** {{ $paymentStatus }}
@@ -16,8 +16,8 @@ We have received your payment. Thank you for your prompt payment!
 @if($remainingDue > 0)
 ## Outstanding Balance
 
-- **Total Invoice Amount:** ${{ number_format($totalAmount, 2) }}
-- **Remaining Due:** ${{ number_format($remainingDue, 2) }}
+- **Total Invoice Amount:** ₹{{ \App\Support\Inr::fmt($totalAmount, 2) }}
+- **Remaining Due:** ₹{{ \App\Support\Inr::fmt($remainingDue, 2) }}
 
 Please arrange payment for the outstanding balance by the original due date.
 @else

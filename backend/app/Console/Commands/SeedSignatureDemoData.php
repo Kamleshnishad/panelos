@@ -215,7 +215,7 @@ class SeedSignatureDemoData extends Command
         $quotation = $quotationService->send($quotation);
         $quotation = $quotationService->accept($quotation);
         $leadService->changeStatus($lead->fresh(), 'won', null, $admin->id);
-        $this->info("Quotation {$quotation->quotation_no} created and accepted — total ₹" . number_format((float) $quotation->total_amount, 2));
+        $this->info("Quotation {$quotation->quotation_no} created and accepted — total ₹" . \App\Support\Inr::fmt((float) $quotation->total_amount, 2));
 
         // ── 5. Order ─────────────────────────────────────────────────────────
         $order = $orderService->createFromQuotation($quotation, true);

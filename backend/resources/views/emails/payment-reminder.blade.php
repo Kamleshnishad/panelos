@@ -16,7 +16,7 @@ This is a friendly reminder that the following invoice payment is due soon.
 ## Invoice Details
 
 - **Invoice Number:** {{ $invoiceNo }}
-- **Amount Due:** ${{ number_format($remainingDue, 2) }}
+- **Amount Due:** ₹{{ \App\Support\Inr::fmt($remainingDue, 2) }}
 - **Original Due Date:** {{ $dueDate }}
 
 @if($isOverdue)

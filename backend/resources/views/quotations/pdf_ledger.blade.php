@@ -7,7 +7,7 @@
     $by  = $doc['buyer'];
     $pr  = $doc['project'];
     $t   = $doc['totals'];
-    $n   = fn ($v) => number_format((float) $v, 2);
+    $n   = fn ($v) => \App\Support\Inr::fmt((float) $v, 2);
     $dash = fn ($v) => ($v !== null && trim((string) $v) !== '') ? $v : '—';
     $half = (int) ceil(count($doc['terms']) / 2);
 @endphp

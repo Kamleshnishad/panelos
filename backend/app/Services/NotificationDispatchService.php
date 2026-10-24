@@ -30,7 +30,7 @@ class NotificationDispatchService
         $phone = $customer->whatsapp_no ?: $customer->phone;
         $msg   = "✅ Dear {$customer->name},\n\n"
                . "Your order *{$order->order_no}* has been confirmed with us.\n"
-               . "Order Value: ₹" . number_format((float)$order->total_amount, 2) . "\n"
+               . "Order Value: ₹" . \App\Support\Inr::fmt((float)$order->total_amount, 2) . "\n"
                . "We'll update you when production starts.\n\n"
                . "— " . ($order->company->name ?? 'PanelOS');
 
@@ -81,7 +81,7 @@ class NotificationDispatchService
 
         $phone   = $customer->whatsapp_no ?: $customer->phone;
         $dueDate = $invoice->due_date?->format('d M Y') ?? 'N/A';
-        $amount  = number_format((float)$invoice->total_amount, 2);
+        $amount  = \App\Support\Inr::fmt((float)$invoice->total_amount, 2);
         $label   = $daysBefore > 0 ? "due in {$daysBefore} day(s)" : 'due today';
 
         $msg = "💰 Dear {$customer->name},\n\n"

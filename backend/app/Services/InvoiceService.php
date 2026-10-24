@@ -412,7 +412,7 @@ class InvoiceService
 
             $remaining = app(PaymentService::class)->calculateRemainingDue($invoice->id);
             if ($remaining > 0.01) {
-                throw new \Exception('Cannot mark paid: ₹' . number_format($remaining, 2) . ' is still outstanding. Record the payment instead.');
+                throw new \Exception('Cannot mark paid: ₹' . \App\Support\Inr::fmt($remaining, 2) . ' is still outstanding. Record the payment instead.');
             }
 
             $invoice->update(['status' => 'paid', 'paid_date' => now()]);

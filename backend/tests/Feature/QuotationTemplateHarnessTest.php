@@ -74,13 +74,13 @@ class QuotationTemplateHarnessTest extends TestCase
         $must = [
             'quotation number' => $q->quotation_no,
             'buyer'            => 'IDEAL AGRI CARE',
-            'grand total'      => '911,476.00',
-            'taxable amount'   => '772,437.50',
+            'grand total'      => '9,11,476.00',
+            'taxable amount'   => '7,72,437.50',
             'GST'              => '69,519.38',
-            'advance'          => '455,738.00',
+            'advance'          => '4,55,738.00',
             'panel quantity'   => '133.50',
             'panel rate'       => '1,075.00',
-            'installation'     => '109,350.00',
+            'installation'     => '1,09,350.00',
             'a door'           => '73083000',
             'seller GSTIN'     => '24AAFFU9050M1ZS',
             'bank account'     => '59200000008899',
@@ -133,7 +133,7 @@ class QuotationTemplateHarnessTest extends TestCase
         $this->assertGreaterThanOrEqual(4, $this->pages($pdf), "{$key}: 45 lines should spill onto more pages");
         $this->assertLessThan(self::MAX_BYTES + 100 * 1024, strlen($pdf));
         // The totals still say the same thing however many pages it took.
-        $this->assertStringContainsString(number_format((float) $q->total_amount, 2), $this->text($view, $q), "{$key}: grand total lost");
+        $this->assertStringContainsString(\App\Support\Inr::fmt((float) $q->total_amount, 2), $this->text($view, $q), "{$key}: grand total lost");
     }
 
     #[DataProvider('templates')]
@@ -145,8 +145,8 @@ class QuotationTemplateHarnessTest extends TestCase
         $text = $this->text($view, $q);
 
         $this->assertStringContainsString('IGST', $text, "{$key}: inter-state supply must show IGST");
-        $this->assertStringContainsString(number_format((float) $q->igst_amount, 2), $text, "{$key}: IGST amount missing");
-        $this->assertStringContainsString(number_format((float) $q->discount_amount, 2), $text, "{$key}: discount amount missing");
+        $this->assertStringContainsString(\App\Support\Inr::fmt((float) $q->igst_amount, 2), $text, "{$key}: IGST amount missing");
+        $this->assertStringContainsString(\App\Support\Inr::fmt((float) $q->discount_amount, 2), $text, "{$key}: discount amount missing");
     }
 
     #[DataProvider('templates')]

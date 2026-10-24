@@ -205,10 +205,10 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
           <td class="text-center">
             @if($pt && $pt->image_data_uri)<img src="{{ $pt->image_data_uri }}" class="prod-img" alt="">@else<span class="no-img">—</span>@endif
           </td>
-          <td class="text-right bold"><div>{{ number_format($item->total_sqm, 2) }}</div></td>
+          <td class="text-right bold"><div>{{ \App\Support\Inr::fmt($item->total_sqm, 2) }}</div></td>
           <td><div>SQM</div></td>
-          <td class="text-right"><div>₹ {{ number_format($item->rate_per_sqm, 2) }}</div></td>
-          <td class="text-right bold"><div>₹ {{ number_format($item->amount, 2) }}</div></td>
+          <td class="text-right"><div>₹ {{ \App\Support\Inr::fmt($item->rate_per_sqm, 2) }}</div></td>
+          <td class="text-right bold"><div>₹ {{ \App\Support\Inr::fmt($item->amount, 2) }}</div></td>
           <td><div>{{ $item->hsn_code }}</div></td>
         </tr>
         @if($item->sizes->count() > 0)
@@ -232,17 +232,17 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
                   <td>{{ $sz->length_mm }} @if($sz->length_mm < 2000)<span class="dl">DL</span>@endif</td>
                   <td>{{ $sz->width_mm }}</td>
                   <td>{{ $sz->nos }}</td>
-                  <td class="text-right">{{ number_format($sz->sqm, 2) }}</td>
-                  <td class="text-right">{{ number_format($sz->rate_per_sqm, 2) }}</td>
-                  <td class="text-right">{{ number_format($sz->amount, 2) }}</td>
+                  <td class="text-right">{{ \App\Support\Inr::fmt($sz->sqm, 2) }}</td>
+                  <td class="text-right">{{ \App\Support\Inr::fmt($sz->rate_per_sqm, 2) }}</td>
+                  <td class="text-right">{{ \App\Support\Inr::fmt($sz->amount, 2) }}</td>
                 </tr>
                 @endforeach
                 <tr class="size-total">
                   <td colspan="2" class="bold">TOTAL</td>
                   <td class="bold">{{ $item->sizes->sum('nos') }}</td>
-                  <td class="text-right bold">{{ number_format($item->total_sqm, 2) }}</td>
+                  <td class="text-right bold">{{ \App\Support\Inr::fmt($item->total_sqm, 2) }}</td>
                   <td></td>
-                  <td class="text-right bold">₹ {{ number_format($item->amount, 2) }}</td>
+                  <td class="text-right bold">₹ {{ \App\Support\Inr::fmt($item->amount, 2) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -269,10 +269,10 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
           <td class="text-center">
             @if($acc->image_data_uri)<img src="{{ $acc->image_data_uri }}" class="prod-img" alt="">@else<span class="no-img">—</span>@endif
           </td>
-          <td class="text-right">{{ number_format($acc->pivot->quantity, 2) }}</td>
+          <td class="text-right">{{ \App\Support\Inr::fmt($acc->pivot->quantity, 2) }}</td>
           <td>{{ $acc->pivot->unit ?? $acc->unit ?? 'NOS' }}</td>
-          <td class="text-right">₹ {{ number_format($acc->pivot->unit_price, 2) }}</td>
-          <td class="text-right bold">₹ {{ number_format($acc->pivot->amount, 2) }}</td>
+          <td class="text-right">₹ {{ \App\Support\Inr::fmt($acc->pivot->unit_price, 2) }}</td>
+          <td class="text-right bold">₹ {{ \App\Support\Inr::fmt($acc->pivot->amount, 2) }}</td>
           <td>{{ $acc->hsn_code ?? '73089090' }}</td>
         </tr>
       @endforeach
@@ -283,53 +283,53 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
   <div class="totals-wrap">
     <div class="total-row sub-line">
       <div class="total-label">Panel Subtotal:</div>
-      <div class="total-value">₹ {{ number_format($quotation->panel_subtotal, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->panel_subtotal, 2) }}</div>
     </div>
     @if($quotation->accessory_subtotal > 0)
     <div class="total-row sub-line">
       <div class="total-label">Accessories:</div>
-      <div class="total-value">₹ {{ number_format($quotation->accessory_subtotal, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->accessory_subtotal, 2) }}</div>
     </div>
     @endif
     @if($quotation->installation_amount > 0)
     <div class="total-row sub-line">
       <div class="total-label">Installation:</div>
-      <div class="total-value">₹ {{ number_format($quotation->installation_amount, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->installation_amount, 2) }}</div>
     </div>
     @endif
     <div class="total-row sub-line">
       <div class="total-label">Subtotal:</div>
-      <div class="total-value">₹ {{ number_format($quotation->subtotal, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->subtotal, 2) }}</div>
     </div>
     @if($quotation->discount_pct > 0)
     <div class="total-row sub-line">
       <div class="total-label">Discount ({{ $quotation->discount_pct }}%):</div>
-      <div class="total-value" style="color:#D6322A">- ₹ {{ number_format($quotation->discount_amount, 2) }}</div>
+      <div class="total-value" style="color:#D6322A">- ₹ {{ \App\Support\Inr::fmt($quotation->discount_amount, 2) }}</div>
     </div>
     @endif
     <div class="total-row section-line">
       <div class="total-label">Taxable Amount:</div>
-      <div class="total-value">₹ {{ number_format($quotation->taxable_amount, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->taxable_amount, 2) }}</div>
     </div>
     @if($isInter)
     <div class="total-row sub-line">
       <div class="total-label">IGST @ 18%:</div>
-      <div class="total-value">₹ {{ number_format($quotation->igst_amount, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->igst_amount, 2) }}</div>
     </div>
     @else
     <div class="total-row sub-line">
       <div class="total-label">CGST @ 9%:</div>
-      <div class="total-value">₹ {{ number_format($quotation->cgst_amount, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->cgst_amount, 2) }}</div>
     </div>
     <div class="total-row sub-line">
       <div class="total-label">SGST @ 9%:</div>
-      <div class="total-value">₹ {{ number_format($quotation->sgst_amount, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->sgst_amount, 2) }}</div>
     </div>
     @endif
     @if($quotation->transport_fixed && $quotation->transport_amount > 0)
     <div class="total-row sub-line">
       <div class="total-label">Transportation:</div>
-      <div class="total-value">₹ {{ number_format($quotation->transport_amount, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->transport_amount, 2) }}</div>
     </div>
     @else
     <div class="total-row sub-line">
@@ -340,25 +340,25 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
     @if($quotation->round_off != 0)
     <div class="total-row sub-line">
       <div class="total-label">Round Off:</div>
-      <div class="total-value">₹ {{ number_format($quotation->round_off, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->round_off, 2) }}</div>
     </div>
     @endif
     <div class="total-row grand">
       <div class="total-label">GRAND TOTAL:</div>
-      <div class="total-value">₹ {{ number_format($quotation->total_amount, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->total_amount, 2) }}</div>
     </div>
     <div class="total-row sub-line">
       <div class="total-label">Advance ({{ $quotation->advance_pct }}%):</div>
-      <div class="total-value">₹ {{ number_format($quotation->advance_amount, 2) }}</div>
+      <div class="total-value">₹ {{ \App\Support\Inr::fmt($quotation->advance_amount, 2) }}</div>
     </div>
     <div class="total-row">
       <div class="total-label bold blue">Balance Due:</div>
-      <div class="total-value bold blue">₹ {{ number_format($quotation->balance_amount, 2) }}</div>
+      <div class="total-value bold blue">₹ {{ \App\Support\Inr::fmt($quotation->balance_amount, 2) }}</div>
     </div>
   </div>
 
   <div style="font-size:10px;color:#888;margin-top:6px">
-    Total SQM: <strong>{{ number_format($quotation->total_sqm, 2) }}</strong> &nbsp;&nbsp;
+    Total SQM: <strong>{{ \App\Support\Inr::fmt($quotation->total_sqm, 2) }}</strong> &nbsp;&nbsp;
     This is a Proforma Invoice and not a valid tax document. &nbsp;&nbsp;
     PTO →
   </div>
@@ -404,7 +404,7 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 
 
   <div class="tc-section">
     <div class="tc-title">4. Payment Terms</div>
-    <div class="tc-item">Advance: {{ $quotation->advance_pct }}% at order confirmation — ₹ {{ number_format($quotation->advance_amount, 2) }}</div>
+    <div class="tc-item">Advance: {{ $quotation->advance_pct }}% at order confirmation — ₹ {{ \App\Support\Inr::fmt($quotation->advance_amount, 2) }}</div>
     <div class="tc-item">Balance: {{ 100 - $quotation->advance_pct }}% minimum 2 working days before dispatch.</div>
     <div class="tc-item">All payments by NEFT/RTGS/Cheque in favour of {{ $legalName }}.</div>
   </div>
