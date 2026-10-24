@@ -353,7 +353,15 @@ Leads are the pre-customer stage. `lead_no` format `LEAD-YYYY-0001`.
 | Convert to customer | `POST /api/leads/{id}/convert` |
 | Delete | `DELETE /api/leads/{id}` |
 
-**Status ladder:** `new → contacted → qualified → quoted → won | lost`.
+**Statuses (LEADS_PLAN 1.2).** Open: `new`, `contacted`, `qualified`, `quoted`. Waiting: `on_hold`. Closed: `won`, `lost`, `invalid` (`Lead::OPEN`, `Lead::CLOSED`, `Lead::STATUSES`).
+Every change goes through `LeadService::transition()` (`POST /api/leads/{id}/status`; `changeStatus()` is a wrapper). The allowed moves live in one table, `Lead::allowedNext()`,
+and `GET /api/leads/options` returns it as `transitions` so the screen offers exactly those buttons:
+an open lead can move to any other open stage, `on_hold`, `won`, `lost` or `invalid`; a lead on hold can go back to any open stage or be won, lost or invalid; a closed lead can only be
+**reopened** to an open stage, and the request must carry a `reason`, which is written to the timeline and clears the lost reason and note. Won to lost goes through a reopen.
+`on_hold` needs `hold_until` (today or later), which becomes `next_follow_up_date`, so the follow-up badge brings the lead back. `invalid` is junk (spam, wrong number): kept for the record,
+left out of the default list (its own tab shows it), the dashboard totals, win rate, source chart and follow-up counts. Moving to the status a lead already has changes nothing and logs nothing.
+`PUT /api/leads/{id}` refuses a different `status` (422). A new lead may start `new`, `contacted` or `qualified`. A quotation made for a lead moves an open or on-hold lead to `quoted` and links it;
+for a won, lost or invalid lead it only adds a timeline note and leaves the status and the original quotation alone.
 
 **Lead lists (LEADS_PLAN 1.1).** `leads.source` and `leads.status` are plain strings, no longer database enums. The allowed *sources* and the *lost reasons* are lists each company
 edits in **Master Data → Lead lists** (`lead_sources`, `lead_lost_reasons`; `LeadListService`). Starter lists are seeded for every company the first time they are read (15 sources,

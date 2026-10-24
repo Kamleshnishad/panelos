@@ -6,6 +6,8 @@ use App\Models\Customer;
 use App\Models\Lead;
 use App\Models\LeadActivity;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class LeadService
 {
@@ -14,12 +16,13 @@ class LeadService
         $q = Lead::where('company_id', $companyId)->with('assignedUser', 'customer');
 
         if (!empty($filters['status']))      $q->where('status', $filters['status']);
+        else                                 $q->where('status', '!=', 'invalid');     // junk only shows when asked for
         if (!empty($filters['source']))      $q->where('source', $filters['source']);
         if (!empty($filters['assigned_to'])) $q->where('assigned_to_user_id', $filters['assigned_to']);
         if (!empty($filters['follow_up']) && $filters['follow_up'] === 'due') {
             $q->whereNotNull('next_follow_up_date')
               ->whereDate('next_follow_up_date', '<=', Carbon::today())
-              ->whereNotIn('status', ['won', 'lost']);
+              ->whereNotIn('status', Lead::CLOSED);
         }
         if (!empty($filters['search'])) {
             $s = $filters['search'];
@@ -63,28 +66,93 @@ class LeadService
         return $lead->fresh('assignedUser', 'customer');
     }
 
+    /** Kept for existing callers; every change of status goes through transition(). */
     public function changeStatus(Lead $lead, string $status, ?string $lostReason = null, ?int $userId = null, ?int $lostReasonId = null, ?string $lostNote = null): Lead
     {
-        $from = $lead->status;
-        $payload = ['status' => $status];
-        if ($status === 'lost') {
-            $payload['lost_reason'] = $lostReason;
-            $payload['lost_reason_id'] = $lostReasonId;
-            $payload['lost_note'] = $lostNote;
-        }
-        $lead->update($payload);
+        return $this->transition($lead, $status, [
+            'lost_reason' => $lostReason, 'lost_reason_id' => $lostReasonId, 'lost_note' => $lostNote,
+        ], $userId);
+    }
 
-        // Auto-log the status change as an activity
-        LeadActivity::create([
-            'company_id'    => $lead->company_id,
-            'lead_id'       => $lead->id,
-            'user_id'       => $userId,
-            'type'          => 'status_change',
-            'description'   => "Status: {$from} → {$status}" . ($lostReason ? " (reason: {$lostReason}" . ($lostNote ? " — {$lostNote}" : '') . ')' : ''),
-            'activity_date' => now(),
-        ]);
+    /**
+     * The only way a lead's status changes (LEADS_PLAN 1.2): the move must be in Lead::allowedNext(), reopening a closed lead
+     * needs a reason, putting a lead on hold needs the date it comes back, and every change writes a timeline entry.
+     *
+     * Options: lost_reason, lost_reason_id, lost_note (for lost) · reason (note for invalid, required to reopen) · hold_until (on hold)
+     */
+    public function transition(Lead $lead, string $to, array $o = [], ?int $userId = null): Lead
+    {
+        $from = $lead->status;
+        if ($to === $from) {
+            return $lead->fresh('assignedUser', 'customer');       // nothing to change, nothing to log
+        }
+        if (!in_array($to, Lead::STATUSES, true)) {
+            $this->refuse('status', 'That is not a lead status.');
+        }
+        if (!in_array($to, Lead::allowedNext($from), true)) {
+            $this->refuse('status', "A lead cannot go from {$this->label($from)} to {$this->label($to)}." . ($lead->isClosed() ? ' Reopen it first.' : ''));
+        }
+
+        $reason = trim((string) ($o['reason'] ?? ''));
+        $payload = ['status' => $to];
+        $suffix = '';
+
+        if ($lead->isClosed()) {                                      // a reopen: closed -> open
+            if ($reason === '') {
+                $this->refuse('reason', 'Say why you are reopening this lead.');
+            }
+            $payload += ['lost_reason' => null, 'lost_reason_id' => null, 'lost_note' => null];
+            $suffix = " (reopened: {$reason})";
+        } elseif ($to === 'on_hold') {
+            $until = $this->holdDate($o['hold_until'] ?? null);
+            $payload['next_follow_up_date'] = $until->toDateString();  // it comes back on that date: the follow-up badge picks it up
+            $suffix = " (until {$until->toDateString()}" . ($reason !== '' ? ", {$reason}" : '') . ')';
+        } elseif ($to === 'invalid') {
+            $suffix = $reason !== '' ? " ({$reason})" : '';
+        } elseif ($to === 'lost') {
+            $lostReason = $o['lost_reason'] ?? null;
+            $lostNote = $o['lost_note'] ?? null;
+            $payload += ['lost_reason' => $lostReason, 'lost_reason_id' => $o['lost_reason_id'] ?? null, 'lost_note' => $lostNote];
+            $suffix = $lostReason ? " (reason: {$lostReason}" . ($lostNote ? " — {$lostNote}" : '') . ')' : '';
+        }
+
+        DB::transaction(function () use ($lead, $payload, $from, $to, $suffix, $userId) {
+            $lead->update($payload);
+            LeadActivity::create([
+                'company_id'    => $lead->company_id,
+                'lead_id'       => $lead->id,
+                'user_id'       => $userId,
+                'type'          => 'status_change',
+                'description'   => "Status: {$this->label($from)} → {$this->label($to)}{$suffix}",
+                'activity_date' => now(),
+            ]);
+        });
 
         return $lead->fresh('assignedUser', 'customer');
+    }
+
+    private function holdDate($value): Carbon
+    {
+        try {
+            $date = trim((string) $value) === '' ? null : Carbon::parse((string) $value)->startOfDay();   // parse('') would be "now"
+        } catch (\Throwable) {
+            $date = null;
+        }
+        if (!$date || $date->lt(Carbon::today())) {
+            $this->refuse('hold_until', 'Choose the date this lead comes back (today or later).');
+        }
+
+        return $date;
+    }
+
+    private function label(string $status): string
+    {
+        return str_replace('_', ' ', $status);
+    }
+
+    private function refuse(string $field, string $message): never
+    {
+        throw ValidationException::withMessages([$field => $message]);
     }
 
     public function delete(Lead $lead): void
@@ -142,11 +210,29 @@ class LeadService
         return $customer->id;
     }
 
-    /** Called from QuotationService after a quotation is made for a lead. */
+    /**
+     * Called from QuotationService after a quotation is made for a lead.
+     * An open or on-hold lead moves to quoted and remembers the quotation. A won, lost or invalid lead keeps its status and its
+     * original quotation (it was closed on purpose): the new quotation is only noted on the timeline. Reopen it first to work it again.
+     */
     public function linkQuotation(int $leadId, int $companyId, int $quotationId, int $customerId): void
     {
         $lead = Lead::where('company_id', $companyId)->find($leadId);
         if (!$lead) return;
+
+        $number = \App\Models\Quotation::withoutGlobalScope('tenant')->where('company_id', $companyId)->whereKey($quotationId)->value('quotation_no') ?? "#{$quotationId}";
+
+        if ($lead->isClosed()) {
+            if (!$lead->customer_id) $lead->update(['customer_id' => $customerId]);
+            LeadActivity::create([
+                'company_id' => $companyId, 'lead_id' => $lead->id, 'user_id' => auth()?->id(), 'type' => 'note',
+                'description' => "Quotation {$number} was made for this lead. It stays {$this->label($lead->status)}; reopen it to work it again.",
+                'activity_date' => now(),
+            ]);
+
+            return;
+        }
+
         $lead->update(['status' => 'quoted', 'quotation_id' => $quotationId, 'customer_id' => $customerId]);
         LeadActivity::create([
             'company_id'    => $companyId,
@@ -164,25 +250,30 @@ class LeadService
         return Lead::where('company_id', $companyId)
             ->whereNotNull('next_follow_up_date')
             ->whereDate('next_follow_up_date', '<=', Carbon::today())
-            ->whereNotIn('status', ['won', 'lost'])
+            ->whereNotIn('status', Lead::CLOSED)
             ->count();
     }
 
-    /** Funnel + source conversion + follow-up + lost-reason summary. */
+    /** Funnel + source conversion + follow-up + lost-reason summary. Invalid (junk) leads are counted on their own and left out of everything else. */
     public function dashboard(int $companyId): array
     {
-        $funnel = Lead::where('company_id', $companyId)
+        $byStatus = Lead::where('company_id', $companyId)
             ->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status')->toArray();
 
-        $order = ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost'];
         $funnelOut = [];
-        $total = 0;
-        foreach ($order as $s) { $n = (int) ($funnel[$s] ?? 0); $funnelOut[] = ['status' => $s, 'count' => $n]; $total += $n; }
-        $won = (int) ($funnel['won'] ?? 0);
-        $lost = (int) ($funnel['lost'] ?? 0);
+        foreach (['new', 'contacted', 'qualified', 'quoted', 'won', 'lost'] as $s) {
+            $funnelOut[] = ['status' => $s, 'count' => (int) ($byStatus[$s] ?? 0)];
+        }
+        $won = (int) ($byStatus['won'] ?? 0);
+        $lost = (int) ($byStatus['lost'] ?? 0);
+        $invalid = (int) ($byStatus['invalid'] ?? 0);
+        $onHold = (int) ($byStatus['on_hold'] ?? 0);
+        $total = (int) array_sum($byStatus) - $invalid;
         $closed = $won + $lost;
 
-        $bySource = Lead::where('company_id', $companyId)
+        $real = fn () => Lead::where('company_id', $companyId)->where('status', '!=', 'invalid');
+
+        $bySource = $real()
             ->selectRaw('source, count(*) as total, sum(case when status = "won" then 1 else 0 end) as won')
             ->groupBy('source')->orderByDesc('total')->get()
             ->map(fn ($r) => [
@@ -199,7 +290,7 @@ class LeadService
             ->map(fn ($r) => ['reason' => $r->lost_reason, 'count' => (int) $r->c]);
 
         $today = Carbon::today();
-        $openFollow = Lead::where('company_id', $companyId)->whereNotIn('status', ['won', 'lost'])->whereNotNull('next_follow_up_date');
+        $openFollow = Lead::where('company_id', $companyId)->whereNotIn('status', Lead::CLOSED)->whereNotNull('next_follow_up_date');
         $overdue = (clone $openFollow)->whereDate('next_follow_up_date', '<', $today)->count();
         $dueToday = (clone $openFollow)->whereDate('next_follow_up_date', $today)->count();
         $thisWeek = (clone $openFollow)->whereDate('next_follow_up_date', '>', $today)
@@ -210,6 +301,8 @@ class LeadService
             'open'           => $total - $closed,
             'won'            => $won,
             'lost'           => $lost,
+            'on_hold'        => $onHold,
+            'invalid'        => $invalid,
             'win_rate'       => $closed > 0 ? round($won / $closed * 100, 1) : 0,
             'funnel'         => $funnelOut,
             'by_source'      => $bySource,

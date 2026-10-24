@@ -46,7 +46,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 |---|---|---|
 | 0.1 | Lead lifecycle tests | done, local (also PR #16, unmerged) |
 | 1.1 | Lists as data (sources, lost reasons) | done, local |
-| 1.2 | Status engine | not started |
+| 1.2 | Status engine | done, local |
 | 1.3 | Automatic won, lost-reason dialog | not started |
 | 1.4 | Duplicate detection | not started |
 | 1.5 | Convert fixes | not started |
@@ -115,6 +115,9 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Build:** `LeadService::transition()`; allowed moves defined in one table; reopening needs a reason and clears the lost reason; the Edit form can no longer change status; a new quotation moves a lead forward only while it is still open; new statuses **invalid** (junk, excluded from statistics) and **on hold** (with a return date); status change endpoint keeps working for the screen.
 - **Tests:** each allowed and refused move; a won lead stays won when a second quotation is made; timeline entry for every change including via Edit attempts.
 - **Live check:** move a test lead through the ladder on the live screen, then delete it. **Size:** M. **Needs from client:** nothing.
+- **Result:** `Lead::allowedNext()/transitions()`, `LeadService::transition()`, options return `transitions`, Edit cannot set status, `LeadStatusEngineTest` (13). Flipped `any_status_move_is_allowed...` (now
+  `editing_a_lead_cannot_change_its_status...`) and `a_won_lead_goes_back_to_quoted...` (now `a_won_lead_stays_won...`); the six-statuses test no longer loops won then lost, because that is now a reopen.
+  Screen: On hold and Invalid tabs, badges, "Reopen as ..." buttons, one dialog for hold date / invalid note / reopen reason. Lost still uses the browser prompt until 1.3. Live check moves to the release.
 
 ### 1.3 Automatic won and the lost-reason dialog (LD-01, LD-09)
 - **Goal:** the win rate becomes true without anyone remembering a click.

@@ -179,29 +179,27 @@ class LeadLifecycleTest extends TestCase
         $this->assertSame($this->admin->id, LeadActivity::where('lead_id', $lead->id)->orderBy('id')->first()->user_id);
     }
 
-    public function test_only_the_six_known_statuses_are_accepted(): void
+    public function test_only_the_known_statuses_are_accepted(): void
     {
         $lead = $this->lead();
 
         $this->postJson("/api/leads/{$lead->id}/status", ['status' => 'maybe'])->assertStatus(422);
         $this->postJson("/api/leads/{$lead->id}/status", [])->assertStatus(422);
-        foreach (['contacted', 'qualified', 'quoted', 'won', 'lost', 'new'] as $status) {
+        foreach (['contacted', 'qualified', 'quoted', 'new'] as $status) {
             $this->postJson("/api/leads/{$lead->id}/status", ['status' => $status])->assertOk();
         }
     }
 
-    public function test_CURRENT_any_status_move_is_allowed_and_editing_can_change_the_status_without_a_trace(): void
+    public function test_editing_a_lead_cannot_change_its_status_but_can_resend_the_current_one(): void
     {
-        // LD-03. Sub-phase 1.2 defines the allowed moves and makes every change leave a timeline entry.
+        // LD-03 (1.2): a status change goes through the status action, which checks the move and writes the timeline.
         $lead = $this->lead();
-        $this->postJson("/api/leads/{$lead->id}/status", ['status' => 'won'])->assertOk();
-        $this->postJson("/api/leads/{$lead->id}/status", ['status' => 'new'])->assertOk();      // won straight back to new
-        $before = LeadActivity::where('lead_id', $lead->id)->count();
 
-        $this->putJson("/api/leads/{$lead->id}", ['status' => 'lost'])->assertOk();
+        $this->putJson("/api/leads/{$lead->id}", ['status' => 'lost'])->assertStatus(422)->assertJsonValidationErrors('status');
+        $this->assertSame('new', $lead->fresh()->status);
 
-        $this->assertSame('lost', $lead->fresh()->status);
-        $this->assertSame($before, LeadActivity::where('lead_id', $lead->id)->count(), 'No timeline entry for a status set through Edit.');
+        $this->putJson("/api/leads/{$lead->id}", ['status' => 'new', 'city' => 'Surat'])->assertOk();
+        $this->assertSame('Surat', $lead->fresh()->city);
     }
 
     public function test_activities_are_notes_calls_emails_whatsapp_and_meetings_newest_first(): void
@@ -288,16 +286,20 @@ class LeadLifecycleTest extends TestCase
         $this->assertTrue(LeadActivity::where('lead_id', $lead->id)->where('description', 'Converted to quotation')->exists());
     }
 
-    public function test_CURRENT_a_won_lead_goes_back_to_quoted_when_another_quotation_is_made(): void
+    public function test_a_won_lead_stays_won_when_another_quotation_is_made_and_the_timeline_says_so(): void
     {
-        // LD-02 (and LD-01: nothing marks it won by itself). Sub-phase 1.2 stops closed leads from reopening.
+        // LD-02 (1.2): a closed lead is never reopened by a quotation.
         $lead = $this->lead();
         $this->quotationFor($lead)->assertStatus(201);
         $this->postJson("/api/leads/{$lead->id}/status", ['status' => 'won'])->assertOk();
+        $first = $lead->fresh()->quotation_id;
 
         $this->quotationFor($lead->fresh(), $lead->fresh()->customer_id)->assertStatus(201);
 
-        $this->assertSame('quoted', $lead->fresh()->status, 'The won lead has been reopened.');
+        $fresh = $lead->fresh();
+        $this->assertSame('won', $fresh->status);
+        $this->assertSame($first, $fresh->quotation_id, 'The quotation it was won on stays linked.');
+        $this->assertTrue(LeadActivity::where('lead_id', $lead->id)->where('description', 'like', '%stays won%')->exists());
     }
 
     public function test_CURRENT_accepting_the_quotation_does_not_mark_the_lead_won(): void

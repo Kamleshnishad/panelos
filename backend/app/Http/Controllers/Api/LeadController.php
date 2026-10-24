@@ -27,10 +27,10 @@ class LeadController extends Controller
 
         $paginated = $this->leads->list($cid, $filters)->paginate($perPage, ['*'], 'page', $page);
 
-        // Per-status counts for the tabs — unfiltered, server-side (cheap groupBy)
+        // Per-status counts for the tabs — unfiltered, server-side (cheap groupBy). "All" leaves the junk (invalid) out; it has its own tab.
         $byStatus = Lead::where('company_id', $cid)
             ->selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status');
-        $counts = ['' => (int) $byStatus->sum()];
+        $counts = ['' => (int) $byStatus->except('invalid')->sum()];
         foreach ($byStatus as $st => $c) $counts[(string) $st] = (int) $c;
 
         return response()->json([
@@ -56,7 +56,8 @@ class LeadController extends Controller
         return $this->successResponse([
             'sources'      => $this->lists->activeNames('source', $cid),
             'lost_reasons' => $reasons,
-            'statuses'     => ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost'],
+            'statuses'     => Lead::STATUSES,
+            'transitions'  => Lead::transitions(),     // what each status may move to: the screen offers exactly these
         ], 'Lead options');
     }
 
@@ -92,6 +93,9 @@ class LeadController extends Controller
             $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
             $this->normaliseSource($r, $lead->source);
             $data = $r->validate($this->rules(true, $this->cid($r), $lead->source));
+            if ($r->has('status') && $r->input('status') !== $lead->status) {
+                throw ValidationException::withMessages(['status' => 'Change the status with the status action, so it is checked and written to the timeline.']);
+            }
             return $this->successResponse($this->leads->update($lead, $data), 'Lead updated');
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
@@ -105,7 +109,9 @@ class LeadController extends Controller
         try {
             $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
             $data = $r->validate([
-                'status'         => 'required|in:new,contacted,qualified,quoted,won,lost',
+                'status'         => ['required', Rule::in(Lead::STATUSES)],
+                'reason'         => 'nullable|string|max:500',
+                'hold_until'     => 'nullable|date',
                 'lost_reason'    => 'nullable|string|max:255',
                 'lost_reason_id' => 'nullable|integer',
                 'lost_note'      => 'nullable|string|max:1000',
@@ -126,7 +132,10 @@ class LeadController extends Controller
                 $reason = $picked['name'];
             }
 
-            return $this->successResponse($this->leads->changeStatus($lead, $data['status'], $reason, $r->user()->id, $reasonId, $note), 'Status updated');
+            return $this->successResponse($this->leads->transition($lead, $data['status'], [
+                'lost_reason' => $reason, 'lost_reason_id' => $reasonId, 'lost_note' => $note,
+                'reason' => $data['reason'] ?? null, 'hold_until' => $data['hold_until'] ?? null,
+            ], $r->user()->id), 'Status updated');
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
         } catch (\Exception $e) {
@@ -207,7 +216,8 @@ class LeadController extends Controller
             'application'         => 'nullable|string|max:40',
             'est_qty_sqm'         => 'nullable|numeric|min:0',
             'est_value'           => 'nullable|numeric|min:0',
-            'status'              => 'nullable|in:new,contacted,qualified,quoted,won,lost',
+            // A new lead starts in an open stage; every later change goes through the status action.
+            'status'              => $update ? 'nullable|string' : ['nullable', Rule::in(['new', 'contacted', 'qualified'])],
             // Scope the assigned user to the caller's company so a tenant can't write
             // a foreign tenant's user id (information disclosure + cross-tenant UI poisoning).
             'assigned_to_user_id' => [

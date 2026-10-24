@@ -107,7 +107,7 @@ class DashboardService
                 'label' => $s, 'count' => (int) ($quoteStatus[$s]->n ?? 0), 'value' => round((float) ($quoteStatus[$s]->total ?? 0), 2),
             ])->all(),
             'lead_funnel' => $this->countBy(\App\Models\Lead::where('company_id', $companyId), 'status', ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost']),
-            'lead_sources' => \App\Models\Lead::where('company_id', $companyId)->where('created_at', '>=', $fyStart)
+            'lead_sources' => \App\Models\Lead::where('company_id', $companyId)->where('status', '!=', 'invalid')->where('created_at', '>=', $fyStart)
                 ->selectRaw("source, COUNT(*) as n, SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as won")
                 ->groupBy('source')->orderByDesc('n')->get()
                 ->map(fn ($r) => ['label' => $r->source, 'value' => (int) $r->n, 'won' => (int) $r->won])->all(),

@@ -19,7 +19,7 @@ System audit page: https://claude.ai/artifact/7vrGKYzm34XzBnNumWNrPi (10 of 53 d
 - **#12** `ft-03-partial-dispatch` (FR-006): several loads per batch. Waiting for the client's answers: is "pieces" the right unit, and when are accessories/installation billed (default: first invoice). Changes a DB index (unique on `dispatches.batch_id` replaced by a plain one).
 - **#16** `leads-0-1-lifecycle-tests`: tests only. Superseded by the local branch below; leave it.
 
-**Local only, by the owner's decision (24 Oct):** branch **`leads-program`** (3 commits on top of `main`): 0.1 lifecycle tests (25), the protocol change, and
+**Local only, by the owner's decision (24 Oct):** branch **`leads-program`** (commits on top of `main`): 0.1 lifecycle tests (25), the protocol change, and
 **1.1 lists as data** (migration `2026_10_25_000001_lead_lists_as_data`, `LeadListService`, `LeadListController`, `LeadListsSettings.vue`, 13 tests; backend suite 662/662,
 schema check matches, migration verified on MySQL against enum-era data, rollback and re-run clean). **Nothing for the lead programme is pushed or deployed until the whole
 plan is complete**; then push once, let CI run on MySQL 8, review, merge and deploy (recommend releasing in batches). Local `main` is one commit ahead of `origin/main`
@@ -31,14 +31,11 @@ The owner says **"next"**. Each "next" = build the next sub-phase from `LEADS_PL
 suite (`cd backend; php -d memory_limit=1G vendor/bin/phpunit --no-coverage`), `DB_DATABASE=panelos_test php artisan schema:check` when the schema changed, frontend `npm run build`
 and `npm test`, a headless-browser run for screens (see "Tools"), and update `LEADS_PLAN.md` progress, `SYSTEM.md`, `BUGS.md` (row **FR-009** is the programme row) in the same commit.
 
-**Next sub-phase: 1.2 Status engine** (audit LD-02, LD-03, LP-07 statuses):
-- one `LeadService::transition()` that every status change uses, with the allowed moves in one table and a timeline entry for every change;
-- the Edit form (`PUT /api/leads/{id}`) can no longer change `status`;
-- reopening needs a reason and clears the lost reason; new statuses **invalid** (junk, excluded from statistics) and **on hold** (with a return date);
-- a new quotation moves a lead forward only while it is still open (new, contacted, qualified), never reopens won or lost;
-- flips two `CURRENT` tests in `tests/Feature/LeadLifecycleTest.php`: `any_status_move_is_allowed_and_editing_can_change_the_status_without_a_trace` and
-  `a_won_lead_goes_back_to_quoted_when_another_quotation_is_made`. `leads.status` is already a string (1.1), so new values need no migration; the dashboard/funnel
-  and the follow-up badge must exclude invalid and on-hold leads where the plan says so.
+**Done locally:** 0.1, 1.1 lists as data, **1.2 status engine** (`Lead::allowedNext`, `LeadService::transition`, on hold + invalid, reopen needs a reason; backend suite 677/677, browser run 14 checks).
+
+**Next sub-phase: 1.3 Automatic won and the lost-reason dialog** (LD-01, LD-09): lead becomes won when its quotation's order is created (default definition), timeline says why, backfill command with a dry run,
+and the browser `window.prompt` for lost in `LeadManager.vue` (`markLost`) becomes a proper dialog using the reason list from 1.1 (`/api/leads/options` lost_reasons, `lost_reason_id`, note). Flip
+`test_CURRENT_accepting_the_quotation_does_not_mark_the_lead_won`. Reuse the status dialog (`sd`) pattern added in 1.2.
 
 Defaults agreed unless the client says otherwise: "won" = an order was created from the lead's quotation (1.3); no automatic assignment until they choose a rule (2.4);
 the IndiaMART connector is built against a fake until the client's CRM key exists (3.x). Needs from the client are listed in the lead audit page:

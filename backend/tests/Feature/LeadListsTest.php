@@ -230,7 +230,9 @@ class LeadListsTest extends TestCase
         $o = $this->getJson('/api/leads/options')->assertOk()->json('data');
 
         $this->assertSame(LeadListService::DEFAULT_SOURCES, $o['sources']);
-        $this->assertSame(['new', 'contacted', 'qualified', 'quoted', 'won', 'lost'], $o['statuses']);
+        $this->assertSame(['new', 'contacted', 'qualified', 'quoted', 'on_hold', 'won', 'lost', 'invalid'], $o['statuses']);
+        $this->assertContains('on_hold', $o['transitions']['quoted']);
+        $this->assertSame(['new', 'contacted', 'qualified', 'quoted'], $o['transitions']['lost'], 'A closed lead can only be reopened.');
         $this->assertSame('Price too high', $o['lost_reasons'][0]['name']);
         $this->assertArrayHasKey('id', $o['lost_reasons'][0]);
     }
