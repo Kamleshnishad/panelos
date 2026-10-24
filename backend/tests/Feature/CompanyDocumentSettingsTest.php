@@ -54,7 +54,8 @@ class CompanyDocumentSettingsTest extends TestCase
 
         $this->assertSame('UMA SIGNATURE PUF PANEL LLP', $res->json('data.legal_name'));
         $this->assertSame('QUOTATION', $res->json('data.quotation_title'));
-        $this->assertSame([['title' => 'Delivery', 'text' => 'Within 10 days.']], $res->json('data.quotation_terms'));
+        // assertEquals, not assertSame: MySQL 8 sorts the keys inside a JSON column, MariaDB keeps insertion order.
+        $this->assertEquals([['title' => 'Delivery', 'text' => 'Within 10 days.']], $res->json('data.quotation_terms'));
         $this->assertSame(['Crane hire.'], $res->json('data.quotation_exclusions'));
         $this->assertCount(12, $res->json('data.default_quotation_terms'));
         $this->assertCount(6, $res->json('data.default_quotation_exclusions'));
