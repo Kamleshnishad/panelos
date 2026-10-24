@@ -49,6 +49,24 @@ class ServerAlertsAndHealthTest extends TestCase
         $this->getJson('/api/health')->assertStatus(503)->assertJsonPath('errors_last_hour', SystemHealth::ERROR_SPIKE);
     }
 
+    public function test_health_reports_backups_and_goes_503_when_they_have_stopped(): void
+    {
+        SystemHealth::heartbeat();
+        $this->getJson('/api/health')->assertOk()->assertJsonPath('backup', 'UNKNOWN');
+
+        SystemHealth::markBackup();
+        $this->getJson('/api/health')->assertOk()->assertJsonPath('backup', 'OK');
+
+        Cache::forever('health:backup', now()->subHours(40)->timestamp);
+        $this->getJson('/api/health')->assertStatus(503)->assertJsonPath('status', 'DEGRADED')->assertJsonPath('backup', 'STALE');
+    }
+
+    public function test_the_file_cache_stays_writable_for_whoever_writes_next(): void
+    {
+        // PB-062: a cache/lock file written by root locked the scheduler (user panelos) out of every withoutOverlapping task.
+        $this->assertSame(0666, config('cache.stores.file.permission'));
+    }
+
     public function test_the_scheduler_actually_has_a_heartbeat_task(): void
     {
         $names = collect(app(Schedule::class)->events())->map(fn ($e) => $e->description)->all();

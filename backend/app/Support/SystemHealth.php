@@ -15,12 +15,20 @@ class SystemHealth
     /** The scheduler beats once a minute; this many seconds without one means it is not running. */
     public const SCHEDULER_STALE_AFTER = 300;
 
+    /** A backup (the nightly one or a deploy's) older than this means backups have stopped. */
+    public const BACKUP_STALE_AFTER = 36 * 3600;
+
     /** This many server errors inside one hour marks the system degraded. */
     public const ERROR_SPIKE = 25;
 
     public static function heartbeat(): void
     {
         Cache::put('health:scheduler', now()->timestamp, 86400);
+    }
+
+    public static function markBackup(): void
+    {
+        Cache::forever('health:backup', now()->timestamp);
     }
 
     public static function recordError(): void
@@ -43,15 +51,20 @@ class SystemHealth
         $beat = self::safe(fn () => Cache::get('health:scheduler'));
         $scheduler = $beat === null ? 'UNKNOWN' : (now()->timestamp - (int) $beat > self::SCHEDULER_STALE_AFTER ? 'STALE' : 'OK');
 
+        // Unknown until the first backup after a deploy, which runs within seconds of it.
+        $lastBackup = self::safe(fn () => Cache::get('health:backup'));
+        $backup = $lastBackup === null ? 'UNKNOWN' : (now()->timestamp - (int) $lastBackup > self::BACKUP_STALE_AFTER ? 'STALE' : 'OK');
+
         $errors = (int) self::safe(fn () => Cache::get('health:errors:' . now()->format('YmdH'), 0));
         $failedJobs = (int) self::safe(fn () => Schema::hasTable('failed_jobs') ? DB::table('failed_jobs')->count() : 0);
 
-        $ok = $db === 'OK' && $scheduler !== 'STALE' && $errors < self::ERROR_SPIKE;
+        $ok = $db === 'OK' && $scheduler !== 'STALE' && $backup !== 'STALE' && $errors < self::ERROR_SPIKE;
 
         return [
             'status'           => $ok ? 'OK' : 'DEGRADED',
             'database'         => $db,
             'scheduler'        => $scheduler,
+            'backup'           => $backup,
             'errors_last_hour' => $errors,
             'failed_jobs'      => $failedJobs,
             'timestamp'        => now(),

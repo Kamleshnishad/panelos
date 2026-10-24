@@ -51,6 +51,7 @@ return [
             'driver' => 'file',
             'path' => storage_path('framework/cache/data'),
             'lock_path' => storage_path('framework/cache/data'),
+            'permission' => 0666,   // a cache or lock file written by root must not lock the scheduler out (PB-062)
         ],
 
         'memcached' => [

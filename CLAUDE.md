@@ -102,6 +102,11 @@ npm run build    # always run this before calling a frontend change done
 * API responses use the `ApiResponse` envelope (`success`, `data`, `message`, `error_code`). Domain
   rejections are 400/422 with the real message — never a generic 500.
 
+## Production commands
+
+Always `docker exec -u panelos panelos_backend php artisan ...`, never as root: a file root creates in the `storage` volume cannot be written by the scheduler or the web workers
+(PB-042: logs, PB-062: cache locks, which silently stopped the nightly backup and every `withoutOverlapping` task).
+
 ## Git
 
 Private repo `Kamleshnishad/panelos`. Commit before risky changes; `backup.bat` commits and pushes.

@@ -59,6 +59,7 @@ class BackupDatabase extends Command
 
         $size = round(filesize($file) / 1024, 1);
         $this->info("Backup complete ({$size} KB).");
+        \App\Support\SystemHealth::markBackup();
 
         $this->prune((int) $this->option('keep'), $dir);
         return self::SUCCESS;
