@@ -12,6 +12,7 @@ class DispatchItem extends Model
 
     protected $fillable = [
         'dispatch_id',
+        'order_item_id',
         'panel_type_id',
         'quantity',
         'unit_price',
@@ -36,6 +37,11 @@ class DispatchItem extends Model
     public function dispatch()
     {
         return $this->belongsTo(Dispatch::class);
+    }
+
+    public function sizes()
+    {
+        return $this->hasMany(DispatchItemSize::class, 'dispatch_item_id');
     }
 
     public function panelType()

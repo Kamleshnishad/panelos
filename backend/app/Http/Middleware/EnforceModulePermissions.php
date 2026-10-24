@@ -32,6 +32,7 @@ class EnforceModulePermissions
         'batches.create'      => 'production.manage',
         'dispatches.create'   => 'dispatch.manage',
         'dispatches.by_batch' => 'dispatch.view',
+        'dispatches.plan'     => 'dispatch.view',
         // Stage sign-off is a separate duty from running the line, so it
         // gets its own key rather than riding on production.manage.
         'batches.stages.approve' => 'production.approve',

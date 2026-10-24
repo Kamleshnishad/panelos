@@ -160,6 +160,13 @@
                 @if($spec->cello_tap) &nbsp;|&nbsp; Cello Tap @endif
               </div>
             @endif
+            @if($item->sizes->isNotEmpty())
+              <div class="desc-sub">
+                @foreach($item->sizes as $z)
+                  {{ $z->length_mm }} &times; {{ $z->width_mm }} mm &times; {{ $z->nos }} nos{{ !$loop->last ? ' ; ' : '' }}
+                @endforeach
+              </div>
+            @endif
           </td>
           <td><div>{{ $spec->hsn_code ?? '39259010' }}</div></td>
           <td class="text-right bold"><div>{{ \App\Support\Inr::fmt($item->quantity, 2) }}</div></td>
@@ -178,6 +185,10 @@
       @endif
     </tbody>
   </table>
+
+  @if($dispatch->balance_sqm)
+  <div class="note-box"><span class="bold">Part load.</span> Balance still to be dispatched on this order: {{ \App\Support\Inr::fmt($dispatch->balance_sqm, 2) }} SQM.</div>
+  @endif
 
   @if($dispatch->notes)
   <div class="note-box"><span class="bold">Notes:</span> {{ $dispatch->notes }}</div>

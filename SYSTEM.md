@@ -837,13 +837,12 @@ Rules:
 
 1. A QC record exists for the batch, **and** `qc.status === 'pass'`, **and** `qc.approved_at` is set.
 2. `batch.status` ∈ `qc_passed`, `completed`.
-3. No dispatch already exists for the batch — **one dispatch per batch**.
+3. Something is left to send (see §16.3): a batch may have **several** dispatches, but never sends a piece twice.
 
-Payload: `{ customer_address, expected_delivery_date, tracking_number, notes, auto_allocate }`.
+Payload: `{ customer_address, expected_delivery_date, tracking_number, transporter_name, vehicle_no, transport_amount, notes, items? }` where `items` is `[{ order_item_size_id, nos }]` (or `{ order_item_id }` for an order line with no size rows); omit it to send everything still to send.
 
 `dispatch_no` is generated in the model's `boot()` (`creating` hook), prefix + 6-digit sequence.
-Dispatch items are copied from **all** of the batch's order items
-(`quantity = total_sqm` stored at 4 dp, `unit_price = rate_per_sqm`, `amount` carried across verbatim).
+A dispatch carries one item per order line that has pieces on it (`quantity` in square metres at 4 dp, `unit_price = rate_per_sqm`, `amount`), and one `dispatch_item_sizes` row per size row with its `nos`, `sqm` and `amount`.
 Dispatch carries **panel rows only** — accessories and installation are billed on the invoice (§17.1).
 
 ### 16.2 Lifecycle
@@ -860,6 +859,19 @@ Dispatch carries **panel rows only** — accessories and installation are billed
 | By batch | `GET /api/batches/{batchId}/dispatches` | Needs `dispatch.view` |
 
 Once every batch of an order is `dispatched`, the order may be marked `completed`.
+
+### 16.3 Partial dispatch (FT-03, FR-006)
+
+`DispatchPlanService` is the single place that knows what is left. `GET /api/batches/{id}/dispatch-plan` returns, per order line and size row, `ordered_nos`, `dispatched_nos`,
+`remaining_nos`, `sqm_each` and `remaining_sqm`, plus `fully_dispatched` and `legacy`.
+
+* **Left to send** = the order's nos minus the nos on *live* dispatches (anything not `cancelled`). Cancelling returns the pieces.
+* **Money** follows the pieces: `size.amount × nos ÷ size.nos`, except the dispatch that takes the *last* pieces of a size row (or closes an order line), which receives the stored amount
+  minus what earlier live dispatches took, so a line's dispatches sum to the order line exactly. A dispatch that takes everything left therefore equals the old whole-batch dispatch to the paisa.
+* **Batch status** (`DispatchService::syncBatchStatus`): `dispatched` only when nothing is left *and* no dispatch is `pending`/`in_transit`; otherwise it stays `qc_passed`. Cancelling a delivered dispatch moves a `dispatched` batch back to `qc_passed`.
+* **Legacy:** a live dispatch whose items have no `order_item_id` was made before this feature and covered the whole batch, so everything counts as sent. A batch whose order has no lines keeps the one-itemless-dispatch rule.
+* **Concurrency:** the batch row is locked (`lockForUpdate`) while a dispatch is created; the old unique index on `dispatches.batch_id` is gone.
+* **Invoicing** is unchanged: one invoice per dispatch; accessories, installation and fixed freight are billed on the first invoice of the order (§17.1), actual freight on the dispatch that carries it.
 
 ---
 
@@ -1235,8 +1247,8 @@ draft ──start──► in_progress ──complete──► qc_pending ──
 
 ### Dispatch
 ```
-pending ──complete──► delivered          (sets batch → dispatched)
-   └────cancel─────► cancelled           (reverts batch → qc_passed)
+pending ──complete──► delivered          (batch → dispatched only when every piece has been delivered; FR-006)
+   └────cancel─────► cancelled           (its pieces become available again; a dispatched batch → qc_passed)
 ```
 
 ### Invoice
@@ -1399,7 +1411,10 @@ Hit one of these and the message tells you exactly which invariant you tripped.
 | `Batch must be in qc_pending status to enter QC` | QC create | Complete the batch first |
 | `Can only approve QC entries with pass status. Failed QC requires rework.` | QC approve | Failed QC cannot be approved |
 | `Batch must have an approved-pass QC record before dispatch.` | dispatch create | QC missing, failed, or unapproved |
-| `Batch has already been dispatched` | dispatch create | One dispatch per batch |
+| `Batch has already been dispatched` | dispatch create | Nothing is left to send on this batch |
+| `Only N of M pieces of L x W mm are left to dispatch; you asked for K.` | dispatch create | More pieces asked for than remain on that size row |
+| `Enter at least 1 piece for each size row you dispatch.` / `Choose at least one piece to dispatch.` | dispatch create | An empty or zero line |
+| `A size row you chose does not belong to this batch's order.` | dispatch create | Foreign size row id |
 | `An invoice already exists for this dispatch/order.` | invoice create | One active invoice per source |
 | `Cannot record payment for draft invoice` | payment | Send the invoice first |
 | `Payment amount exceeds remaining due amount of N` | payment | Over-payment blocked |
@@ -1594,8 +1609,7 @@ as live defects; what is listed below is what is still true of the code today.
    excludes it.
 3. **"Rate pending" is `0`, not null.** Any size row left at 0 blocks sending.
 4. **BOQ and quotation share one table.** The list endpoint hides `status='boq'` unless asked for it.
-5. **One dispatch per batch, one active invoice per dispatch/order.** Partial dispatch of a batch is not
-   modelled; a dispatch copies **all** of the batch's order items.
+5. *(Fixed, FR-006: a batch can have several dispatches, each taking chosen pieces; see §16.3.)* **One active invoice per dispatch.**
 6. **Dispatch no longer touches stock.** Raw material is consumed at production start; the
    `/dispatches/{id}/allocate` endpoint is a kept-for-compatibility no-op.
 7. **Super admins see no tenant data.** The platform owner belongs to no factory; use impersonation.
