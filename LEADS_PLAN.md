@@ -45,7 +45,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | Sub-phase | What | Status |
 |---|---|---|
 | 0.1 | Lead lifecycle tests | done, local (also PR #16, unmerged) |
-| 1.1 | Lists as data (sources, lost reasons) | not started |
+| 1.1 | Lists as data (sources, lost reasons) | done, local |
 | 1.2 | Status engine | not started |
 | 1.3 | Automatic won, lost-reason dialog | not started |
 | 1.4 | Duplicate detection | not started |
@@ -106,6 +106,9 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Build:** `source` and `status` columns change from MySQL enums to plain strings (two-step, existing values kept); validation moves to code; tables `lead_sources` and `lead_lost_reasons` per company, seeded with today's nine sources and a starter list of reasons (price, competitor, no budget, timing, not genuine, no response); Settings screen to edit them; `lead_lost_reason_id` beside the existing free text (kept for old rows).
 - **Tests:** every old value still validates; a custom source works; another company's list is separate; schema verified on MySQL.
 - **Live check:** existing leads still list and filter. **Size:** M. **Needs from client:** nothing (they can edit the lists later).
+- **Result:** migration `2026_10_25_000001_lead_lists_as_data`, `LeadListService`, `LeadListController`, `LeadListsTest` (13), screen `LeadListsSettings.vue` under Master Data. Verified on a scratch MySQL database that
+  held enum-era leads (values kept, 15 and 7 starter rows for the existing company, unique keys and foreign keys present, rollback and re-run clean). The lost-reason *dialog* that uses the list is 1.3.
+  The `source_is_a_fixed_list...` lifecycle test was flipped as planned (TradeIndia is now a normal source). Live check moves to the release.
 
 ### 1.2 Status engine (LD-02, LD-03, LP-07 statuses)
 - **Goal:** every status change goes through one method that logs it and obeys rules.

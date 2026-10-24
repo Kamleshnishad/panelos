@@ -63,11 +63,15 @@ class LeadService
         return $lead->fresh('assignedUser', 'customer');
     }
 
-    public function changeStatus(Lead $lead, string $status, ?string $lostReason = null, ?int $userId = null): Lead
+    public function changeStatus(Lead $lead, string $status, ?string $lostReason = null, ?int $userId = null, ?int $lostReasonId = null, ?string $lostNote = null): Lead
     {
         $from = $lead->status;
         $payload = ['status' => $status];
-        if ($status === 'lost') $payload['lost_reason'] = $lostReason;
+        if ($status === 'lost') {
+            $payload['lost_reason'] = $lostReason;
+            $payload['lost_reason_id'] = $lostReasonId;
+            $payload['lost_note'] = $lostNote;
+        }
         $lead->update($payload);
 
         // Auto-log the status change as an activity
@@ -76,7 +80,7 @@ class LeadService
             'lead_id'       => $lead->id,
             'user_id'       => $userId,
             'type'          => 'status_change',
-            'description'   => "Status: {$from} → {$status}" . ($lostReason ? " (reason: {$lostReason})" : ''),
+            'description'   => "Status: {$from} → {$status}" . ($lostReason ? " (reason: {$lostReason}" . ($lostNote ? " — {$lostNote}" : '') . ')' : ''),
             'activity_date' => now(),
         ]);
 

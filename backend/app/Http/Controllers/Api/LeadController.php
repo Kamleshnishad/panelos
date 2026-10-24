@@ -14,7 +14,7 @@ class LeadController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(private LeadService $leads) {}
+    public function __construct(private LeadService $leads, private \App\Services\LeadListService $lists) {}
 
     private function cid(Request $r) { return $r->user()->company_id; }
 
@@ -47,6 +47,19 @@ class LeadController extends Controller
         ]);
     }
 
+    /** What the lead form needs to fill its drop-downs: the company's active sources and lost reasons, and the statuses. */
+    public function options(Request $r)
+    {
+        $cid = $this->cid($r);
+        $reasons = collect($this->lists->all('reason', $cid))->where('is_active', true)->map(fn ($x) => ['id' => $x['id'], 'name' => $x['name']])->values();
+
+        return $this->successResponse([
+            'sources'      => $this->lists->activeNames('source', $cid),
+            'lost_reasons' => $reasons,
+            'statuses'     => ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost'],
+        ], 'Lead options');
+    }
+
     public function dashboard(Request $r)
     {
         return $this->successResponse($this->leads->dashboard($this->cid($r)), 'Lead dashboard');
@@ -66,7 +79,7 @@ class LeadController extends Controller
     {
         try {
             $this->normaliseSource($r);
-            $data = $r->validate($this->rules(false, $this->cid($r)));
+            $data = $r->validate($this->rules(false, $this->cid($r), null));
             return $this->createdResponse($this->leads->create($this->cid($r), $data), 'Lead created', 201);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
@@ -77,8 +90,8 @@ class LeadController extends Controller
     {
         try {
             $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
-            $this->normaliseSource($r);
-            $data = $r->validate($this->rules(true, $this->cid($r)));
+            $this->normaliseSource($r, $lead->source);
+            $data = $r->validate($this->rules(true, $this->cid($r), $lead->source));
             return $this->successResponse($this->leads->update($lead, $data), 'Lead updated');
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
@@ -92,10 +105,28 @@ class LeadController extends Controller
         try {
             $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
             $data = $r->validate([
-                'status'      => 'required|in:new,contacted,qualified,quoted,won,lost',
-                'lost_reason' => 'nullable|string|max:255',
+                'status'         => 'required|in:new,contacted,qualified,quoted,won,lost',
+                'lost_reason'    => 'nullable|string|max:255',
+                'lost_reason_id' => 'nullable|integer',
+                'lost_note'      => 'nullable|string|max:1000',
             ]);
-            return $this->successResponse($this->leads->changeStatus($lead, $data['status'], $data['lost_reason'] ?? null, $r->user()->id), 'Status updated');
+
+            // A reason picked from the company's list wins: its name is stored (so reports group on it) with the id beside it.
+            // Free text still works (older callers); then it is the reason itself, as before.
+            $reason = $data['lost_reason'] ?? null;
+            $reasonId = null;
+            $note = $data['lost_note'] ?? null;
+            if (!empty($data['lost_reason_id'])) {
+                $picked = $this->lists->activeReason($this->cid($r), (int) $data['lost_reason_id']);
+                if (!$picked) {
+                    throw ValidationException::withMessages(['lost_reason_id' => 'Choose one of the lost reasons in the list.']);
+                }
+                $reasonId = $picked['id'];
+                $note = $note ?: (($reason && $reason !== $picked['name']) ? $reason : null);
+                $reason = $picked['name'];
+            }
+
+            return $this->successResponse($this->leads->changeStatus($lead, $data['status'], $reason, $r->user()->id, $reasonId, $note), 'Status updated');
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
         } catch (\Exception $e) {
@@ -144,23 +175,26 @@ class LeadController extends Controller
         }
     }
 
-    /** Source is a fixed list with mixed casing ("Website", "IndiaMART", "Walk-in") — match it case-insensitively. */
-    private function normaliseSource(Request $r): void
+    /** The source is one of the company's own list (Settings): match it case-insensitively and use the company's spelling. */
+    private function normaliseSource(Request $r, ?string $current = null): void
     {
         $source = $r->input('source');
         if (!is_string($source) || $source === '') return;
 
-        $allowed = ['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other'];
-        foreach ($allowed as $option) {
-            if (strcasecmp($source, $option) === 0) {
-                $r->merge(['source' => $option]);
-                return;
-            }
+        $cid = $this->cid($r);
+        if ($current !== null && strcasecmp($source, $current) === 0) {
+            $r->merge(['source' => $current]);          // unchanged: allowed even if the source has been switched off since
+            return;
+        }
+        if ($match = $this->lists->resolveSource($cid, $source)) {
+            $r->merge(['source' => $match]);
         }
     }
 
-    private function rules(bool $update = false, ?int $companyId = null): array
+    private function rules(bool $update = false, ?int $companyId = null, ?string $currentSource = null): array
     {
+        $sources = $companyId ? $this->lists->activeNames('source', $companyId) : [];
+        if ($currentSource !== null) $sources[] = $currentSource;
         $req = $update ? 'sometimes|required' : 'required';
         return [
             'contact_name'        => [...explode('|', $req), 'string', 'max:150'],
@@ -168,7 +202,7 @@ class LeadController extends Controller
             'phone'               => 'nullable|string|max:30',
             'email'               => 'nullable|email|max:150',
             'city'                => 'nullable|string|max:120',
-            'source'              => 'nullable|in:Website,Phone,WhatsApp,Referral,IndiaMART,Justdial,Exhibition,Walk-in,Other',
+            'source'              => ['nullable', Rule::in($sources)],
             'requirement'         => 'nullable|string|max:2000',
             'application'         => 'nullable|string|max:40',
             'est_qty_sqm'         => 'nullable|numeric|min:0',

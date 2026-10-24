@@ -116,6 +116,7 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     Route::get('/leads/dashboard', [\App\Http\Controllers\Api\LeadController::class, 'dashboard'])->name('leads.dashboard');
+    Route::get('/leads/options', [\App\Http\Controllers\Api\LeadController::class, 'options'])->name('leads.options');
     Route::post('/leads', [\App\Http\Controllers\Api\LeadController::class, 'store'])->name('leads.store');
     Route::get('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'show'])->name('leads.show');
     Route::put('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'update'])->name('leads.update');
@@ -123,6 +124,15 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::post('/leads/{id}/activities', [\App\Http\Controllers\Api\LeadController::class, 'addActivity'])->name('leads.activities');
     Route::post('/leads/{id}/convert', [\App\Http\Controllers\Api\LeadController::class, 'convert'])->name('leads.convert');
     Route::delete('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'destroy'])->name('leads.destroy');
+
+    // The company's lead lists (sources, lost reasons). /settings is read-open and write-guarded by settings.manage.
+    Route::get('/settings/lead-lists', [\App\Http\Controllers\Api\LeadListController::class, 'index'])->name('leadlists.index');
+    Route::post('/settings/lead-sources', [\App\Http\Controllers\Api\LeadListController::class, 'storeSource'])->name('leadlists.sources.store');
+    Route::put('/settings/lead-sources/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'updateSource'])->name('leadlists.sources.update');
+    Route::delete('/settings/lead-sources/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'destroySource'])->name('leadlists.sources.destroy');
+    Route::post('/settings/lead-lost-reasons', [\App\Http\Controllers\Api\LeadListController::class, 'storeReason'])->name('leadlists.reasons.store');
+    Route::put('/settings/lead-lost-reasons/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'updateReason'])->name('leadlists.reasons.update');
+    Route::delete('/settings/lead-lost-reasons/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'destroyReason'])->name('leadlists.reasons.destroy');
 
     // Customer Management
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');

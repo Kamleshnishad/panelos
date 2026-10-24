@@ -92,11 +92,12 @@ class LeadLifecycleTest extends TestCase
         $this->assertSame('LEAD-2027-0002', $second);
     }
 
-    public function test_source_is_a_fixed_list_matched_without_regard_to_case(): void
+    public function test_source_is_the_companys_own_list_matched_without_regard_to_case(): void
     {
         $this->newLead(['source' => 'indiamart'])->assertStatus(201)->assertJsonPath('data.source', 'IndiaMART');
         $this->newLead(['source' => 'walk-in'])->assertStatus(201)->assertJsonPath('data.source', 'Walk-in');
-        $this->newLead(['source' => 'TradeIndia'])->assertStatus(422);     // CURRENT (LD-14): a new channel is rejected until the schema changes
+        $this->newLead(['source' => 'TradeIndia'])->assertStatus(201);       // flipped in 1.1: a channel is a list entry, not a schema change
+        $this->newLead(['source' => 'Smoke Signals'])->assertStatus(422);
     }
 
     public function test_CURRENT_the_same_phone_number_can_be_entered_again_as_a_new_lead(): void

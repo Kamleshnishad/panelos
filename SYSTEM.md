@@ -354,6 +354,13 @@ Leads are the pre-customer stage. `lead_no` format `LEAD-YYYY-0001`.
 | Delete | `DELETE /api/leads/{id}` |
 
 **Status ladder:** `new → contacted → qualified → quoted → won | lost`.
+
+**Lead lists (LEADS_PLAN 1.1).** `leads.source` and `leads.status` are plain strings, no longer database enums. The allowed *sources* and the *lost reasons* are lists each company
+edits in **Master Data → Lead lists** (`lead_sources`, `lead_lost_reasons`; `LeadListService`). Starter lists are seeded for every company the first time they are read (15 sources,
+7 reasons). Leads store the source and the reason by **name**, so reports and old rows keep working; renaming an entry rewrites it on that company's leads, an entry that leads use is
+switched off rather than deleted, and *Other* is built in (the fallback). `GET /api/leads/options` gives the lead form its drop-downs; `GET /api/settings/lead-lists` and
+`POST|PUT|DELETE /api/settings/lead-sources[/{id}]`, `/api/settings/lead-lost-reasons[/{id}]` manage the lists (reads open, writes `settings.manage`). Changing status to lost accepts
+`lost_reason_id` (a reason from the list; stored as `lost_reason` = its name with `lost_reason_id` beside it) and an optional `lost_note`; free-text `lost_reason` still works.
 Every status change auto-writes a `status_change` activity, so the lead timeline is complete.
 
 **Convert** (`LeadService::ensureCustomer`) creates a `Customer` from the lead's details if one is not

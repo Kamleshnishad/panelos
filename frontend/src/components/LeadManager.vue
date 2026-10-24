@@ -214,7 +214,8 @@ import FormSelect from './Form/FormSelect.vue'
 
 const emit = defineEmits(['convert'])
 
-const sources = ['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other']
+// The company's own list (Master Data -> Lead lists). The fallback below only shows if the options call fails.
+const sources = ref(['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other'])
 const applications = ['Wall', 'Roof', 'Cold Room', 'Partition', 'Clean Room', 'Ceiling', 'PEB Shade', 'Architectural']
 const statusTabs = [
   { key: '', label: 'All' }, { key: 'new', label: 'New' }, { key: 'contacted', label: 'Contacted' },
@@ -407,7 +408,15 @@ async function removeLead(l) {
   catch (e) { toastError('Failed to delete.') }
 }
 
-onMounted(load)
+async function loadOptions() {
+  try {
+    const res = await leadService.options()
+    const list = (res?.data ?? res)?.sources
+    if (Array.isArray(list) && list.length) sources.value = list
+  } catch { /* keep the fallback list */ }
+}
+
+onMounted(() => { load(); loadOptions() })
 </script>
 
 <style scoped>
