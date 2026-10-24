@@ -536,7 +536,8 @@
         "notify_dispatch_done": "tinyint",
         "admin_phone": "varchar(20)",
         "created_at": "timestamp",
-        "updated_at": "timestamp"
+        "updated_at": "timestamp",
+        "email_payment_reminders": "tinyint"
     },
     "orders": {
         "id": "bigint unsigned",
