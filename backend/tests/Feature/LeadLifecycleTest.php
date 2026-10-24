@@ -302,9 +302,9 @@ class LeadLifecycleTest extends TestCase
         $this->assertTrue(LeadActivity::where('lead_id', $lead->id)->where('description', 'like', '%stays won%')->exists());
     }
 
-    public function test_CURRENT_accepting_the_quotation_does_not_mark_the_lead_won(): void
+    public function test_accepting_the_quotation_alone_does_not_mark_the_lead_won(): void
     {
-        // LD-01. Sub-phase 1.3 sets the lead to won when its order is created.
+        // LD-01 (1.3): "won" means an order was created (see LeadWonFromOrderTest), not that the quotation was accepted.
         $lead = $this->lead();
         $q = $this->quotationFor($lead)->json('data.id');
 

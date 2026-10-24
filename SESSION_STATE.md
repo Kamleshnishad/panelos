@@ -31,11 +31,9 @@ The owner says **"next"**. Each "next" = build the next sub-phase from `LEADS_PL
 suite (`cd backend; php -d memory_limit=1G vendor/bin/phpunit --no-coverage`), `DB_DATABASE=panelos_test php artisan schema:check` when the schema changed, frontend `npm run build`
 and `npm test`, a headless-browser run for screens (see "Tools"), and update `LEADS_PLAN.md` progress, `SYSTEM.md`, `BUGS.md` (row **FR-009** is the programme row) in the same commit.
 
-**Done locally:** 0.1, 1.1 lists as data, **1.2 status engine** (`Lead::allowedNext`, `LeadService::transition`, on hold + invalid, reopen needs a reason; backend suite 677/677, browser run 14 checks).
+**Done locally:** 0.1, 1.1 lists as data, 1.2 status engine, **1.3 automatic won + lost dialog** (`markWonFromOrder`, `leads:backfill-won`; backend suite 687/687, browser runs for 1.2 and 1.3).
 
-**Next sub-phase: 1.3 Automatic won and the lost-reason dialog** (LD-01, LD-09): lead becomes won when its quotation's order is created (default definition), timeline says why, backfill command with a dry run,
-and the browser `window.prompt` for lost in `LeadManager.vue` (`markLost`) becomes a proper dialog using the reason list from 1.1 (`/api/leads/options` lost_reasons, `lost_reason_id`, note). Flip
-`test_CURRENT_accepting_the_quotation_does_not_mark_the_lead_won`. Reuse the status dialog (`sd`) pattern added in 1.2.
+**Next sub-phase:** see the progress table in `LEADS_PLAN.md` (1.4 duplicate detection). Use the `sd` dialog pattern in `LeadManager.vue` for any screen that needs a reason or date.
 
 Defaults agreed unless the client says otherwise: "won" = an order was created from the lead's quotation (1.3); no automatic assignment until they choose a rule (2.4);
 the IndiaMART connector is built against a fake until the client's CRM key exists (3.x). Needs from the client are listed in the lead audit page:

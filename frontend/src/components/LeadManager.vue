@@ -101,11 +101,14 @@
     </div>
     </template>
 
-    <!-- Hold / junk / reopen: the three moves that need a date or a reason -->
+    <!-- Hold / junk / lost / reopen: the moves that need a date or a reason -->
     <div v-if="sd.open" class="modal-overlay sd-overlay" @click.self="sd.open = false">
       <div class="modal-box">
         <div class="modal-header"><h3>{{ sd.title }}</h3><button class="btn-close" @click="sd.open = false">✕</button></div>
         <div class="form-grid one">
+          <div v-if="sd.isLost && lostReasons.length" class="form-group"><label for="sd-lost">Reason *</label>
+            <select id="sd-lost" v-model="sd.lostReasonId" class="sd-input"><option value="">Choose a reason…</option><option v-for="r in lostReasons" :key="r.id" :value="r.id">{{ r.name }}</option></select>
+          </div>
           <div v-if="sd.needsDate" class="form-group"><label for="sd-date">Comes back on *</label><input id="sd-date" v-model="sd.hold_until" type="date" :min="today" class="sd-input" /></div>
           <div class="form-group"><label for="sd-reason">{{ sd.reasonLabel }}</label><input id="sd-reason" v-model="sd.reason" type="text" maxlength="500" class="sd-input" /></div>
         </div>
@@ -176,7 +179,7 @@
           <div :class="followClass(detail)"><label>Follow-up</label><span>{{ detail.next_follow_up_date ? fmtDate(detail.next_follow_up_date) : '—' }}</span></div>
         </div>
         <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
-        <div class="d-req" v-if="detail.lost_reason"><label>Lost reason</label><p>{{ detail.lost_reason }}</p></div>
+        <div class="d-req" v-if="detail.lost_reason"><label>Lost reason</label><p>{{ detail.lost_reason }}<template v-if="detail.lost_note"> — {{ detail.lost_note }}</template></p></div>
 
         <div class="d-section">
           <label class="d-label">Move to</label>
@@ -388,7 +391,8 @@ async function addActivity() {
   finally { actBusy.value = false }
 }
 
-const sd = reactive({ open: false, lead: null, to: '', title: '', needsDate: false, reasonLabel: '', reasonRequired: false, hold_until: '', reason: '', error: '' })
+const sd = reactive({ open: false, lead: null, to: '', title: '', needsDate: false, isLost: false, lostReasonId: '', reasonLabel: '', reasonRequired: false, hold_until: '', reason: '', error: '' })
+const lostReasons = ref([])   // the company's list (Master Data -> Lead lists), from the options call
 
 async function sendStatus(l, payload, done) {
   busy.value = true
@@ -410,7 +414,7 @@ function setStatus(l, to) {
   const reopen = isClosed(l.status)
   if (!reopen && to !== 'on_hold' && to !== 'invalid') return sendStatus(l, { status: to }, `Moved to ${statusLabel(to)}.`)
   Object.assign(sd, {
-    open: true, lead: l, to, error: '', reason: '', hold_until: '',
+    open: true, lead: l, to, error: '', reason: '', hold_until: '', isLost: false, lostReasonId: '',
     needsDate: !reopen && to === 'on_hold',
     reasonRequired: reopen,
     title: reopen ? `Reopen as ${statusLabel(to)}` : to === 'on_hold' ? 'Put on hold' : 'Mark as invalid',
@@ -422,15 +426,23 @@ async function submitStatusDialog() {
   sd.error = ''
   if (sd.needsDate && !sd.hold_until) { sd.error = 'Choose the date this lead comes back.'; return }
   if (sd.reasonRequired && !sd.reason.trim()) { sd.error = 'Say why you are reopening this lead.'; return }
+  if (sd.isLost && lostReasons.value.length && !sd.lostReasonId) { sd.error = 'Choose why this lead was lost.'; return }
   const payload = { status: sd.to, reason: sd.reason.trim() || null }
+  if (sd.isLost) {
+    delete payload.reason
+    if (lostReasons.value.length) { payload.lost_reason_id = Number(sd.lostReasonId); payload.lost_note = sd.reason.trim() || null }
+    else payload.lost_reason = sd.reason.trim() || null          // the options call failed: free text still works
+  }
   if (sd.needsDate) payload.hold_until = sd.hold_until
   if (await sendStatus(sd.lead, payload, `Moved to ${statusLabel(sd.to)}.`)) sd.open = false
 }
 
-async function markLost(l) {
-  const reason = window.prompt('Reason for marking lost? (optional)')
-  if (reason === null) return
-  await sendStatus(l, { status: 'lost', lost_reason: reason || null }, 'Marked lost.')
+function markLost(l) {
+  Object.assign(sd, {
+    open: true, lead: l, to: 'lost', error: '', reason: '', hold_until: '', isLost: true, lostReasonId: '',
+    needsDate: false, reasonRequired: false, title: 'Mark as lost',
+    reasonLabel: lostReasons.value.length ? 'Note (optional)' : 'Why was it lost? (optional)',
+  })
 }
 
 async function convertLead(l) {
@@ -463,6 +475,7 @@ async function loadOptions() {
     const o = res?.data ?? res
     if (Array.isArray(o?.sources) && o.sources.length) sources.value = o.sources
     if (o?.transitions && typeof o.transitions === 'object') transitions.value = o.transitions
+    if (Array.isArray(o?.lost_reasons)) lostReasons.value = o.lost_reasons
   } catch { /* keep the fallback list */ }
 }
 

@@ -363,6 +363,14 @@ left out of the default list (its own tab shows it), the dashboard totals, win r
 `PUT /api/leads/{id}` refuses a different `status` (422). A new lead may start `new`, `contacted` or `qualified`. A quotation made for a lead moves an open or on-hold lead to `quoted` and links it;
 for a won, lost or invalid lead it only adds a timeline note and leaves the status and the original quotation alone.
 
+**Won (LEADS_PLAN 1.3).** A lead is **won when an order is created from its quotation**, not when the quotation is accepted. `OrderService::createFromQuotation` calls
+`LeadService::markWonFromOrder()` after the order exists (inside its own try/catch: a lead problem is reported and never stops the order). The lead is found through `leads.quotation_id`, following
+`parent_quotation_id` back from the ordered quotation, so an order from a revision (v2, v3) still wins the lead. An open or on-hold lead becomes `won` and the timeline reads
+`Status: quoted → won (order ORD-... created)`; a lead that is already won is left alone; a lost or invalid lead is **not** reopened, it gets a note. Known limit: only the lead's latest quotation (plus its
+revisions) is linked, so ordering an older, separate quotation does not win the lead. `php artisan leads:backfill-won [--company=ID] [--apply]` catches up leads whose order already exists: it lists
+them and changes nothing unless `--apply` is given; closed leads are listed as left alone. Marking a lead lost on the screen is a dialog with the company's lost-reason list (a reason is required there)
+and a note; the API still accepts a free-text `lost_reason`.
+
 **Lead lists (LEADS_PLAN 1.1).** `leads.source` and `leads.status` are plain strings, no longer database enums. The allowed *sources* and the *lost reasons* are lists each company
 edits in **Master Data → Lead lists** (`lead_sources`, `lead_lost_reasons`; `LeadListService`). Starter lists are seeded for every company the first time they are read (15 sources,
 7 reasons). Leads store the source and the reason by **name**, so reports and old rows keep working; renaming an entry rewrites it on that company's leads, an entry that leads use is

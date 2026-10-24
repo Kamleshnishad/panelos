@@ -47,7 +47,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 0.1 | Lead lifecycle tests | done, local (also PR #16, unmerged) |
 | 1.1 | Lists as data (sources, lost reasons) | done, local |
 | 1.2 | Status engine | done, local |
-| 1.3 | Automatic won, lost-reason dialog | not started |
+| 1.3 | Automatic won, lost-reason dialog | done, local |
 | 1.4 | Duplicate detection | not started |
 | 1.5 | Convert fixes | not started |
 | 1.6 | Numbering race and small hardening | not started |
@@ -125,6 +125,8 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Default I will use unless told otherwise:** "won" = an order has been created from the lead's quotation. Other options the client may prefer: quotation accepted, or advance received.
 - **Tests:** accept and order paths, double events do nothing twice, closed leads are not reopened, backfill dry run changes nothing.
 - **Live check:** dry-run the backfill on the live data and read the list together. **Size:** M. **Needs from client:** the definition of won (default above).
+- **Result:** `LeadService::markWonFromOrder` (hooked from `OrderService`), `leads:backfill-won` command, lost dialog in `LeadManager.vue`, `LeadWonFromOrderTest` (10). The lifecycle test about accepting
+  became `accepting_the_quotation_alone_does_not_mark_the_lead_won` (by design: won = order). Known limit: separate older quotations of one lead are not linked (revisions are). The live dry run moves to the release.
 
 ### 1.4 Duplicate detection (LD-05)
 - **Goal:** the same buyer is one lead, not three.

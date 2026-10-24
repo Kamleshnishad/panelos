@@ -107,7 +107,7 @@ class LeadService
             $until = $this->holdDate($o['hold_until'] ?? null);
             $payload['next_follow_up_date'] = $until->toDateString();  // it comes back on that date: the follow-up badge picks it up
             $suffix = " (until {$until->toDateString()}" . ($reason !== '' ? ", {$reason}" : '') . ')';
-        } elseif ($to === 'invalid') {
+        } elseif ($to === 'invalid' || $to === 'won') {
             $suffix = $reason !== '' ? " ({$reason})" : '';
         } elseif ($to === 'lost') {
             $lostReason = $o['lost_reason'] ?? null;
@@ -242,6 +242,95 @@ class LeadService
             'description'   => 'Converted to quotation',
             'activity_date' => now(),
         ]);
+    }
+
+    /**
+     * "Won" means an order was created from the lead's quotation (LEADS_PLAN 1.3). Called by OrderService after the order exists.
+     * The lead is found through the quotation and its revisions. An open or on-hold lead becomes won and the timeline says which order;
+     * a lead that is already won is left alone (so a repeat does nothing); a lost or invalid lead is never reopened, it only gets a note.
+     */
+    public function markWonFromOrder(\App\Models\Order $order, ?int $userId = null): void
+    {
+        foreach ($this->leadsForQuotation((int) $order->company_id, (int) $order->quotation_id) as $lead) {
+            $this->winFromOrder($lead, $order->order_no, $userId ?? auth()?->id());
+        }
+    }
+
+    private function winFromOrder(Lead $lead, string $orderNo, ?int $userId, string $how = ''): bool
+    {
+        if ($lead->status === 'won') {
+            return false;
+        }
+        if ($lead->isClosed()) {
+            LeadActivity::create([
+                'company_id' => $lead->company_id, 'lead_id' => $lead->id, 'user_id' => $userId, 'type' => 'note',
+                'description' => "Order {$orderNo} was created from this lead's quotation. It stays {$this->label($lead->status)}; reopen it to mark it won.",
+                'activity_date' => now(),
+            ]);
+
+            return false;
+        }
+        $this->transition($lead, 'won', ['reason' => "order {$orderNo} created{$how}"], $userId);
+
+        return true;
+    }
+
+    /** @return \Illuminate\Support\Collection<int,Lead> leads whose quotation is this one or any earlier version of it */
+    private function leadsForQuotation(int $companyId, int $quotationId)
+    {
+        $ids = [];
+        for ($id = $quotationId, $guard = 0; $id && !in_array($id, $ids, true) && $guard < 25; $guard++) {
+            $ids[] = $id;
+            $id = (int) \App\Models\Quotation::withoutGlobalScope('tenant')->where('company_id', $companyId)->whereKey($id)->value('parent_quotation_id');
+        }
+
+        return Lead::withoutGlobalScope('tenant')->where('company_id', $companyId)->whereIn('quotation_id', $ids)->get();
+    }
+
+    /**
+     * One-off catch-up for leads whose order was created before this rule existed. Dry run by default: returns what it would change and
+     * changes nothing until $apply is true.
+     *
+     * @return list<array{lead_no:string,lead_id:int,status:string,order_no:string,action:string}>
+     */
+    public function backfillWon(?int $companyId = null, bool $apply = false): array
+    {
+        $leads = Lead::withoutGlobalScope('tenant')->whereNotNull('quotation_id')->where('status', '!=', 'won')
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))->orderBy('id')->get();
+
+        $rows = [];
+        foreach ($leads as $lead) {
+            $orderNo = $this->orderNoForLead($lead);
+            if (!$orderNo) continue;
+            $closed = $lead->isClosed();
+            $rows[] = ['lead_no' => $lead->lead_no, 'lead_id' => $lead->id, 'status' => $lead->status, 'order_no' => $orderNo,
+                       'action' => $closed ? 'left alone (closed: reopen by hand if it should be won)' : 'would become won'];
+            if ($apply && !$closed) {
+                $this->winFromOrder($lead, $orderNo, null, ' (backfill)');
+            }
+        }
+
+        return $rows;
+    }
+
+    private function orderNoForLead(Lead $lead): ?string
+    {
+        $ids = [];
+        for ($id = (int) $lead->quotation_id; $id && !in_array($id, $ids, true) && count($ids) < 25;) {
+            $ids[] = $id;
+            $id = (int) \App\Models\Quotation::withoutGlobalScope('tenant')->where('company_id', $lead->company_id)->whereKey($id)->value('parent_quotation_id');
+        }
+
+        // revisions of the lead's quotation carry the order, so look down the chain as well as up
+        $down = $ids;
+        for ($i = 0; $i < 25; $i++) {
+            $next = \App\Models\Quotation::withoutGlobalScope('tenant')->where('company_id', $lead->company_id)->whereIn('parent_quotation_id', $down)->pluck('id')->diff($ids)->all();
+            if (!$next) break;
+            $ids = array_merge($ids, $next);
+            $down = $next;
+        }
+
+        return \App\Models\Order::withoutGlobalScope('tenant')->where('company_id', $lead->company_id)->whereIn('quotation_id', $ids)->orderBy('id')->value('order_no');
     }
 
     /** Count of leads whose follow-up is due/overdue (for the nav badge). */

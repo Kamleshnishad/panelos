@@ -114,6 +114,13 @@ class OrderService
 
             $loaded = $order->load('items.sizes', 'items.panelType', 'customer', 'quotation');
 
+            // The lead this quotation came from is now won. Never lets a lead problem stop an order.
+            try {
+                app(\App\Services\LeadService::class)->markWonFromOrder($order);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
             // Fire-and-forget WhatsApp/SMS notification (silent on failure)
             try {
                 app(\App\Services\NotificationDispatchService::class)->orderConfirmed($loaded);
