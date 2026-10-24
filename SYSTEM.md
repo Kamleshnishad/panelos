@@ -1619,7 +1619,7 @@ as live defects; what is listed below is what is still true of the code today.
     whole DejaVu files (717 KB) ride in every PDF; the logo adds a further 173 KB because it is stored at
     3381×1085 px and shown at 200×46. Correct output, just heavy. See PB-022 in `BUGS.md` for the measured
     breakdown and the two-line fix (97% smaller).
-22. **Much of the legacy test suite is stale.** 24 tests fail against the current API because they post
+22. **Much of the legacy test suite is stale.** 191 tests fail (the earlier note said 24). They are recorded in `backend/tests/ci/known-failures.txt` and the CI ratchet blocks any failure not on that list (see `CLAUDE.md`). They fail against the current API because they post
     long-superseded payloads (e.g. `items` instead of `panel_rows`) or call routes that no longer exist.
     They were failing before the October 2026 fixes and are unrelated to them. The suite runs against
     **MySQL/MariaDB** (`phpunit.xml` forces `DB_DATABASE=panelos_test`), matching production — see

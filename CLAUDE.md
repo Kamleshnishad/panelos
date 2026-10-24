@@ -52,6 +52,20 @@ Rules:
   long-superseded payloads (`items` instead of `panel_rows`) or call routes that no longer exist; they are
   unrelated to current work. A fix is clean when it adds zero newly-broken tests.
 
+**The build enforces this.** `.github/workflows/tests.yml` runs the whole suite on MySQL 8 before every deploy
+(`deploy.yml` waits for it) and on pull requests. It is a *ratchet*, not "all tests pass":
+`backend/tests/ci/ratchet.php` fails the build on any failure that is **not** listed in
+`backend/tests/ci/known-failures.txt` (the legacy 191). So:
+
+* A new failure blocks the deploy. Fix the code or the test; **never add a line to `known-failures.txt` to get a
+  build through.**
+* When you fix a known-failing test, delete its line (the build output lists the ones that now pass).
+* To run the same check locally: `php -d memory_limit=1G vendor/bin/phpunit --no-coverage --log-junit /tmp/j.xml`
+  then `php tests/ci/ratchet.php /tmp/j.xml tests/ci/known-failures.txt`.
+* CI uses MySQL 8 and many developers use MariaDB. They differ: MySQL 8 sorts the keys inside a JSON column and
+  MariaDB does not, so never assert on JSON key order (`assertEquals`, not `assertSame`, on decoded JSON).
+* Emergency only: Actions → Deploy → Run workflow → tick *skip_tests*. Say why in the commit or the register.
+
 Every bug fix gets a feature test under `backend/tests/Feature/`. Useful traits:
 `Tests\Traits\HasDatabaseTestHelpers` (`createAdminUser()`) and `Tests\Traits\HasAuthTestHelpers`.
 
