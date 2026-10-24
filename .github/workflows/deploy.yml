@@ -13,6 +13,11 @@ on:
   # Lets you re-run a deploy from the Actions tab without a new commit
   # (useful for rollback: re-run an old workflow → redeploys that SHA).
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'EMERGENCY ONLY: deploy without running the backend tests'
+        type: boolean
+        default: false
 
 # Allow this workflow to push images to GitHub Container Registry.
 # Default GITHUB_TOKEN has read-only on packages; we widen it to write
@@ -38,8 +43,18 @@ env:
   IMAGE_FRONTEND: ghcr.io/kamleshnishad/panelos-frontend
 
 jobs:
+  # The backend test suite must pass (no NEW failures) before anything is built or shipped.
+  # See tests.yml and backend/tests/ci/ratchet.php. A manual run may skip it for an emergency.
+  tests:
+    name: Backend tests
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_tests) }}
+    uses: ./.github/workflows/tests.yml
+
   deploy:
     name: Build, Push, Deploy
+    needs: tests
+    # `needs` alone would also skip this job when tests is skipped; run unless tests failed or was cancelled.
+    if: ${{ !cancelled() && (needs.tests.result == 'success' || needs.tests.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # `environment: production` enables GitHub's environment protection
