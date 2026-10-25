@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Common shape ($data; every key optional except that a name or contact is needed):
  *   contact_name, company_name, phone, email, city, requirement, application, est_qty_sqm, est_value,
- *   external_id (the channel's id for the enquiry), campaign, utm_source/medium/campaign/term/content, first_seen_at.
+ *   external_id (the channel's id for the enquiry), campaign, utm_source/medium/campaign/term/content, landing_page, first_seen_at.
  *
  * What it does, in order:
  *  1. Same channel and same external_id as before: nothing (ALREADY_RECEIVED). Safe to call twice, or to re-pull a period.
@@ -74,7 +74,7 @@ class LeadIntakeService
                 'company_name' => $d['company_name'], 'phone' => $d['phone'], 'email' => $d['email'], 'city' => $d['city'],
                 'source' => $source, 'external_id' => $d['external_id'], 'campaign' => $d['campaign'],
                 'utm_source' => $d['utm_source'], 'utm_medium' => $d['utm_medium'], 'utm_campaign' => $d['utm_campaign'],
-                'utm_term' => $d['utm_term'], 'utm_content' => $d['utm_content'],
+                'utm_term' => $d['utm_term'], 'utm_content' => $d['utm_content'], 'landing_page' => $d['landing_page'],
                 'first_seen_at' => $d['first_seen_at'] ?? now(),
                 'requirement' => $d['requirement'], 'application' => $d['application'], 'est_qty_sqm' => $d['est_qty_sqm'], 'est_value' => $d['est_value'],
                 'status' => 'new',
@@ -199,7 +199,7 @@ class LeadIntakeService
             'est_qty_sqm' => $n('est_qty_sqm'), 'est_value' => $n('est_value'),
             'external_id' => $s('external_id', 120), 'campaign' => $s('campaign', 150),
             'utm_source' => $s('utm_source', 150), 'utm_medium' => $s('utm_medium', 150), 'utm_campaign' => $s('utm_campaign', 150),
-            'utm_term' => $s('utm_term', 150), 'utm_content' => $s('utm_content', 150),
+            'utm_term' => $s('utm_term', 150), 'utm_content' => $s('utm_content', 150), 'landing_page' => $s('landing_page', 500),
             'first_seen_at' => $when,
         ];
     }

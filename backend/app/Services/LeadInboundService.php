@@ -21,6 +21,8 @@ class LeadInboundService
     public const PREFIX = 'lt_';
     /** The hidden "leave this empty" field of the website form. A person never fills it; a bot does. */
     public const HONEYPOT = '_hp';
+    /** The website form sends how long the page had been open (ms) in `_t`. A bot posts at once; a person cannot fill a form in under a second. */
+    public const MIN_FILL_MS = 1000;
 
     /** Friendly names some forms use, mapped to the intake keys. The intake keys always win when both are sent. */
     private const ALIASES = ['name' => 'contact_name', 'mobile' => 'phone', 'message' => 'requirement', 'company' => 'company_name', 'id' => 'external_id'];
@@ -86,7 +88,7 @@ class LeadInboundService
      * @param int   $bytes the size of the body as received
      * @return array{status:int, body:array}
      */
-    public function receive(string $plain, array $input, int $bytes, ?string $ip): array
+    public function receive(string $plain, array $input, int $bytes, ?string $ip, ?string $origin = null): array
     {
         $token = $this->findActive($plain);
         if (!$token) {
@@ -102,6 +104,15 @@ class LeadInboundService
 
         $log = fn (string $outcome, ?int $leadId = null, ?string $reason = null, ?string $ext = null) => $this->log($token, $outcome, $leadId, $reason, $ext, $ip);
 
+        // A browser says which website the form is on. If this address is limited to certain websites, any other one is refused (a server sending
+        // without an Origin header, like curl or Zapier, is not a browser and is not asked). Anyone can fake the header outside a browser; this stops
+        // the address being reused on someone else's page.
+        if ($origin !== null && $token->allowed_origins && !in_array(self::origin($origin), $token->allowed_origins, true)) {
+            $log('blocked', null, 'Sent from ' . mb_substr($origin, 0, 120) . ', which is not on the allowed websites.');
+
+            return $this->answer(403, false, 'ORIGIN_NOT_ALLOWED', 'This form is not allowed on this website.');
+        }
+
         if ($bytes > self::MAX_BYTES) {
             $log('too_large', null, 'Message larger than ' . (self::MAX_BYTES / 1024) . ' KB.');
 
@@ -114,6 +125,11 @@ class LeadInboundService
             $log('spam', null, 'Hidden field was filled in.', $ext);
 
             return $this->answer(200, true, null, 'Received.', ['outcome' => 'received']);   // looks like success to a bot
+        }
+        if (isset($input['_t']) && is_numeric($input['_t']) && (float) $input['_t'] < self::MIN_FILL_MS) {
+            $log('spam', null, 'Sent faster than a person can fill the form.', $ext);
+
+            return $this->answer(200, true, null, 'Received.', ['outcome' => 'received']);
         }
 
         try {
@@ -136,6 +152,21 @@ class LeadInboundService
             LeadIntakeResult::ALREADY_RECEIVED => $this->answer(200, true, null, 'Already received.', ['outcome' => 'already_received']),
             default => $this->answer(422, false, 'REJECTED', $result->reason ?? 'The message could not be used.', ['outcome' => 'rejected']),
         };
+    }
+
+    /** "https://WWW.Example.com:443/page?x" -> "https://www.example.com" (default ports dropped). Null when it is not a web address. */
+    public static function origin(string $url): ?string
+    {
+        $p = parse_url(trim($url));
+        $scheme = strtolower($p['scheme'] ?? '');
+        $host = strtolower($p['host'] ?? '');
+        if (!in_array($scheme, ['http', 'https'], true) || $host === '') {
+            return null;
+        }
+        $port = $p['port'] ?? null;
+        $default = $scheme === 'https' ? 443 : 80;
+
+        return "{$scheme}://{$host}" . ($port && $port !== $default ? ":{$port}" : '');
     }
 
     private function mapped(array $in): array

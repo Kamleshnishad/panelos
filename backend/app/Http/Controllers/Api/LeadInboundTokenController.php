@@ -53,7 +53,11 @@ class LeadInboundTokenController extends Controller
     {
         try {
             $row = $this->token($r, $id);
-            $d = $r->validate(['name' => 'sometimes|required|string|max:100', 'source' => 'sometimes|required|string|max:60', 'is_active' => 'sometimes|boolean']);
+            $d = $r->validate(['name' => 'sometimes|required|string|max:100', 'source' => 'sometimes|required|string|max:60', 'is_active' => 'sometimes|boolean',
+                'allowed_origins' => 'sometimes|nullable|array|max:10', 'allowed_origins.*' => 'string|max:200']);
+            if (array_key_exists('allowed_origins', $d)) {
+                $d['allowed_origins'] = $this->origins($d['allowed_origins'] ?? []);
+            }
             if (isset($d['source'])) {
                 $resolved = app(\App\Services\LeadListService::class)->resolveSource($this->cid($r), $d['source']);
                 if (!$resolved) {
@@ -69,6 +73,21 @@ class LeadInboundTokenController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
             return $this->errorResponse([], 'Not found', 'NOT_FOUND', 404);
         }
+    }
+
+    /** @return list<string>|null the websites as origins, or null (any website) when the list is empty */
+    private function origins(array $in): ?array
+    {
+        $out = [];
+        foreach ($in as $url) {
+            $o = LeadInboundService::origin((string) $url);
+            if (!$o) {
+                throw ValidationException::withMessages(['allowed_origins' => "\"{$url}\" is not a website address. Use the form https://www.example.com."]);
+            }
+            $out[$o] = $o;
+        }
+
+        return $out ? array_values($out) : null;
     }
 
     public function regenerate(Request $r, int $id)

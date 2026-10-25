@@ -19,7 +19,7 @@ class InboundLeadController extends Controller
     public function store(Request $r, string $token)
     {
         $input = $r->isJson() ? $r->json()->all() : $r->post();
-        $result = $this->inbound->receive($token, is_array($input) ? $input : [], strlen($r->getContent()), $r->ip());
+        $result = $this->inbound->receive($token, is_array($input) ? $input : [], strlen($r->getContent()), $r->ip(), $r->headers->get('Origin'));
 
         return response()->json($result['body'], $result['status']);
     }

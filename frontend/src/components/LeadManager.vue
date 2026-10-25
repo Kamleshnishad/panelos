@@ -221,9 +221,9 @@
           <div :class="followClass(detail)"><label>Follow-up</label><span>{{ detail.next_follow_up_date ? fmtDate(detail.next_follow_up_date) : '—' }}</span></div>
         </div>
         <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
-        <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.first_seen_at">
+        <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.landing_page || detail.first_seen_at">
           <label>Where it came from</label>
-          <p>{{ detail.source }}<template v-if="detail.external_id"> · ref {{ detail.external_id }}</template><template v-if="detail.campaign"> · {{ detail.campaign }}</template><template v-if="utmText"> · {{ utmText }}</template><template v-if="detail.first_seen_at"> · first seen {{ fmtDateTime(detail.first_seen_at) }}</template></p>
+          <p>{{ detail.source }}<template v-if="detail.external_id"> · ref {{ detail.external_id }}</template><template v-if="detail.campaign"> · {{ detail.campaign }}</template><template v-if="utmText"> · {{ utmText }}</template><template v-if="detail.landing_page"> · page {{ detail.landing_page }}</template><template v-if="detail.first_seen_at"> · first seen {{ fmtDateTime(detail.first_seen_at) }}</template></p>
           <button class="link-btn" @click="togglePayload">{{ rawMsg.open ? 'Hide' : 'Show' }} original message</button>
           <p v-if="rawMsg.open && !rawMsg.items.length" class="tl-empty">{{ rawMsg.loading ? 'Loading…' : 'No original message was kept.' }}</p>
           <pre v-for="m in (rawMsg.open ? rawMsg.items : [])" :key="m.id" class="raw-msg">{{ JSON.stringify(m.payload, null, 2) }}</pre>

@@ -46,6 +46,24 @@
       <button class="btn btn-primary" @click="copyExample">{{ copiedExample ? 'Copied' : 'Copy example' }}</button>
     </section>
 
+    <section class="li-card" aria-label="Website form">
+      <h3>Website form</h3>
+      <p class="li-note2">Put this on your website where the enquiry form should appear. It draws a short form (name, phone, e-mail, city, what they need), and every enquiry arrives here as a lead with the page and the campaign it came from.
+        {{ fresh ? 'The address you just made is filled in.' : 'Make an address above (or a new one) and it is filled in here; it can be shown only once.' }}</p>
+      <pre class="li-code" aria-label="website snippet">{{ snippet }}</pre>
+      <button class="btn btn-primary" @click="copySnippet">{{ copiedSnippet ? 'Copied' : 'Copy snippet' }}</button>
+      <p class="li-note2 li-gap">Anyone can read the address in your page's source, so you can limit it to your own websites. A form on any other website is then refused.
+        Use the full address of each site, and list the "www" and plain versions if both are used.</p>
+      <form class="li-sites" @submit.prevent="saveSites">
+        <select v-model="siteId" aria-label="Address to limit" @change="pickSite">
+          <option :value="null" disabled>Choose an address…</option>
+          <option v-for="t in tokens" :key="t.id" :value="t.id">{{ t.name }} (…{{ t.token_hint }})</option>
+        </select>
+        <textarea v-model="siteText" rows="3" :disabled="!siteId" aria-label="Allowed websites, one per line" placeholder="https://www.example.com&#10;https://example.com&#10;Leave empty to allow any website"></textarea>
+        <button class="btn btn-primary" type="submit" :disabled="busy || !siteId">Save websites</button>
+      </form>
+    </section>
+
     <slot />
 
     <section class="li-card" aria-label="Import log">
@@ -78,7 +96,7 @@ import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 
 const outcomes = [
   { key: 'created', label: 'New leads' }, { key: 'merged', label: 'Added to a lead' }, { key: 'already_received', label: 'Repeats ignored' },
-  { key: 'rejected', label: 'Rejected' }, { key: 'spam', label: 'Spam' }, { key: 'too_large', label: 'Too large' }, { key: 'error', label: 'Errors' },
+  { key: 'rejected', label: 'Rejected' }, { key: 'spam', label: 'Spam' }, { key: 'blocked', label: 'Wrong website' }, { key: 'too_large', label: 'Too large' }, { key: 'error', label: 'Errors' },
 ]
 const label = (k) => outcomes.find(o => o.key === k)?.label ?? k
 
@@ -90,6 +108,9 @@ const form = reactive({ name: '', source: '' })
 const fresh = ref(null)       // the token just made, shown once
 const copied = ref(false)
 const copiedExample = ref(false)
+const copiedSnippet = ref(false)
+const siteId = ref(null)
+const siteText = ref('')
 const busy = ref(false)
 const error = ref('')
 
@@ -98,6 +119,7 @@ const example = computed(() => {
   const url = fresh.value ? fullUrl(fresh.value) : `${window.location.origin}/api/inbound/leads/YOUR_ADDRESS_TOKEN`
   return `curl -X POST "${url}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name": "Ravi Patel", "mobile": "9876543210", "message": "Need 300 sqm PUF wall panel", "city": "Rajkot", "id": "form-123"}'`
 })
+const snippet = computed(() => `<div id="panelos-enquiry"></div>\n<script src="${window.location.origin}/lead-form.js" data-token="${fresh.value?.token ?? 'YOUR_ADDRESS_TOKEN'}" async><\/script>`)
 const when = (d) => new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 const body = (res) => res?.data?.data ?? res?.data ?? {}
 
@@ -145,6 +167,18 @@ async function copy(t) {
   try { await navigator.clipboard.writeText(fullUrl(t)); copied.value = true } catch { toastError('Could not copy. Select the address and copy it by hand.') }
 }
 
+async function copySnippet() {
+  try { await navigator.clipboard.writeText(snippet.value); copiedSnippet.value = true } catch { toastError('Could not copy. Select the text and copy it by hand.') }
+}
+
+function pickSite() { siteText.value = (tokens.value.find(t => t.id === siteId.value)?.allowed_origins ?? []).join('\n') }
+
+async function saveSites() {
+  const list = siteText.value.split(/[\n,]+/).map(x => x.trim()).filter(Boolean)
+  const r = await run(() => api.put(`/settings/lead-inbound-tokens/${siteId.value}`, { allowed_origins: list }), list.length ? 'Websites saved.' : 'Any website may use this address.')
+  if (r) pickSite()
+}
+
 async function copyExample() {
   try { await navigator.clipboard.writeText(example.value); copiedExample.value = true } catch { toastError('Could not copy. Select the text and copy it by hand.') }
 }
@@ -178,7 +212,7 @@ onMounted(load)
 .chip.merged { background: #e3f2fd; color: #1565c0; }
 .chip.rejected, .chip.too_large { background: #fff3e0; color: #e65100; }
 .chip.error { background: #ffebee; color: #c62828; }
-.chip.spam { background: #f3e5f5; color: #6a1b9a; }
+.chip.spam, .chip.blocked { background: #f3e5f5; color: #6a1b9a; }
 .link { background: none; border: 0; color: var(--primary); font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: underline; margin-right: 6px; }
 .x { background: none; border: none; color: #b0b0b0; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
 .x:hover:not(:disabled) { color: #c62828; background: #fdecea; }
@@ -186,6 +220,10 @@ onMounted(load)
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 code { font-size: 12px; }
+.li-gap { margin-top: 14px; }
+.li-sites { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+.li-sites select, .li-sites textarea { padding: 8px 10px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; font-family: inherit; }
+.li-sites textarea { flex: 1; min-width: 260px; }
 .li-note2 { margin: 0 0 8px; font-size: 12.5px; color: #666; }
 .li-code { background: #263238; color: #eceff1; padding: 12px 14px; border-radius: 8px; font-size: 12px; overflow-x: auto; margin: 0 0 10px; white-space: pre; }
 </style>

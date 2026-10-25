@@ -20,7 +20,7 @@ class Lead extends BaseModel
 
     protected $fillable = [
         'company_id', 'lead_no', 'contact_name', 'company_name', 'phone', 'email', 'city',
-        'source', 'external_id', 'campaign', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'first_seen_at', 'requirement', 'application', 'est_qty_sqm', 'est_value', 'status',
+        'source', 'external_id', 'campaign', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'landing_page', 'first_seen_at', 'requirement', 'application', 'est_qty_sqm', 'est_value', 'status',
         'assigned_to_user_id', 'next_follow_up_date', 'lost_reason', 'lost_reason_id', 'lost_note', 'customer_id', 'quotation_id', 'notes',
     ];
 
