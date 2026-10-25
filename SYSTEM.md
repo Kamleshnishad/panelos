@@ -1230,20 +1230,22 @@ PO status is then recomputed: all lines full → `received`, some → `partial`,
 
 All under `reports.view`.
 
+**Known report defects still open (Reports audit, 25 Oct 2026): PB-074 to PB-082 in BUGS.md** (MIS last-day cut-off and planned-sqm, default period in IST, revenue-leak headline, accessory lines under 'Unknown', Receivables as-of and bucket filter, inconsistent definitions, CSV export dates, input validation). Read them before changing a report; the High ones (PB-071 to PB-073) are fixed.
+
 | Endpoint | Content |
 |---|---|
 | `/api/reports/profit-loss` | Revenue, COGS proxy, expenses, net |
 | `/api/reports/balance-sheet` | As-of snapshot |
-| `/api/reports/cash-flow` | Period cash movement |
+| `/api/reports/cash-flow` | Period cash movement: cash received (payments by `transaction_date`, first and last day included, write-offs excluded) and write-offs shown separately; `net_operating_cash_flow` = cash received |
 | `/api/reports/accounts-receivable` | **AR ageing** buckets |
 | `/api/reports/sales` | Sales by period |
-| `/api/reports/tax` | GST summary from `tax_calculations` |
+| `/api/reports/tax` | GST for the invoices dated in the period that are not draft or cancelled (`TaxService::getTaxReport`), with one row per invoice: number, date, customer, GSTIN, rate, taxable, CGST / SGST / IGST |
 | `/api/reports/accounting-dashboard` | Combined finance view |
 | `/api/reports/reconcile` · `/reconciliation` | Invoice reconciliation; per-order **ordered vs invoiced vs paid** (revenue-leakage flags) |
 | `/api/reports/revenue-trend` | Invoiced vs collected, last N months |
 | `/api/reports/top-customers` · `/panel-type-mix` | Customer and product mix |
 | `/api/reports/mis` | Owner-level monthly MIS: revenue, collection, production sqm + runs, GST liability, outstanding |
-| `/api/reports/tally/xml` · `/tally/csv` | Tally-compatible export |
+| `/api/reports/tally/xml` · `/tally/csv` | Tally-compatible export. XML: every value escaped, dates `YYYYMMDD`, amounts two decimals. CSV: UTF-8 with a byte-order mark, text columns formula-guarded. The ledger names are fixed (`Sales @ <rate>%`, `CGST`, `SGST`, `IGST`) and must exist in the client's Tally |
 | `/api/export/customers|quotations|orders|invoices` | Bulk CSV |
 
 Forecasting (`reports.manage` to generate): `/api/forecasts/inventory`, `/demand`, `/reorders`, plus an ML
