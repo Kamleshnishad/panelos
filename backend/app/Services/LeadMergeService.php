@@ -27,7 +27,6 @@ use Illuminate\Validation\ValidationException;
  */
 class LeadMergeService
 {
-    private const RANK = ['new' => 0, 'contacted' => 1, 'qualified' => 2, 'quoted' => 3];
     private const FILL = ['company_name', 'phone', 'email', 'city', 'application', 'est_qty_sqm', 'est_value', 'assigned_to_user_id', 'customer_id', 'quotation_id', 'campaign', 'landing_page',
         'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
 
@@ -153,8 +152,9 @@ class LeadMergeService
         if ($dup->first_seen_at && (!$keep->first_seen_at || $dup->first_seen_at->lt($keep->first_seen_at))) {
             $set['first_seen_at'] = $dup->first_seen_at;
         }
-        if (isset(self::RANK[$keep->status], self::RANK[$dup->status]) && self::RANK[$dup->status] > self::RANK[$keep->status]) {
-            $set['status'] = $dup->status;
+        $stages = LeadStages::for((int) $keep->company_id);
+        if ($stages->isOpen($keep->status) && $stages->isOpen($dup->status) && $stages->rank($dup->status) > $stages->rank($keep->status)) {
+            $set['status'] = $dup->status;                                    // the later stage in the pipeline
         }
         $da = $dup->next_follow_up_date;
         $ka = $keep->next_follow_up_date;

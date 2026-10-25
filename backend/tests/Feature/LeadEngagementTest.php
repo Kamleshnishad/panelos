@@ -52,9 +52,9 @@ class LeadEngagementTest extends TestCase
         return $l->fresh();
     }
 
-    private function act(Lead $l, string $type, $when, ?User $by = null, string $text = 'x'): LeadActivity
+    private function act(Lead $l, string $type, $when, ?User $by = null, string $text = 'x', ?string $from = null): LeadActivity
     {
-        return LeadActivity::create(['company_id' => $this->company->id, 'lead_id' => $l->id, 'user_id' => $by?->id, 'type' => $type, 'description' => $text, 'activity_date' => $when]);
+        return LeadActivity::create(['company_id' => $this->company->id, 'lead_id' => $l->id, 'user_id' => $by?->id, 'type' => $type, 'from_status' => $from, 'description' => $text, 'activity_date' => $when]);
     }
 
     private function row(Lead $l): array
@@ -92,9 +92,9 @@ class LeadEngagementTest extends TestCase
     public function test_a_person_moving_a_lead_out_of_new_counts_but_other_status_changes_do_not(): void
     {
         $moved = $this->lead(1);
-        $this->act($moved, 'status_change', now()->subDay()->addMinutes(30), $this->ben, 'Status: new → contacted');
+        $this->act($moved, 'status_change', now()->subDay()->addMinutes(30), $this->ben, 'Status: new → contacted', 'new');
         $other = $this->lead(1);
-        $this->act($other, 'status_change', now()->subHours(10), $this->ben, 'Status: contacted → qualified');
+        $this->act($other, 'status_change', now()->subHours(10), $this->ben, 'Status: contacted → qualified', 'contacted');
 
         $this->assertSame(30, $this->row($moved)['response_minutes']);
         $this->assertNull($this->row($other)['response_minutes']);

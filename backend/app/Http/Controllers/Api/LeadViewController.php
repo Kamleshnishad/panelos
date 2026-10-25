@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Lead;
 use App\Models\LeadView;
 use App\Services\LeadService;
+use App\Services\LeadStages;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -38,7 +39,7 @@ class LeadViewController extends Controller
             if ($name === '') {
                 throw ValidationException::withMessages(['name' => 'Give the view a name.']);
             }
-            $filters = $this->clean($d['filters']);
+            $filters = $this->clean($d['filters'], (int) $r->user()->company_id);
 
             $view = $this->mine($r)->where('name', $name)->first();
             if (!$view && $this->mine($r)->count() >= self::MAX_PER_PERSON) {
@@ -65,11 +66,11 @@ class LeadViewController extends Controller
     }
 
     /** Keep only what the list understands, in a shape it accepts. */
-    private function clean(array $f): array
+    private function clean(array $f, int $company): array
     {
         $s = fn ($k, $max) => isset($f[$k]) && is_scalar($f[$k]) && trim((string) $f[$k]) !== '' ? mb_substr(trim((string) $f[$k]), 0, $max) : null;
         $out = [
-            'status'      => in_array($s('status', 20), Lead::STATUSES, true) ? $s('status', 20) : null,
+            'status'      => LeadStages::for($company)->has($s('status', 40)) ? $s('status', 40) : null,
             'source'      => $s('source', 60),
             'assigned_to' => preg_match('/^(me|none|\d{1,12})$/', (string) $s('assigned_to', 12)) ? $s('assigned_to', 12) : null,
             'follow_up'   => in_array($s('follow_up', 10), LeadService::FOLLOW_UPS, true) ? $s('follow_up', 10) : null,

@@ -552,6 +552,18 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "lead_stages": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "key": "varchar(40)",
+        "name": "varchar(40)",
+        "probability": "tinyint unsigned",
+        "sort_order": "smallint unsigned",
+        "role": "varchar(10)",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
     "lead_attachments": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",
@@ -670,6 +682,8 @@
         "lead_id": "bigint unsigned",
         "user_id": "bigint unsigned",
         "type": "enum('note','call','email','whatsapp','meeting','status_change')",
+        "from_status": "varchar(40)",
+        "to_status": "varchar(40)",
         "description": "text",
         "activity_date": "timestamp",
         "created_at": "timestamp",

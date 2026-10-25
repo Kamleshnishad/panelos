@@ -40,7 +40,7 @@
           <div class="ins-card">
             <h4>Funnel</h4>
             <div v-for="f in dash.funnel" :key="f.status" class="funnel-row">
-              <span class="funnel-label" :class="f.status">{{ f.status }}</span>
+              <span class="funnel-label" :class="f.status" :title="f.name || f.status">{{ f.name || f.status }}</span>
               <div class="funnel-bar-track"><div class="funnel-bar" :class="f.status" :style="{ width: barPct(f.count) + '%' }"></div></div>
               <span class="funnel-count">{{ f.count }}</span>
             </div>
@@ -126,7 +126,7 @@
     </div>
 
     <template v-if="view === 'list'">
-    <lead-bulk-bar v-if="view === 'list' && canManage && selected.length" :ids="selected" :users="users" @clear="selected = []" @done="onBulkDone" />
+    <lead-bulk-bar v-if="view === 'list' && canManage && selected.length" :ids="selected" :users="users" :stages="stages" @clear="selected = []" @done="onBulkDone" />
     <div v-if="loading" class="lm-loading">Loading…</div>
     <p v-else-if="!leads.length && (filtersActive || search)" class="empty">No leads match these filters. <button class="link" type="button" @click="clearFilters">Show everything</button></p>
     <p v-else-if="!leads.length" class="empty">No leads here. Click <strong>+ New Lead</strong> to add an inquiry.</p>
@@ -364,11 +364,12 @@ const emit = defineEmits(['convert', 'detail', 'open-quotation', 'open-boq'])
 // The company's own list (Master Data -> Lead lists). The fallback below only shows if the options call fails.
 const sources = ref(['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other'])
 const applications = LEAD_APPLICATIONS
-const statusTabs = [
-  { key: '', label: 'All' }, { key: 'new', label: 'New' }, { key: 'contacted', label: 'Contacted' },
-  { key: 'qualified', label: 'Qualified' }, { key: 'quoted', label: 'Quoted' }, { key: 'on_hold', label: 'On hold' },
-  { key: 'won', label: 'Won' }, { key: 'lost', label: 'Lost' }, { key: 'invalid', label: 'Invalid' },
-]
+// The open stages are the company's own (Master Data -> Lead stages); the options call replaces this starter set. On hold, won, lost and invalid are fixed.
+const FIXED_NAMES = { on_hold: 'On hold', won: 'Won', lost: 'Lost', invalid: 'Invalid' }
+const stages = ref([{ key: 'new', name: 'New' }, { key: 'contacted', name: 'Contacted' }, { key: 'qualified', name: 'Qualified' }, { key: 'quoted', name: 'Quoted' }])
+const statusTabs = computed(() => [
+  { key: '', label: 'All' }, ...stages.value.map(s => ({ key: s.key, label: s.name })), ...Object.entries(FIXED_NAMES).map(([key, label]) => ({ key, label })),
+])
 const CLOSED = ['won', 'lost', 'invalid']
 // What each status may move to. The server sends the real table with the options; this is only the fallback.
 const transitions = ref({
@@ -528,7 +529,7 @@ function followClass(l) {
   return ''
 }
 const isClosed = (status) => CLOSED.includes(status)
-const statusLabel = (status) => String(status || '').replace('_', ' ')
+const statusLabel = (status) => stages.value.find(s => s.key === status)?.name ?? FIXED_NAMES[status] ?? String(status || '').replace(/_/g, ' ')
 const moveTo = (status) => transitions.value[status] || []
 const today = new Date().toISOString().slice(0, 10)
 
@@ -541,9 +542,9 @@ const mergeOpen = ref(false)
 const board = ref(null)
 /** The list's filters for the board: its status tabs and sort do not apply (the columns are the statuses). */
 const boardFilters = computed(() => { const { status, sort, dir, ...rest } = currentFilters(); return rest })
-const DIRECT = ['new', 'contacted', 'qualified', 'quoted']      // moves that need nothing more; hold, lost and junk ask their question first
+const direct = computed(() => stages.value.map(s => s.key))     // moves that need nothing more (any open stage); hold, lost and junk ask their question first
 async function onBoardMove({ lead, to }) {
-  if (!DIRECT.includes(to)) return setStatus(lead, to)
+  if (!direct.value.includes(to)) return setStatus(lead, to)
   try { await leadService.changeStatus(lead.id, { status: to }); toastSuccess(`${lead.lead_no} moved to ${statusLabel(to)}.`) }
   catch (e) { toastError(e?.response?.data?.message ?? 'That move did not work.') }
   board.value?.load()
@@ -825,6 +826,7 @@ async function loadOptions() {
     const res = await leadService.options()
     const o = res?.data ?? res
     if (Array.isArray(o?.sources) && o.sources.length) sources.value = o.sources
+    if (Array.isArray(o?.stages) && o.stages.length) stages.value = o.stages
     if (o?.transitions && typeof o.transitions === 'object') transitions.value = o.transitions
     if (Array.isArray(o?.lost_reasons)) lostReasons.value = o.lost_reasons
     ownOnly.value = !!o?.own_only
@@ -881,7 +883,7 @@ onMounted(async () => {
 .ins-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .ins-card h4 { margin: 0 0 12px; font-size: 13px; color: var(--primary); }
 .funnel-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
-.funnel-label { width: 78px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.funnel-label { width: 110px; font-size: 11px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .funnel-bar-track { flex: 1; height: 14px; background: var(--surface-2); border-radius: 7px; overflow: hidden; }
 .funnel-bar { height: 100%; background: var(--primary); border-radius: 7px; }
 .funnel-bar.won { background: #2e7d32; } .funnel-bar.lost { background: #c62828; }
@@ -940,7 +942,7 @@ button.vchip { cursor: pointer; font-family: inherit; padding: 5px 12px; }     /
 .src-badge { font-size: 11px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 2px 8px; }
 .follow-over { color: #c62828; font-weight: 700; } .follow-today { color: #b5740a; font-weight: 700; }
 
-.status-badge { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.3px; }
+.status-badge { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.3px; background: var(--primary-tint); color: var(--primary); }   /* a stage the company added gets this; the built-in ones below override it */
 .status-badge.big { font-size: 12px; padding: 4px 12px; display: inline-block; margin-bottom: 14px; }
 .status-badge.new { background: #e3f2fd; color: #1565c0; }
 .status-badge.contacted { background: var(--primary-tint); color: var(--primary); }

@@ -19,7 +19,6 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class LeadEngagement
 {
-    public const OPEN = Lead::OPEN;
     public const DEFAULT_STALE_DAYS = 7;
     public const WITHIN = 60;                           // minutes: "answered within the hour"
 
@@ -29,7 +28,7 @@ class LeadEngagement
     public static function firstResponseSql(): string
     {
         return "select min(a.activity_date) from lead_activities a where a.lead_id = leads.id and a.deleted_at is null and a.user_id is not null "
-            . "and (a.type in (" . self::CONTACT . ") or (a.type = 'status_change' and a.description like 'Status: new →%'))";
+            . "and (a.type in (" . self::CONTACT . ") or (a.type = 'status_change' and a.from_status = 'new'))";
     }
 
     /** SQL: the latest thing a person did on the lead. */
@@ -76,7 +75,7 @@ class LeadEngagement
     /** Restrict a lead query to the quiet ones. */
     public static function onlyQuiet(Builder $q, int $companyId): Builder
     {
-        $inList = "'" . implode("','", self::OPEN) . "'";
+        $inList = "'" . implode("','", LeadStages::for($companyId)->open()) . "'";
 
         return $q->whereRaw("leads.status in ({$inList})")
             ->whereRaw('coalesce((' . self::lastTouchSql() . '), leads.created_at) < ?', [now()->subDays(self::staleDays($companyId))->toDateTimeString()])
@@ -87,7 +86,7 @@ class LeadEngagement
     public static function onlyUnanswered(Builder $q): Builder
     {
         return $q->whereRaw('not exists (select 1 from lead_activities a where a.lead_id = leads.id and a.deleted_at is null and a.user_id is not null '
-            . "and (a.type in (" . self::CONTACT . ") or (a.type = 'status_change' and a.description like 'Status: new →%')))");
+            . "and (a.type in (" . self::CONTACT . ") or (a.type = 'status_change' and a.from_status = 'new')))");
     }
 
     /**
@@ -103,7 +102,7 @@ class LeadEngagement
             'responded'       => $mins->count(),
             'avg_minutes'     => $mins->isEmpty() ? null : (int) round($mins->avg()),
             'within_hour_pct' => $mins->isEmpty() ? null : round($mins->filter(fn ($m) => $m <= self::WITHIN)->count() / $mins->count() * 100, 1),
-            'waiting'         => self::onlyUnanswered((clone $visible)->whereIn('leads.status', self::OPEN))->count(),
+            'waiting'         => self::onlyUnanswered((clone $visible)->whereIn('leads.status', LeadStages::for($companyId)->open()))->count(),
             'quiet'           => self::onlyQuiet(clone $visible, $companyId)->count(),
             'quiet_days'      => self::staleDays($companyId),
         ];

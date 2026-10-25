@@ -40,14 +40,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import leadService from '../services/leadService.js'
 
-const props = defineProps({ ids: { type: Array, required: true }, users: { type: Array, default: () => [] } })
+const props = defineProps({ ids: { type: Array, required: true }, users: { type: Array, default: () => [] }, stages: { type: Array, default: () => [] } })
 const emit = defineEmits(['clear', 'done'])
 
 const tabs = [{ key: 'assign', label: 'Assign' }, { key: 'status', label: 'Move to' }, { key: 'plan', label: 'Plan an action' }]
-const STATUSES = [{ key: 'contacted', label: 'Contacted' }, { key: 'qualified', label: 'Qualified' }, { key: 'on_hold', label: 'On hold' }, { key: 'lost', label: 'Lost' }, { key: 'invalid', label: 'Invalid (junk)' }]
+// Any open stage except the two the system sets itself (new on arrival, quoted by a quotation), then hold, lost and junk.
+const STATUSES = computed(() => [
+  ...props.stages.filter(s => s.key !== 'new' && s.key !== 'quoted').map(s => ({ key: s.key, label: s.name })),
+  { key: 'on_hold', label: 'On hold' }, { key: 'lost', label: 'Lost' }, { key: 'invalid', label: 'Invalid (junk)' },
+])
 const mode = ref('')
 const user = ref('')
 const status = ref('')

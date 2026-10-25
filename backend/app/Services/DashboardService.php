@@ -106,7 +106,7 @@ class DashboardService
             'quotation_outcomes' => collect(['draft', 'sent', 'accepted', 'rejected'])->map(fn ($s) => [
                 'label' => $s, 'count' => (int) ($quoteStatus[$s]->n ?? 0), 'value' => round((float) ($quoteStatus[$s]->total ?? 0), 2),
             ])->all(),
-            'lead_funnel' => $this->countBy(\App\Models\Lead::where('company_id', $companyId), 'status', ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost']),
+            'lead_funnel' => $this->leadFunnel($companyId),
             'lead_sources' => \App\Models\Lead::where('company_id', $companyId)->where('status', '!=', 'invalid')->where('created_at', '>=', $fyStart)
                 ->selectRaw("source, COUNT(*) as n, SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as won")
                 ->groupBy('source')->orderByDesc('n')->get()
@@ -128,6 +128,16 @@ class DashboardService
         return $query->where($dateCol, '>=', $from)->get([$dateCol, $valCol])
             ->groupBy(fn ($r) => \Carbon\Carbon::parse($r->$dateCol)->format('Y-m'))
             ->map(fn ($g) => $g->sum($valCol));
+    }
+
+    /** One bar per open stage, in the company's order and under the company's names, then won and lost. */
+    private function leadFunnel(int $companyId): array
+    {
+        $stages = LeadStages::for($companyId);
+        $keys = [...$stages->open(), 'won', 'lost'];
+        $rows = $this->countBy(\App\Models\Lead::where('company_id', $companyId), 'status', $keys);
+
+        return array_map(fn ($r) => ['label' => $stages->name($r['label']), 'value' => $r['value']], $rows);
     }
 
     private function countBy($query, string $col, array $keys): array

@@ -6,6 +6,7 @@
                @dragover.prevent="overCol = c.status" @dragleave="overCol = ''" @drop.prevent="drop(c.status)">
         <header>
           <h4>{{ label(c.status) }} <span class="bd-n">{{ c.count }}</span></h4>
+          <small v-if="c.probability != null" class="bd-p" :title="'Chance of winning a lead in this stage'">{{ c.probability }}%</small>
           <small v-if="c.est_qty_sqm || c.est_value">{{ c.est_qty_sqm ? fmt(c.est_qty_sqm) + ' sqm' : '' }}{{ c.est_qty_sqm && c.est_value ? ' · ' : '' }}{{ c.est_value ? '₹ ' + fmt(c.est_value) : '' }}</small>
         </header>
         <div v-for="l in c.leads" :key="l.id" class="bd-card" draggable="true" tabindex="0" role="button" :aria-label="'Open ' + l.lead_no + ' ' + l.contact_name"
@@ -52,11 +53,13 @@ const error = ref('')
 const dragging = ref(null)
 const overCol = ref('')
 
-const NAMES = { new: 'New', contacted: 'Contacted', qualified: 'Qualified', quoted: 'Quoted', on_hold: 'On hold' }
-const label = (s) => NAMES[s] ?? s
+// The columns are the company's own stages (name and chance of winning come from the server), then on hold.
+const label = (s) => columns.value.find(c => c.status === s)?.name ?? s
 const DROPS = [{ key: 'lost', label: 'Drop here: mark lost' }, { key: 'invalid', label: 'Drop here: junk' }]
-const MOVES = [{ key: 'new', label: 'New' }, { key: 'contacted', label: 'Contacted' }, { key: 'qualified', label: 'Qualified' }, { key: 'quoted', label: 'Quoted' }, { key: 'on_hold', label: 'On hold…' }, { key: 'lost', label: 'Lost…' }, { key: 'invalid', label: 'Junk…' }]
-const targets = (from) => MOVES.filter(m => m.key !== from)
+const targets = (from) => [
+  ...columns.value.filter(c => c.status !== 'on_hold').map(c => ({ key: c.status, label: c.name })),
+  { key: 'on_hold', label: 'On hold…' }, { key: 'lost', label: 'Lost…' }, { key: 'invalid', label: 'Junk…' },
+].filter(m => m.key !== from)
 
 const fmt = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })
 const initials = (n) => String(n).split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
@@ -95,7 +98,7 @@ onMounted(load)
 
 <style scoped>
 .bd-error { background: #ffebee; color: #c62828; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
-.bd-cols { display: grid; grid-template-columns: repeat(5, minmax(230px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 8px; align-items: start; }
+.bd-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; align-items: start; }
 .bd-col { background: #f3f5f8; border-radius: 10px; padding: 10px; min-height: 140px; border: 2px solid transparent; }
 .bd-col.over { border-color: var(--primary); background: #eaf0ff; }
 .bd-col header { margin-bottom: 8px; }
@@ -103,6 +106,7 @@ onMounted(load)
 .bd-col.on_hold h4 { color: #8a5300; }
 .bd-n { margin-left: 6px; background: #fff; border-radius: 9px; padding: 0 7px; font-size: 11px; }
 .bd-col header small { color: #888; font-size: 11.5px; }
+.bd-col header small.bd-p { margin-right: 8px; font-weight: 700; color: #5e6b7d; }
 .bd-card { background: #fff; border: 1px solid #e3e6ec; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; cursor: grab; font-size: 12.5px; }
 .bd-card:hover, .bd-card:focus { border-color: var(--primary); outline: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .bd-card:active { cursor: grabbing; }

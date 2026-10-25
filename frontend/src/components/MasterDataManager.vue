@@ -10,6 +10,7 @@
       <button :class="['md-tab', { active: tab === 'leadlists' }]"   @click="tab = 'leadlists'">Lead lists</button>
       <button :class="['md-tab', { active: tab === 'leadintake' }]"  @click="tab = 'leadintake'">Lead intake</button>
       <button :class="['md-tab', { active: tab === 'leadmessages' }]" @click="tab = 'leadmessages'">Lead messages</button>
+      <button :class="['md-tab', { active: tab === 'leadstages' }]"   @click="tab = 'leadstages'">Lead stages</button>
     </div>
 
     <panel-type-master       v-if="tab === 'panels'" />
@@ -20,6 +21,7 @@
     <lead-lists-settings     v-else-if="tab === 'leadlists'" />
     <lead-inbound-settings   v-else-if="tab === 'leadintake'"><india-mart-settings /><lead-assignment-settings /></lead-inbound-settings>
     <lead-message-settings   v-else-if="tab === 'leadmessages'" />
+    <lead-stage-settings     v-else-if="tab === 'leadstages'" />
   </div>
 </template>
 
@@ -33,6 +35,7 @@ import GstConfigManager      from './GstConfigManager.vue'
 import LeadListsSettings     from './LeadListsSettings.vue'
 import LeadInboundSettings   from './LeadInboundSettings.vue'
 import LeadMessageSettings   from './LeadMessageSettings.vue'
+import LeadStageSettings     from './LeadStageSettings.vue'
 import LeadAssignmentSettings from './LeadAssignmentSettings.vue'
 import IndiaMartSettings from './IndiaMartSettings.vue'
 

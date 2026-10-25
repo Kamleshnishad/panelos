@@ -22,7 +22,6 @@ class LeadBulkService
 {
     public const MAX = 200;
     public const ACTIONS = ['assign', 'status', 'plan'];
-    public const STATUSES = ['contacted', 'qualified', 'on_hold', 'lost', 'invalid'];
 
     public function __construct(private LeadService $leads, private LeadTaskService $tasks, private AppNotificationService $notify, private LeadListService $lists)
     {
@@ -118,8 +117,8 @@ class LeadBulkService
     private function prepareStatus(int $companyId, array $p): array
     {
         $to = (string) ($p['status'] ?? '');
-        if (!in_array($to, self::STATUSES, true)) {
-            $this->refuse('status', 'Choose contacted, qualified, on hold, lost or invalid.');
+        if (!in_array($to, $this->statusesFor($companyId), true)) {
+            $this->refuse('status', 'Choose one of the open stages, on hold, lost or invalid. New, quoted and won are set by the system and cannot be chosen here.');
         }
         $o = ['reason' => $p['reason'] ?? null];
         if ($to === 'on_hold') {
@@ -142,10 +141,16 @@ class LeadBulkService
         return ['to' => $to, 'options' => $o];
     }
 
+    /** Any open stage the company has except the two the system sets itself (new on arrival, quoted by a quotation), then on hold, lost and invalid. Won is never set in bulk. @return list<string> */
+    public function statusesFor(int $companyId): array
+    {
+        return [...array_values(array_diff(LeadStages::for($companyId)->open(), [LeadStages::ENTRY, LeadStages::QUOTED])), 'on_hold', 'lost', 'invalid'];
+    }
+
     private function status(Lead $lead, array $o, User $actor): ?int
     {
         if ($lead->status === $o['to']) {
-            $this->refuse('lead', 'Already ' . str_replace('_', ' ', $o['to']) . '.');
+            $this->refuse('lead', 'Already ' . LeadStages::for((int) $lead->company_id)->label($o['to']) . '.');
         }
         if ($lead->isClosed()) {
             $this->refuse('lead', "{$lead->lead_no} is {$lead->status}. Reopen it on its own first (that needs a reason); it is not changed here.");

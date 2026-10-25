@@ -27,7 +27,7 @@ class LeadBulkController extends Controller
             $d = $r->validate([
                 'ids' => 'required|array|min:1|max:' . LeadBulkService::MAX, 'ids.*' => 'integer',
                 'action' => 'required|string|max:12',
-                'user_id' => 'nullable', 'status' => 'nullable|string|max:12', 'reason' => 'nullable|string|max:500', 'hold_until' => 'nullable|date',
+                'user_id' => 'nullable', 'status' => 'nullable|string|max:40', 'reason' => 'nullable|string|max:500', 'hold_until' => 'nullable|date',
                 'lost_reason_id' => 'nullable|integer', 'lost_note' => 'nullable|string|max:500',
                 'type' => 'nullable|in:' . implode(',', array_keys(LeadTask::TYPES)), 'due_date' => 'nullable|date_format:Y-m-d', 'due_time' => 'nullable|string|max:8',
                 'title' => 'nullable|string|max:150', 'assigned_to_user_id' => 'nullable|integer',

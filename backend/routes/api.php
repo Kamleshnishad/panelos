@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AccessoryController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\QuotationController;
+use App\Http\Controllers\Api\LeadStageController;
 use App\Http\Controllers\Api\ProductionBatchController;
 use App\Http\Controllers\Api\ProductionStageController;
 use App\Http\Controllers\Api\AttachmentController;
@@ -197,6 +198,11 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::post('/settings/lead-inbound-tokens/{id}/regenerate', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'regenerate'])->name('leadinbound.regenerate');
     Route::delete('/settings/lead-inbound-tokens/{id}', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'destroy'])->name('leadinbound.destroy');
     Route::get('/settings/lead-import-logs', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'logs'])->name('leadinbound.logs');
+    Route::get('/settings/lead-stages', [LeadStageController::class, 'index'])->name('leadstages.index');
+    Route::post('/settings/lead-stages', [LeadStageController::class, 'store'])->name('leadstages.store');
+    Route::put('/settings/lead-stages/order', [LeadStageController::class, 'reorder'])->name('leadstages.order');
+    Route::put('/settings/lead-stages/{id}', [LeadStageController::class, 'update'])->name('leadstages.update');
+    Route::delete('/settings/lead-stages/{id}', [LeadStageController::class, 'destroy'])->name('leadstages.destroy');
     Route::get('/settings/lead-message-templates', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'index'])->name('leadmsg.index');
     Route::post('/settings/lead-message-templates', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'store'])->name('leadmsg.store');
     Route::put('/settings/lead-message-templates/{id}', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'update'])->name('leadmsg.update');

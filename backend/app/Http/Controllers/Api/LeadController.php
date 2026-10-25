@@ -8,6 +8,7 @@ use App\Exceptions\LeadCustomerMatchException;
 use App\Rules\IndianGstin;
 use App\Rules\IndianPincode;
 use App\Services\LeadMatcher;
+use App\Services\LeadStages;
 use App\Services\LeadService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -60,11 +61,12 @@ class LeadController extends Controller
         return $this->successResponse([
             'sources'      => $this->lists->activeNames('source', $cid),
             'lost_reasons' => $reasons,
-            'statuses'     => Lead::STATUSES,
+            'statuses'     => LeadStages::for($cid)->statuses(),
+            'stages'       => array_map(fn ($s) => ['key' => $s['key'], 'name' => $s['name'], 'probability' => $s['probability'], 'role' => $s['role']], LeadStages::for($cid)->rows),
             'task_types'   => \App\Models\LeadTask::TYPES,
             'quiet_days'   => \App\Services\LeadEngagement::staleDays($cid),
             'own_only'     => $r->user()->ownLeadsOnly(),      // the screen hides the filters that cannot apply to a restricted person
-            'transitions'  => Lead::transitions(),     // what each status may move to: the screen offers exactly these
+            'transitions'  => LeadStages::for($cid)->transitions(),     // what each status may move to: the screen offers exactly these
         ], 'Lead options');
     }
 
@@ -178,7 +180,7 @@ class LeadController extends Controller
         try {
             $lead = $this->mine($r, $id);
             $data = $r->validate([
-                'status'         => ['required', Rule::in(Lead::STATUSES)],
+                'status'         => ['required', Rule::in(LeadStages::for($this->cid($r))->statuses())],
                 'reason'         => 'nullable|string|max:500',
                 'hold_until'     => 'nullable|date',
                 'lost_reason'    => 'nullable|string|max:255',
@@ -307,7 +309,7 @@ class LeadController extends Controller
             'est_qty_sqm'         => 'nullable|numeric|min:0',
             'est_value'           => 'nullable|numeric|min:0',
             // A new lead starts in an open stage; every later change goes through the status action.
-            'status'              => $update ? 'nullable|string' : ['nullable', Rule::in(['new', 'contacted', 'qualified'])],
+            'status'              => $update ? 'nullable|string' : ['nullable', Rule::in(array_values(array_diff(LeadStages::for((int) $companyId)->open(), [LeadStages::QUOTED])))],
             // Scope the assigned user to the caller's company so a tenant can't write
             // a foreign tenant's user id (information disclosure + cross-tenant UI poisoning).
             'assigned_to_user_id' => [

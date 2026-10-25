@@ -50,7 +50,7 @@ class LeadService
         }
 
         if (!empty($filters['quiet']))       LeadEngagement::onlyQuiet($q, $companyId);
-        if (!empty($filters['unanswered']))  LeadEngagement::onlyUnanswered($q)->whereIn('leads.status', LeadEngagement::OPEN);
+        if (!empty($filters['unanswered']))  LeadEngagement::onlyUnanswered($q)->whereIn('leads.status', LeadStages::for($companyId)->open());
 
         if (!empty($filters['search'])) {
             $s = addcslashes(trim((string) $filters['search']), '\\%_');
@@ -76,6 +76,7 @@ class LeadService
         return $q->orderByDesc('id');
     }
 
+    /** The board's columns for a company that has not edited its stages; the real list is LeadStages::open() then on hold. */
     public const BOARD_COLUMNS = ['new', 'contacted', 'qualified', 'quoted', 'on_hold'];
     public const BOARD_PER_COLUMN = 25;
 
@@ -89,12 +90,13 @@ class LeadService
     {
         $filters = array_diff_key($filters, ['status' => 1, 'sort' => 1, 'dir' => 1]) + ['sort' => 'follow_up'];
         $out = [];
-        foreach (self::BOARD_COLUMNS as $status) {
+        $stages = LeadStages::for($companyId);
+        foreach ([...$stages->open(), 'on_hold'] as $status) {
             $q = $this->list($companyId, $filters + ['status' => $status], $viewer);
             $sums = (clone $q)->reorder()->toBase()->select(DB::raw('count(*) as n, coalesce(sum(est_qty_sqm),0) as sqm, coalesce(sum(est_value),0) as val'))->first();      // select() replaces the list's columns
             $n = (int) ($sums->n ?? 0);
             $out[] = [
-                'status' => $status, 'count' => $n, 'est_qty_sqm' => (float) ($sums->sqm ?? 0), 'est_value' => (float) ($sums->val ?? 0),
+                'status' => $status, 'name' => $stages->name($status), 'probability' => $stages->probability($status), 'count' => $n, 'est_qty_sqm' => (float) ($sums->sqm ?? 0), 'est_value' => (float) ($sums->val ?? 0),
                 'more' => max(0, $n - self::BOARD_PER_COLUMN), 'leads' => (clone $q)->limit(self::BOARD_PER_COLUMN)->get(),
             ];
         }
@@ -130,7 +132,7 @@ class LeadService
     public function create(int $companyId, array $data): Lead
     {
         $data['company_id'] = $companyId;
-        $data['status'] = $data['status'] ?? 'new';
+        $data['status'] = $data['status'] ?? LeadStages::ENTRY;
 
         // Two leads made at the same moment read the same "last number". The unique (company_id, lead_no) key makes the loser fail,
         // so it runs again, reads the new last number and takes the next one (same helper as quotations and invoices; LD-07).
@@ -184,11 +186,12 @@ class LeadService
         if ($to === $from) {
             return $lead->fresh('assignedUser', 'customer');       // nothing to change, nothing to log
         }
-        if (!in_array($to, Lead::STATUSES, true)) {
+        $stages = LeadStages::for((int) $lead->company_id);
+        if (!$stages->has($to)) {
             $this->refuse('status', 'That is not a lead status.');
         }
-        if (!in_array($to, Lead::allowedNext($from), true)) {
-            $this->refuse('status', "A lead cannot go from {$this->label($from)} to {$this->label($to)}." . ($lead->isClosed() ? ' Reopen it first.' : ''));
+        if (!in_array($to, $stages->allowedNext($from), true)) {
+            $this->refuse('status', "A lead cannot go from {$stages->label($from)} to {$stages->label($to)}." . ($lead->isClosed() ? ' Reopen it first.' : ''));
         }
 
         $reason = trim((string) ($o['reason'] ?? ''));
@@ -214,7 +217,7 @@ class LeadService
             $suffix = $lostReason ? " (reason: {$lostReason}" . ($lostNote ? " — {$lostNote}" : '') . ')' : '';
         }
 
-        DB::transaction(function () use ($lead, $payload, $from, $to, $suffix, $userId) {
+        DB::transaction(function () use ($lead, $payload, $from, $to, $suffix, $userId, $stages) {
             $lead->update($payload);
             if (in_array($to, Lead::CLOSED, true)) {
                 app(LeadTaskService::class)->cancelOpen($lead);        // a won, lost or invalid lead has nothing left to do (5.2)
@@ -224,7 +227,9 @@ class LeadService
                 'lead_id'       => $lead->id,
                 'user_id'       => $userId,
                 'type'          => 'status_change',
-                'description'   => "Status: {$this->label($from)} → {$this->label($to)}{$suffix}",
+                'from_status'   => $from,
+                'to_status'     => $to,
+                'description'   => "Status: {$stages->label($from)} → {$stages->label($to)}{$suffix}",
                 'activity_date' => now(),
             ]);
         });
@@ -246,9 +251,9 @@ class LeadService
         return $date;
     }
 
-    private function label(string $status): string
+    private function statusLabel(Lead $lead): string
     {
-        return str_replace('_', ' ', $status);
+        return LeadStages::for((int) $lead->company_id)->label($lead->status);
     }
 
     private function refuse(string $field, string $message): never
@@ -406,14 +411,14 @@ class LeadService
             if (!$lead->customer_id) $lead->update(['customer_id' => $customerId]);
             LeadActivity::create([
                 'company_id' => $companyId, 'lead_id' => $lead->id, 'user_id' => auth()?->id(), 'type' => 'note',
-                'description' => "Quotation {$number} was made for this lead. It stays {$this->label($lead->status)}; reopen it to work it again.",
+                'description' => "Quotation {$number} was made for this lead. It stays {$this->statusLabel($lead)}; reopen it to work it again.",
                 'activity_date' => now(),
             ]);
 
             return;
         }
 
-        $lead->update(['status' => 'quoted', 'quotation_id' => $quotationId, 'customer_id' => $customerId]);
+        $lead->update(['status' => LeadStages::QUOTED, 'quotation_id' => $quotationId, 'customer_id' => $customerId]);
         LeadActivity::create([
             'company_id'    => $companyId,
             'lead_id'       => $lead->id,
@@ -444,7 +449,7 @@ class LeadService
         if ($lead->isClosed()) {
             LeadActivity::create([
                 'company_id' => $lead->company_id, 'lead_id' => $lead->id, 'user_id' => $userId, 'type' => 'note',
-                'description' => "Order {$orderNo} was created from this lead's quotation. It stays {$this->label($lead->status)}; reopen it to mark it won.",
+                'description' => "Order {$orderNo} was created from this lead's quotation. It stays {$this->statusLabel($lead)}; reopen it to mark it won.",
                 'activity_date' => now(),
             ]);
 
@@ -530,8 +535,9 @@ class LeadService
             ->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status')->toArray();
 
         $funnelOut = [];
-        foreach (['new', 'contacted', 'qualified', 'quoted', 'won', 'lost'] as $s) {
-            $funnelOut[] = ['status' => $s, 'count' => (int) ($byStatus[$s] ?? 0)];
+        $stages = LeadStages::for($companyId);
+        foreach ([...$stages->open(), 'won', 'lost'] as $s) {
+            $funnelOut[] = ['status' => $s, 'name' => $stages->name($s), 'count' => (int) ($byStatus[$s] ?? 0)];
         }
         $won = (int) ($byStatus['won'] ?? 0);
         $lost = (int) ($byStatus['lost'] ?? 0);

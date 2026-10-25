@@ -9,7 +9,7 @@ class Lead extends BaseModel
     use \App\Traits\Auditable;
     use SoftDeletes;
 
-    /** Still being worked. */
+    /** The STARTER open stages. A company edits its own (LeadStages); code must ask there, not here. Kept for the defaults and for tests that name them. */
     public const OPEN = ['new', 'contacted', 'qualified', 'quoted'];
 
     /** Finished. A closed lead leaves the pipeline; it can only come back through a reopen (with a reason). */
@@ -38,7 +38,7 @@ class Lead extends BaseModel
     /** Days since a person last touched this open lead; null when the lead is closed or on hold, or the engagement columns were not loaded. */
     public function getQuietDaysAttribute(): ?int
     {
-        if (!array_key_exists('last_touch_at', $this->attributes) || !in_array($this->status, self::OPEN, true)) {
+        if (!array_key_exists('last_touch_at', $this->attributes) || !$this->isOpen()) {
             return null;
         }
 
@@ -64,7 +64,7 @@ class Lead extends BaseModel
     /** Minutes an open lead has waited for its first response so far; null once answered, when closed or on hold, or when not loaded. */
     public function getResponseWaitingMinutesAttribute(): ?int
     {
-        if (!array_key_exists('first_response_at', $this->attributes) || $this->first_response_at !== null || !in_array($this->status, self::OPEN, true)) {
+        if (!array_key_exists('first_response_at', $this->attributes) || $this->first_response_at !== null || !$this->isOpen()) {
             return null;
         }
 
@@ -100,6 +100,12 @@ class Lead extends BaseModel
         }
 
         return $map;
+    }
+
+    /** In one of the company's open stages (not on hold, not closed). */
+    public function isOpen(): bool
+    {
+        return \App\Services\LeadStages::for((int) $this->company_id)->isOpen($this->status);
     }
 
     public function isClosed(): bool
