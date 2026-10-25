@@ -21,6 +21,7 @@
           </div>
           <div class="bd-foot">
             <span class="bd-owner" :title="l.assigned_user?.name || 'Nobody has this lead'">{{ l.assigned_user ? initials(l.assigned_user.name) : '—' }}</span>
+            <span v-if="l.temperature" class="bd-chip temp" :class="l.temperature" :title="'Score ' + l.score + ' of 100'">{{ l.temperature }}</span>
             <span v-if="l.quiet_days != null && l.quiet_days >= quietDays" class="bd-chip quiet">quiet {{ l.quiet_days }} d</span>
             <span v-else-if="l.response_waiting_minutes != null && l.response_waiting_minutes >= 60" class="bd-chip wait">waiting</span>
             <select class="bd-move" :aria-label="'Move ' + l.lead_no + ' to'" @click.stop @change="move(l, $event)">
@@ -121,6 +122,8 @@ onMounted(load)
 .bd-chip { font-size: 10.5px; font-weight: 700; border-radius: 9px; padding: 1px 7px; }
 .bd-chip.quiet { background: #fdecea; color: #b3261e; }
 .bd-chip.wait { background: #fff4e0; color: #8a5300; }
+.bd-chip.temp { text-transform: capitalize; }
+.bd-chip.temp.hot { background: #fdecea; color: #b3261e; } .bd-chip.temp.warm { background: #fff4e0; color: #8a5300; } .bd-chip.temp.cold { background: #e8f1fb; color: #1e5a9c; }
 .bd-move { margin-left: auto; font-size: 11px; padding: 2px 4px; border: 1px solid #ddd; border-radius: 5px; background: #fff; max-width: 84px; }
 .bd-empty { color: #aaa; font-size: 12px; text-align: center; margin: 14px 0; }
 .bd-more { width: 100%; background: none; border: 1px dashed #c5cbd6; border-radius: 6px; padding: 6px; font-size: 12px; color: var(--primary); cursor: pointer; }

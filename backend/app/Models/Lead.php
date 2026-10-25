@@ -31,9 +31,16 @@ class Lead extends BaseModel
         'first_seen_at'       => 'datetime',
         'first_response_at'   => 'datetime',      // only present when the query asked for it (LeadEngagement::select)
         'last_touch_at'       => 'datetime',
+        'score'               => 'integer',      // only present when the query asked for it (LeadScoring::select)
     ];
 
-    protected $appends = ['quiet_days', 'response_minutes', 'response_waiting_minutes'];
+    protected $appends = ['quiet_days', 'response_minutes', 'response_waiting_minutes', 'temperature'];
+
+    /** hot, warm or cold from the score; null for a closed lead or when the score was not loaded. */
+    public function getTemperatureAttribute(): ?string
+    {
+        return \App\Services\LeadScoring::temperature(array_key_exists('score', $this->attributes) && $this->attributes['score'] !== null ? (int) $this->attributes['score'] : null);
+    }
 
     /** Days since a person last touched this open lead; null when the lead is closed or on hold, or the engagement columns were not loaded. */
     public function getQuietDaysAttribute(): ?int

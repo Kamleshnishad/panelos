@@ -77,6 +77,7 @@ class LeadViewController extends Controller
             'search'      => $s('search', 100),
             'quiet'       => $s('quiet', 1) === '1' ? '1' : null,
             'unanswered'  => $s('unanswered', 1) === '1' ? '1' : null,
+            'temperature' => in_array($s('temperature', 4), \App\Services\LeadScoring::TEMPERATURES, true) ? $s('temperature', 4) : null,
             'sort'        => in_array($s('sort', 12), LeadService::SORTS, true) ? $s('sort', 12) : null,
             'dir'         => in_array($s('dir', 4), ['asc', 'desc'], true) ? $s('dir', 4) : null,
         ];

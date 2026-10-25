@@ -35,6 +35,9 @@
           <div class="kpi"><label>Win Rate</label><span>{{ dash.win_rate }}%</span></div>
           <div class="kpi"><label>On hold</label><span>{{ dash.on_hold || 0 }}</span></div>
         </div>
+        <div v-if="dash.temperature" class="temp-row" aria-label="Open leads by temperature">
+          <button v-for="t in ['hot', 'warm', 'cold']" :key="t" type="button" class="temp-tile" :class="t" @click="showView({ temperature: t, sort: 'score', dir: 'desc' })"><span>{{ dash.temperature[t] }}</span> {{ t }} leads</button>
+        </div>
 
         <div class="ins-grid">
           <div class="ins-card">
@@ -102,6 +105,7 @@
           <option value="">Any follow-up</option><option value="overdue">Overdue</option><option value="today">Due today</option>
           <option value="due">Due or overdue</option><option value="none">No date set</option>
         </select>
+        <select v-model="fTemp" aria-label="Temperature" @change="filterChanged"><option value="">Any temperature</option><option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option></select>
         <select v-model="sortKey" aria-label="Sort by" @change="filterChanged">
           <option v-for="o in SORTS" :key="o.key" :value="o.key">{{ o.label }}</option>
         </select>
@@ -149,7 +153,7 @@
             <span v-if="l.quiet_days != null && l.quiet_days >= quietDays" class="eng-chip quiet" :title="'Nobody has touched this lead for ' + l.quiet_days + ' days'">quiet {{ l.quiet_days }} d</span>
             <span v-else-if="l.response_waiting_minutes != null && l.response_waiting_minutes >= 60" class="eng-chip wait" title="Nobody has responded yet">waiting {{ fmtMins(l.response_waiting_minutes) }}</span>
           </td>
-          <td><span class="status-badge" :class="l.status">{{ statusLabel(l.status) }}</span></td>
+          <td><span class="status-badge" :class="l.status">{{ statusLabel(l.status) }}</span><span v-if="l.temperature" class="temp" :class="l.temperature" :title="'Score ' + l.score + ' of 100'">{{ l.temperature }}</span></td>
         </tr>
       </tbody>
     </table>
@@ -271,6 +275,13 @@
 
         <span class="status-badge big" :class="detail.status">{{ statusLabel(detail.status) }}</span>
 
+        <div v-if="detail.score_detail" class="score-box" aria-label="Lead score">
+          <div class="score-head"><span class="temp big" :class="detail.temperature">{{ detail.temperature }}</span><b>{{ detail.score_detail.score }}</b><small>out of 100</small></div>
+          <ul>
+            <li v-for="p in detail.score_detail.parts" :key="p.key"><span class="sc-l">{{ p.label }}</span><span class="sc-why">{{ p.why }}</span><b>{{ p.points }}<small>/{{ p.max }}</small></b></li>
+          </ul>
+        </div>
+
         <div class="d-fields">
           <div><label>Phone</label><span>{{ detail.phone || '—' }}</span></div>
           <div><label>Email</label><span>{{ detail.email || '—' }}</span></div>
@@ -391,6 +402,7 @@ const fAssigned = ref('')
 const fFollow = ref('')
 const fQuiet = ref('')
 const fUnanswered = ref('')
+const fTemp = ref('')              // hot, warm or cold: from the score (LeadScoring)
 const quietDays = ref(7)           // the company's setting, from the options
 const sortKey = ref('created:desc')
 const ownOnly = ref(false)          // the role may see only the leads assigned to it: the server answers for that, the screen just hides what cannot apply
@@ -400,7 +412,7 @@ const saveAs = reactive({ open: false, name: '' })
 
 const SORTS = [
   { key: 'created:desc', label: 'Newest first' }, { key: 'created:asc', label: 'Oldest first' }, { key: 'follow_up:asc', label: 'Follow-up soonest' },
-  { key: 'name:asc', label: 'Name A to Z' }, { key: 'updated:desc', label: 'Recently changed' },
+  { key: 'score:desc', label: 'Hottest first' }, { key: 'name:asc', label: 'Name A to Z' }, { key: 'updated:desc', label: 'Recently changed' },
 ]
 // Ready-made views: plain filters, the same shape as a saved one. "Me" and "none" are understood by the server.
 const readyViews = computed(() => [
@@ -411,18 +423,19 @@ const readyViews = computed(() => [
   ...(sources.value.includes('IndiaMART') ? [{ key: 'indiamart', label: 'New from IndiaMART', filters: { status: 'new', source: 'IndiaMART' } }] : []),
   ...(ownOnly.value ? [] : [{ key: 'unassigned', label: 'Unassigned', filters: { assigned_to: 'none' } }]),
   { key: 'unanswered', label: 'Waiting for a reply', filters: { unanswered: '1' } },
+  { key: 'hot', label: 'Hot leads', filters: { temperature: 'hot', sort: 'score', dir: 'desc' } },
   { key: 'quiet', label: 'Quiet leads', filters: { quiet: '1' } },
 ])
 
 /** What the list is asking for right now, in the shape the server and a saved view both use. */
 function currentFilters() {
   const [sort, dir] = sortKey.value.split(':')
-  const f = { status: statusFilter.value, source: fSource.value, assigned_to: fAssigned.value, follow_up: fFollow.value, search: search.value, quiet: fQuiet.value, unanswered: fUnanswered.value }
+  const f = { status: statusFilter.value, source: fSource.value, assigned_to: fAssigned.value, follow_up: fFollow.value, search: search.value, quiet: fQuiet.value, unanswered: fUnanswered.value, temperature: fTemp.value }
   if (sortKey.value !== 'created:desc') Object.assign(f, { sort, dir })
   return Object.fromEntries(Object.entries(f).filter(([, v]) => v))
 }
 const sameFilters = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort())
-const filtersActive = computed(() => !!(fSource.value || fAssigned.value || fFollow.value || fQuiet.value || fUnanswered.value || statusFilter.value || search.value || sortKey.value !== 'created:desc'))
+const filtersActive = computed(() => !!(fSource.value || fAssigned.value || fFollow.value || fQuiet.value || fUnanswered.value || fTemp.value || statusFilter.value || search.value || sortKey.value !== 'created:desc'))
 
 function setFilters(f = {}) {
   statusFilter.value = f.status || ''
@@ -431,6 +444,7 @@ function setFilters(f = {}) {
   fFollow.value = f.follow_up || ''
   fQuiet.value = f.quiet || ''
   fUnanswered.value = f.unanswered || ''
+  fTemp.value = f.temperature || ''
   search.value = f.search || ''
   sortKey.value = f.sort ? `${f.sort}:${f.dir || (['follow_up', 'name'].includes(f.sort) ? 'asc' : 'desc')}` : 'created:desc'
 }
@@ -896,6 +910,20 @@ onMounted(async () => {
 .fu-row.red b { color: #c62828; } .fu-row.amber b { color: #b5740a; }
 @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } .ins-grid { grid-template-columns: 1fr; } }
 
+.temp { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; border-radius: 9px; padding: 1px 7px; text-transform: capitalize; }
+.temp.hot { background: #fdecea; color: #b3261e; } .temp.warm { background: #fff4e0; color: #8a5300; } .temp.cold { background: #e8f1fb; color: #1e5a9c; }
+.temp.big { margin: 0 8px 0 0; font-size: 12px; padding: 3px 11px; }
+.score-box { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; }
+.score-head { display: flex; align-items: baseline; margin-bottom: 6px; }
+.score-head b { font-size: 22px; margin-right: 4px; } .score-head small { color: var(--text-3); }
+.score-box ul { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+.score-box li { display: grid; grid-template-columns: 110px 1fr auto; gap: 8px; padding: 3px 0; border-top: 1px solid var(--border); }
+.score-box li:first-child { border-top: 0; }
+.sc-l { font-weight: 600; } .sc-why { color: var(--text-2, #666); } .score-box li small { color: var(--text-3); font-weight: 400; }
+.temp-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.temp-tile { border: 0; border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; text-transform: capitalize; }
+.temp-tile span { font-size: 18px; font-weight: 800; margin-right: 4px; }
+.temp-tile.hot { background: #fdecea; color: #b3261e; } .temp-tile.warm { background: #fff4e0; color: #8a5300; } .temp-tile.cold { background: #e8f1fb; color: #1e5a9c; }
 .eng-chip { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; border-radius: 9px; padding: 1px 7px; white-space: nowrap; }
 .eng-chip.quiet { background: #fdecea; color: #b3261e; }
 .eng-chip.wait { background: #fff4e0; color: #8a5300; }

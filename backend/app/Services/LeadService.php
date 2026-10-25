@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 class LeadService
 {
     public const FOLLOW_UPS = ['due', 'overdue', 'today', 'none'];
-    public const SORTS = ['created', 'follow_up', 'name', 'updated'];
+    public const SORTS = ['created', 'follow_up', 'name', 'updated', 'score'];
 
     /** The leads a person may see: all of the company's, or only the ones assigned to them when their role carries the "own leads only" restriction (5.1). */
     public function visible(int $companyId, ?User $viewer = null): Builder
@@ -30,7 +30,7 @@ class LeadService
      */
     public function list(int $companyId, array $filters = [], ?User $viewer = null)
     {
-        $q = LeadEngagement::select($this->visible($companyId, $viewer))->with('assignedUser', 'customer');
+        $q = LeadScoring::select(LeadEngagement::select($this->visible($companyId, $viewer)), $companyId)->with('assignedUser', 'customer');
 
         if (!empty($filters['status']))      $q->where('status', $filters['status']);
         else                                 $q->where('status', '!=', 'invalid');     // junk only shows when asked for
@@ -51,6 +51,7 @@ class LeadService
 
         if (!empty($filters['quiet']))       LeadEngagement::onlyQuiet($q, $companyId);
         if (!empty($filters['unanswered']))  LeadEngagement::onlyUnanswered($q)->whereIn('leads.status', LeadStages::for($companyId)->open());
+        if (in_array($filters['temperature'] ?? null, LeadScoring::TEMPERATURES, true)) LeadScoring::onlyTemperature($q, $companyId, $filters['temperature']);
 
         if (!empty($filters['search'])) {
             $s = addcslashes(trim((string) $filters['search']), '\\%_');
@@ -69,6 +70,7 @@ class LeadService
         match ($sort) {
             'follow_up' => $q->orderByRaw('next_follow_up_date is null')->orderBy('next_follow_up_date', $dir),    // leads with no date last, whichever way
             'name'      => $q->orderBy('contact_name', $dir),
+            'score'     => $q->orderByRaw('score is null')->orderBy('score', $dir),                                 // closed leads (no score) last, whichever way
             'updated'   => $q->orderBy('updated_at', $dir),
             default     => $q->orderBy('created_at', $dir),
         };
@@ -107,6 +109,8 @@ class LeadService
     public function getDetails(Lead $lead): Lead
     {
         LeadEngagement::attach($lead);
+        LeadScoring::attach($lead);
+        $lead->setAttribute('score_detail', LeadScoring::explain($lead));
 
         return $lead->load('assignedUser', 'customer', 'quotation', 'activities.user');
     }
@@ -584,6 +588,7 @@ class LeadService
             'lost_reasons'   => $lostReasons,
             'follow_ups'     => ['overdue' => $overdue, 'today' => $dueToday, 'this_week' => $thisWeek],
             'response'       => LeadEngagement::summary($this->visible($companyId, $viewer), $companyId),
+            'temperature'    => LeadScoring::counts($this->visible($companyId, $viewer)->whereIn('leads.status', LeadStages::for($companyId)->open()), $companyId),
         ];
     }
 

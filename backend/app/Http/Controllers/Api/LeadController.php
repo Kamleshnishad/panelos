@@ -26,7 +26,7 @@ class LeadController extends Controller
     public function index(Request $r)
     {
         $cid = $this->cid($r);
-        $filters = $r->only(['status', 'source', 'assigned_to', 'follow_up', 'search', 'sort', 'dir', 'quiet', 'unanswered']);
+        $filters = $r->only(['status', 'source', 'assigned_to', 'follow_up', 'search', 'sort', 'dir', 'quiet', 'unanswered', 'temperature']);
         $page    = (int) $r->input('page', 1);
         $perPage = (int) $r->input('per_page', 50);
 
@@ -79,7 +79,7 @@ class LeadController extends Controller
     /** The board: a column per stage with its count, totals and first leads. Same filters as the list (its status tabs do not apply). */
     public function board(Request $r)
     {
-        $cols = $this->leads->board($this->cid($r), $r->only(['source', 'assigned_to', 'follow_up', 'search', 'quiet', 'unanswered']), $r->user());
+        $cols = $this->leads->board($this->cid($r), $r->only(['source', 'assigned_to', 'follow_up', 'search', 'quiet', 'unanswered', 'temperature']), $r->user());
 
         return $this->successResponse(['columns' => array_map(fn ($c) => $c + ['leads' => $c['leads']->values()], $cols), 'per_column' => LeadService::BOARD_PER_COLUMN], 'Lead board');
     }

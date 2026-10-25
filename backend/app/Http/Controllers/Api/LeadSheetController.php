@@ -39,7 +39,7 @@ class LeadSheetController extends Controller
     /** The leads as the list shows them (same filters), newest first, streamed so a large list never sits in memory. */
     public function export(Request $r)
     {
-        $query = $this->leads->list($this->cid($r), $r->only(['status', 'source', 'assigned_to', 'follow_up', 'search', 'quiet', 'unanswered']), $r->user())->with('assignedUser:id,name');
+        $query = $this->leads->list($this->cid($r), $r->only(['status', 'source', 'assigned_to', 'follow_up', 'search', 'quiet', 'unanswered', 'temperature']), $r->user())->with('assignedUser:id,name');
 
         return response()->streamDownload(function () use ($query) {
             echo LeadImportService::csv([[
