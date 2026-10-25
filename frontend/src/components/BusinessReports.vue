@@ -4,44 +4,57 @@
       <h2>Reports</h2>
       <div class="br-tabs">
         <button :class="{ on: tab === 'dashboard' }" @click="tab = 'dashboard'">Dashboard</button>
+        <button :class="{ on: tab === 'gst' }" @click="tab = 'gst'">GST Register</button>
+        <button :class="{ on: tab === 'payments' }" @click="tab = 'payments'">Payments</button>
+        <button :class="{ on: tab === 'statements' }" @click="tab = 'statements'">Statements</button>
         <button :class="{ on: tab === 'mis' }" @click="switchTab('mis')">MIS Report</button>
         <button :class="{ on: tab === 'recon' }" @click="switchTab('recon')">Reconciliation</button>
         <button :class="{ on: tab === 'tally' }" @click="switchTab('tally')">Tally Export</button>
         <button :class="{ on: tab === 'export' }" @click="tab = 'export'">Export</button>
       </div>
       <div class="period-picker">
+        <select v-model="preset" aria-label="Period" @change="onPreset">
+          <option v-for="p in PERIOD_PRESETS" :key="p.key" :value="p.key">{{ p.label }}</option>
+          <option value="custom">Custom dates</option>
+        </select>
         <label>From</label>
-        <input v-model="from" type="date" @change="onPeriodChange" />
+        <input v-model="from" type="date" @change="onDates" />
         <label>To</label>
-        <input v-model="to" type="date" @change="onPeriodChange" />
+        <input v-model="to" type="date" @change="onDates" />
         <button class="btn btn-ghost btn-sm" @click="onPeriodChange">↻</button>
       </div>
     </div>
 
+    <div v-if="badPeriod" class="error-banner" role="alert">The end of the period is before its start.</div>
     <div v-if="error" class="error-banner">{{ error }}</div>
 
     <!-- ═══ DASHBOARD TAB ═══════════════════════════════════════════════ -->
     <template v-if="tab === 'dashboard'">
       <div class="headline-grid" v-if="pl && cf">
-        <div class="hl-card">
+        <div class="hl-card click" role="button" tabindex="0" title="See the invoices behind this" @click="tab = 'gst'" @keyup.enter="tab = 'gst'">
           <div class="hl-val">₹ {{ fmtShort(pl.revenue.sales) }}</div>
           <div class="hl-lbl">Net Sales</div>
+          <div v-if="cmp.sales" class="hl-delta" :class="cmp.sales.cls" :title="cmp.sales.title">{{ cmp.sales.text }}</div>
         </div>
-        <div class="hl-card">
+        <div class="hl-card click" role="button" tabindex="0" title="See the invoices behind this" @click="tab = 'gst'" @keyup.enter="tab = 'gst'">
           <div class="hl-val">₹ {{ fmtShort(pl.revenue.tax_collected) }}</div>
           <div class="hl-lbl">GST Collected</div>
+          <div v-if="cmp.tax" class="hl-delta" :class="cmp.tax.cls" :title="cmp.tax.title">{{ cmp.tax.text }}</div>
         </div>
-        <div class="hl-card primary">
+        <div class="hl-card primary click" role="button" tabindex="0" title="See the invoices behind this" @click="tab = 'gst'" @keyup.enter="tab = 'gst'">
           <div class="hl-val">₹ {{ fmtShort(pl.revenue.gross_revenue) }}</div>
           <div class="hl-lbl">Gross Revenue</div>
+          <div v-if="cmp.gross" class="hl-delta" :class="cmp.gross.cls" :title="cmp.gross.title">{{ cmp.gross.text }}</div>
         </div>
-        <div class="hl-card green">
+        <div class="hl-card green click" role="button" tabindex="0" title="See the payments behind this" @click="tab = 'payments'" @keyup.enter="tab = 'payments'">
           <div class="hl-val">₹ {{ fmtShort(cf.operating_activities.cash_collected) }}</div>
           <div class="hl-lbl">Cash Collected</div>
+          <div v-if="cmp.cash" class="hl-delta" :class="cmp.cash.cls" :title="cmp.cash.title">{{ cmp.cash.text }}</div>
         </div>
         <div class="hl-card">
           <div class="hl-val">₹ {{ fmtShort(pl.average_invoice_value) }}</div>
           <div class="hl-lbl">Avg Invoice</div>
+          <div v-if="cmp.avg" class="hl-delta" :class="cmp.avg.cls" :title="cmp.avg.title">{{ cmp.avg.text }}</div>
         </div>
       </div>
 
@@ -71,7 +84,7 @@
           <table class="rep-table" v-if="topCustomers.length">
             <thead><tr><th>Customer</th><th class="text-right">Invoiced</th><th class="text-right">Outstanding</th></tr></thead>
             <tbody>
-              <tr v-for="c in topCustomers" :key="c.customer_id">
+              <tr v-for="c in topCustomers" :key="c.customer_id" :class="{ 'click-row': c.customer_id > 0 }" :title="c.customer_id > 0 ? 'Open the statement of account' : ''" @click="openStatement(c)">
                 <td class="bold">{{ c.customer_name }}</td>
                 <td class="text-right">₹ {{ fmtShort(c.invoiced) }}</td>
                 <td class="text-right" :class="{ red: c.outstanding > 0 }">₹ {{ fmtShort(c.outstanding) }}</td>
@@ -102,6 +115,11 @@
       </div>
     </template>
 
+    <!-- ═══ GST REGISTER, PAYMENTS, STATEMENTS (FR-010) ══════════════════ -->
+    <template v-else-if="tab === 'gst'"><report-gst v-if="!badPeriod" :from="from" :to="to" /></template>
+    <template v-else-if="tab === 'payments'"><report-payments v-if="!badPeriod" :from="from" :to="to" /></template>
+    <template v-else-if="tab === 'statements'"><report-statements v-if="!badPeriod" :from="from" :to="to" :customer="stmtCustomer" /></template>
+
     <!-- ═══ MIS REPORT TAB ══════════════════════════════════════════════ -->
     <template v-else-if="tab === 'mis'">
       <div v-if="misLoading" class="loading-hint">Computing MIS…</div>
@@ -110,7 +128,7 @@
 
         <!-- Revenue summary cards -->
         <div class="headline-grid">
-          <div class="hl-card primary">
+          <div class="hl-card primary click" role="button" tabindex="0" title="See the invoices" @click="tab = 'gst'" @keyup.enter="tab = 'gst'">
             <div class="hl-val">₹ {{ fmtShort(mis.revenue.invoiced) }}</div>
             <div class="hl-lbl">Total Invoiced</div>
           </div>
@@ -118,7 +136,7 @@
             <div class="hl-val">₹ {{ fmtShort(mis.revenue.collected) }}</div>
             <div class="hl-lbl">Paid so far</div>
           </div>
-          <div class="hl-card" :class="mis.revenue.outstanding > 0 ? 'amber' : ''">
+          <div class="hl-card click" :class="mis.revenue.outstanding > 0 ? 'amber' : ''" role="button" tabindex="0" title="Open Receivables" @click="emit('navigate', 'receivables')" @keyup.enter="emit('navigate', 'receivables')">
             <div class="hl-val" :class="mis.revenue.outstanding > 0 ? 'red' : ''">₹ {{ fmtShort(mis.revenue.outstanding) }}</div>
             <div class="hl-lbl">Still unpaid</div>
           </div>
@@ -277,7 +295,7 @@
           </div>
           <div class="tally-step">
             <div class="step-num">4</div>
-            <div>Ensure your Tally company has ledgers: <b>Sales @ 18%</b>, <b>CGST</b>, <b>SGST</b>, <b>IGST</b>, and a debtor ledger per customer.</div>
+            <div>Ensure your Tally company has the ledgers named below (set them to match your Tally), and a debtor ledger per customer.</div>
           </div>
         </div>
 
@@ -291,6 +309,7 @@
         </div>
         <div v-if="tallyError" class="error-banner" style="margin-top:12px">{{ tallyError }}</div>
       </div>
+      <tally-ledger-settings />
     </template>
   </div>
 </template>
@@ -299,12 +318,25 @@
 import { ref, computed, onMounted } from 'vue'
 import reportService from '../services/reportService.js'
 import { downloadFile } from '../services/transfers.js'
-import { todayLocal, monthStartLocal } from '../services/dates.js'
+import { todayLocal, monthStartLocal, periodPreset, previousPeriod, PERIOD_PRESETS } from '../services/dates.js'
+import companyService from '../services/companyService.js'
+import ReportGst from './ReportGst.vue'
+import ReportPayments from './ReportPayments.vue'
+import ReportStatements from './ReportStatements.vue'
+import TallyLedgerSettings from './TallyLedgerSettings.vue'
+
+const emit = defineEmits(['navigate'])
 
 const from = ref(monthStartLocal())     // local dates: the UTC date is yesterday until 05:30 IST and the 1st of the month came out as the 31st (PB-075)
 const to   = ref(todayLocal())
 
 const tab   = ref('dashboard')
+const preset = ref('month')                 // which ready-made period the dates are (or 'custom')
+const fyMonth = ref(4)                      // the company's financial-year start month (Company settings; 4 = April)
+const stmtCustomer = ref(null)              // a customer opened from Top Customers
+const prevPl = ref(null)
+const prevCf = ref(null)
+const badPeriod = computed(() => !!from.value && !!to.value && from.value > to.value)
 const error = ref(null)
 
 // Dashboard
@@ -363,7 +395,15 @@ async function loadDashboard() {
     cf.value           = c?.data ?? null
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Failed to load reports.'
+    return
   }
+  // The same length of time just before, for the "vs previous period" lines. A failure here only hides them.
+  const before = previousPeriod(from.value, to.value)
+  try {
+    const [pp, pc] = await Promise.all([reportService.profitLoss({ from_date: before.from, to_date: before.to }), reportService.cashFlow({ from_date: before.from, to_date: before.to })])
+    prevPl.value = pp?.data ?? null
+    prevCf.value = pc?.data ?? null
+  } catch { prevPl.value = null; prevCf.value = null }
 }
 
 async function loadMis() {
@@ -392,7 +432,45 @@ async function switchTab(t) {
   if (t === 'recon' && !recon.value) await loadRecon()
 }
 
+/** The preset whose dates these are, else 'custom'. */
+function presetFor(f, t) {
+  const hit = PERIOD_PRESETS.find((p) => { const r = periodPreset(p.key, new Date(), fyMonth.value); return r && r.from === f && r.to === t })
+  return hit ? hit.key : 'custom'
+}
+function onPreset() {
+  const r = periodPreset(preset.value, new Date(), fyMonth.value)
+  if (!r) return                            // "Custom dates": keep what is typed
+  from.value = r.from; to.value = r.to
+  onPeriodChange()
+}
+function onDates() { preset.value = presetFor(from.value, to.value); onPeriodChange() }
+
+/** "▲ 12.5% vs previous period" for a figure against the same length of time before. Null when there is nothing to compare. */
+function compare(now, before) {
+  if (before === undefined || before === null) return null
+  const n = Number(now || 0); const b = Number(before || 0)
+  const title = `Previous period: ₹ ${fmtNum(b)}`
+  if (b === 0) return n > 0 ? { text: 'new this period', cls: 'up', title } : null
+  const pct = ((n - b) / b) * 100
+  if (Math.abs(pct) < 0.05) return { text: 'same as previous period', cls: 'flat', title }
+  return { text: `${pct > 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}% vs previous period`, cls: pct > 0 ? 'up' : 'down', title }
+}
+const cmp = computed(() => ({
+  sales: pl.value && prevPl.value ? compare(pl.value.revenue.sales, prevPl.value.revenue.sales) : null,
+  tax:   pl.value && prevPl.value ? compare(pl.value.revenue.tax_collected, prevPl.value.revenue.tax_collected) : null,
+  gross: pl.value && prevPl.value ? compare(pl.value.revenue.gross_revenue, prevPl.value.revenue.gross_revenue) : null,
+  avg:   pl.value && prevPl.value ? compare(pl.value.average_invoice_value, prevPl.value.average_invoice_value) : null,
+  cash:  cf.value && prevCf.value ? compare(cf.value.operating_activities.cash_collected, prevCf.value.operating_activities.cash_collected) : null,
+}))
+
+function openStatement(c) {
+  if (!(c.customer_id > 0)) return
+  stmtCustomer.value = { id: c.customer_id, name: c.customer_name }
+  tab.value = 'statements'
+}
+
 function onPeriodChange() {
+  if (badPeriod.value) return
   mis.value = null; recon.value = null
   if (tab.value === 'dashboard') loadDashboard()
   else if (tab.value === 'mis') loadMis()
@@ -429,7 +507,13 @@ async function downloadTally(type) {
   } finally { tallyLoading.value = null }
 }
 
-onMounted(loadDashboard)
+onMounted(async () => {
+  loadDashboard()
+  try {
+    const c = (await companyService.get())?.data ?? {}
+    if (c.financial_year_start) { fyMonth.value = Number(c.financial_year_start); preset.value = presetFor(from.value, to.value) }
+  } catch { /* the Indian default (April) stays */ }
+})
 </script>
 
 <style scoped>
@@ -457,6 +541,14 @@ onMounted(loadDashboard)
 .hl-card.green .hl-val { color: #2e7d32; }
 .hl-card.amber { border-color: #ffe082; }
 .hl-val { font-size: 20px; font-weight: 800; color: var(--primary); }
+.hl-card.click { cursor: pointer; }
+.hl-card.click:hover { border-color: var(--primary); box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+.hl-delta { font-size: 11px; font-weight: 600; margin-top: 5px; color: #888; }
+.hl-delta.up { color: #2e7d32; } .hl-delta.down { color: #c62828; }
+.hl-card.primary .hl-delta { color: rgba(255,255,255,.9); }
+.click-row { cursor: pointer; }
+.click-row:hover td { background: var(--primary-tint); }
+.period-picker select { padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; background: #fff; }
 .hl-lbl { font-size: 11px; color: #888; text-transform: uppercase; font-weight: 600; margin-top: 3px; }
 
 .card { background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }

@@ -73,6 +73,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import invoiceService from '../services/invoiceService.js'
+import { todayLocal, addDaysLocal } from '../services/dates.js'
 
 const emit = defineEmits(['created', 'cancel'])
 
@@ -83,8 +84,8 @@ const loadingSrc  = ref(false)
 const saving      = ref(false)
 const error       = ref(null)
 
-const today = new Date().toISOString().slice(0, 10)
-const due30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+const today = todayLocal()
+const due30 = addDaysLocal(30)
 
 const form = reactive({
   dispatch_id: '',

@@ -91,7 +91,7 @@ npm run build    # always run this before calling a frontend change done
   are not `$fillable` and must be written with `forceFill()->save()`, only from
   `TenantProvisioningService`, `SubscriptionService` or `SuperAdminController`. `update()` is
   mass-assignment and will silently drop them.
-* **Dates in the SPA:** a calendar date for "today" or "the first of the month" comes from `frontend/src/services/dates.js` (`todayLocal()`, `monthStartLocal()`), never `new Date().toISOString().slice(0, 10)`: that is the UTC date, yesterday in India until 05:30, and the 1st of the month came out as the 31st (PB-075, PB-083).
+* **Dates in the SPA:** a calendar date for "today" or "the first of the month" comes from `frontend/src/services/dates.js` (`todayLocal()`, `addDaysLocal(n)`, `monthStartLocal()`, and `periodPreset()` / `previousPeriod()` for report periods, which follow the company's financial-year month), never `new Date().toISOString().slice(0, 10)`: that is the UTC date, yesterday in India until 05:30, and the 1st of the month came out as the 31st (PB-075, PB-083).
 * **Printing amounts:** always `App\Support\Inr::fmt($n, 2)` (9,11,476.00), never `number_format()` — a test fails the build if it comes back in `app/` or `resources/views/`.
 * **Money:** copy a stored `amount` rather than recomputing `quantity × unit_price` — rates are weighted
   averages and recomputation drifts by paise. Quantities carrying square metres are `decimal(12,4)`.

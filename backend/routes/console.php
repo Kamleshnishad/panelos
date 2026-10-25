@@ -66,3 +66,10 @@ Schedule::command('sanctum:prune-expired --hours=24')
 
 // One beat a minute: /api/health reports the scheduler as STALE when these stop (backups and reminders ride on it).
 Schedule::call(fn () => \App\Support\SystemHealth::heartbeat())->everyMinute()->name('health-heartbeat');
+
+// The owner's monthly MIS on the 1st (08:00 IST), for companies that switched it on in Settings -> Notifications (off until then). Sent through the
+// company's own mailbox, once per month.
+Schedule::command('reports:send-monthly-mis')
+    ->monthlyOn(1, '08:00')
+    ->timezone('Asia/Kolkata')
+    ->withoutOverlapping(30);

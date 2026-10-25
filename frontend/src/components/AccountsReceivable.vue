@@ -11,6 +11,7 @@
           <input v-model="asOf" type="date" @change="page = 1; load()" />
         </div>
         <button class="btn btn-ghost btn-sm" @click="load">↻ Refresh</button>
+        <button class="btn btn-ghost btn-sm" :disabled="pdfBusy" title="Every invoice with a balance, as a printable PDF" @click="downloadPdf">{{ pdfBusy ? 'Preparing…' : '⬇ PDF' }}</button>
       </div>
     </div>
 
@@ -116,6 +117,7 @@
 import { ref, computed, onMounted } from 'vue'
 import invoiceService from '../services/invoiceService.js'
 import { todayLocal } from '../services/dates.js'
+import { downloadFile } from '../services/transfers.js'
 
 defineEmits(['view-invoice'])
 
@@ -166,6 +168,17 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+const pdfBusy = ref(false)
+/** The whole ageing (not just this page) as a PDF, as of the date on screen. */
+async function downloadPdf() {
+  pdfBusy.value = true; error.value = null
+  try {
+    await downloadFile('/api/reports/accounts-receivable/pdf', `receivables_ageing_${asOf.value}.pdf`, { label: 'Receivables ageing', kind: 'ar-pdf', type: 'application/pdf', estimateMs: 3000, params: { as_of: asOf.value } })
+  } catch (e) {
+    error.value = e?.response?.data?.message ?? 'Failed to prepare the PDF.'
+  } finally { pdfBusy.value = false }
 }
 
 function setBucket(b) { bucket.value = bucket.value === b ? null : b; page.value = 1; load() }
