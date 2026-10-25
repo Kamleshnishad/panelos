@@ -262,6 +262,7 @@
           <div :class="followClass(detail)"><label>Follow-up</label><span>{{ detail.next_follow_up_date ? fmtDate(detail.next_follow_up_date) : '—' }}</span></div>
         </div>
         <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
+        <lead-contact-bar :lead="detail" @changed="onActionsChanged" />
         <lead-next-actions :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :users="users" @changed="onActionsChanged" />
         <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.landing_page || detail.first_seen_at">
           <label>Where it came from</label>
@@ -324,6 +325,7 @@ import FormInput from './Form/FormInput.vue'
 import FormSelect from './Form/FormSelect.vue'
 import LeadImportDialog from './LeadImportDialog.vue'
 import LeadNextActions from './LeadNextActions.vue'
+import LeadContactBar from './LeadContactBar.vue'
 import LeadMyDay from './LeadMyDay.vue'
 
 const props = defineProps({ openId: { type: Number, default: null } })

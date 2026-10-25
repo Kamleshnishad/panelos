@@ -69,7 +69,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 4.6 | Missed-call leads | not started |
 | 5.1 | List filters, saved views, search, address | done, local |
 | 5.2 | Next actions and my day | done, local |
-| 5.3 | Call, WhatsApp, e-mail from the lead | not started |
+| 5.3 | Call, WhatsApp, e-mail from the lead | done, local |
 | 5.4 | Requirement lines and one-step quote | not started |
 | 5.5 | Quotation chasing | not started |
 | 5.6 | Stale leads and response time | not started |
@@ -246,6 +246,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **5.2 Next actions and my day (LP-01, LX-05):** tasks with type, due date and time, assignee, reminders; completing one prompts the next; a "my day" list. **M.**
   **Result (local):** `lead_tasks`, `LeadTaskService`, `LeadTaskReminderService`, `LeadNextActions.vue`, `LeadMyDay.vue`, `LeadTaskDoneDialog.vue`, `LeadTaskTest` (27) and a browser run. Decisions: the lead's follow-up date follows its earliest open action (so everything built on it keeps working); done asks "what is next" with a suggestion and allows "nothing more"; a lead with actions is reminded per action, not per lead; closing a lead cancels its actions; times are Indian time and the reminder rings within the hour (the scan is hourly). Not built: exact-time reminders, recurring actions, calendar sync.
 - **5.3 Call, WhatsApp and e-mail from the lead (LP-02):** tap-to-call, WhatsApp templates, e-mail through the company mailbox, each logged on the timeline. **M.**
+  **Result (local):** contact bar in the lead drawer, `LeadMessageService`, `lead_message_templates` and the *Lead messages* tab in Master Data, mail type `lead_message`, `LeadMessageTest` (17) and a browser run. Decisions: WhatsApp uses click-to-chat (`wa.me`), not the Twilio API, so it works without any account and the client's answer on WhatsApp automation is not needed for this step (the timeline says "opened", not "sent"); e-mail needs the company's own mailbox and is refused with a plain message otherwise; it writes only to the lead's own address. Not built: Twilio sending, attachments, bulk messages.
 - **5.4 Requirement lines and one-step quote (LP-03, LP-04):** structured requirement (panel type, thickness, application, area, accessories) prefilling the quotation rows; "Quote this lead" creates the draft. **M.**
 - **5.5 Quotation chasing (LP-05):** follow-ups at +3 and +7 days and before the validity ends, as tasks. Uses the "sent" event; richer once quotations can be e-mailed from the system (FT-02). **M.**
 - **5.6 Stale leads and response time (LP-10):** first-response time recorded, alert after N quiet days. **S.**

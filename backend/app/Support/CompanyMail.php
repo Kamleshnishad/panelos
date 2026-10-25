@@ -29,6 +29,7 @@ class CompanyMail
         'invoice'         => ['label' => 'Invoices sent by your team', 'default' => CompanyMailbox::MAIN],
         'payment_reminder' => ['label' => 'Payment reminders (automatic)', 'default' => CompanyMailbox::NOTIFICATIONS],
         'payment_receipt' => ['label' => 'Payment receipts (automatic)', 'default' => CompanyMailbox::NOTIFICATIONS],
+        'lead_message'    => ['label' => 'E-mails your team writes to a lead', 'default' => CompanyMailbox::MAIN],
     ];
 
     /** @var callable|null  replaces the real SMTP mailer; tests only */

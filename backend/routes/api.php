@@ -65,6 +65,9 @@ RateLimiter::for('lead-pull', fn (Request $request) => Limit::perMinute(6)->by('
 // address may be the proxy's, shared by everyone, so a limit on it would let one noisy sender block all real ones. Wrong-token guesses are
 // counted per address inside LeadInboundService instead (valid tokens never count against it).
 // Checking and running a spreadsheet are heavy: a few a minute per person is plenty.
+// E-mails and WhatsApp links written from a lead: a person sends a few a minute, not hundreds.
+RateLimiter::for('lead-contact', fn (Request $request) => Limit::perMinute(30)->by('lead-contact:' . ($request->user()?->id ?? $request->ip())));
+
 RateLimiter::for('lead-import', fn (Request $request) => Limit::perMinute(10)->by('lead-import:' . ($request->user()?->id ?? $request->ip())));
 
 RateLimiter::for('inbound-leads', function (Request $request) {
@@ -134,6 +137,10 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     // Spreadsheet in and out (LEADS_PLAN 4.2). Before /leads/{id} so "export" is not read as an id.
+    // Contacting a lead from its screen (LEADS_PLAN 5.3).
+    Route::get('/leads/{id}/message-templates', [\App\Http\Controllers\Api\LeadMessageController::class, 'templates'])->name('leads.messages.templates');
+    Route::post('/leads/{id}/whatsapp', [\App\Http\Controllers\Api\LeadMessageController::class, 'whatsapp'])->middleware('throttle:lead-contact')->name('leads.messages.whatsapp');
+    Route::post('/leads/{id}/email', [\App\Http\Controllers\Api\LeadMessageController::class, 'email'])->middleware('throttle:lead-contact')->name('leads.messages.email');
     // Next actions (LEADS_PLAN 5.2). Before /leads/{id}: "tasks" must not be read as an id.
     Route::get('/leads/tasks', [\App\Http\Controllers\Api\LeadTaskController::class, 'index'])->name('leads.tasks.index');
     Route::put('/leads/tasks/{id}', [\App\Http\Controllers\Api\LeadTaskController::class, 'update'])->name('leads.tasks.update');
@@ -170,6 +177,10 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::post('/settings/lead-inbound-tokens/{id}/regenerate', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'regenerate'])->name('leadinbound.regenerate');
     Route::delete('/settings/lead-inbound-tokens/{id}', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'destroy'])->name('leadinbound.destroy');
     Route::get('/settings/lead-import-logs', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'logs'])->name('leadinbound.logs');
+    Route::get('/settings/lead-message-templates', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'index'])->name('leadmsg.index');
+    Route::post('/settings/lead-message-templates', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'store'])->name('leadmsg.store');
+    Route::put('/settings/lead-message-templates/{id}', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'update'])->name('leadmsg.update');
+    Route::delete('/settings/lead-message-templates/{id}', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'destroy'])->name('leadmsg.destroy');
     Route::get('/settings/lead-assignment-rules', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'index'])->name('leadassign.index');
     Route::post('/settings/lead-assignment-rules', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'store'])->name('leadassign.store');
     Route::put('/settings/lead-assignment-rules/{id}', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'update'])->name('leadassign.update');

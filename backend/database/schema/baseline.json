@@ -551,6 +551,19 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "lead_message_templates": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "channel": "varchar(10)",
+        "name": "varchar(80)",
+        "subject": "varchar(150)",
+        "body": "text",
+        "is_active": "tinyint",
+        "sort_order": "smallint unsigned",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
     "lead_tasks": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",
