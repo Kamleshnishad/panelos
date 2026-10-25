@@ -19,11 +19,11 @@ System audit page: https://claude.ai/artifact/7vrGKYzm34XzBnNumWNrPi (10 of 53 d
 - **#12** `ft-03-partial-dispatch` (FR-006): several loads per batch. Waiting for the client's answers: is "pieces" the right unit, and when are accessories/installation billed (default: first invoice). Changes a DB index (unique on `dispatches.batch_id` replaced by a plain one).
 - **#16** `leads-0-1-lifecycle-tests`: tests only. Superseded by the local branch below; leave it.
 
-**Local only, by the owner's decision (24 Oct):** branch **`leads-program`** (commits on top of `main`): 0.1 lifecycle tests (25), the protocol change, and
+**RELEASED 25 Oct 2026** (the owner said "push it live" and that the other phases come later): PR #17 (lead programme phases 0 to 5, 32 commits) was merged to `main`; CI on MySQL 8 was green (CI caught one test that pinned JSON key order, fixed test-only); Deploy run 40201631676 succeeded: pre-migration backup, all 13 migrations `2026_10_26_000001` to `000013` ran, `schema:check` matched, `/api/health` OK (`lead_pull` NONE until a company switches IndiaMART on), front page and `/lead-form.js` respond. Still to check live with the owner: the screens as a real user, and the IndiaMART key when the client has it. Phases 6 and 7 are still to do; from here each sub-phase is again built locally on a branch and released only on the owner's word.
+
+**How it was built (history, 24 Oct, local only by the owner's decision then):** branch **`leads-program`** (commits on top of `main`): 0.1 lifecycle tests (25), the protocol change, and
 **1.1 lists as data** (migration `2026_10_25_000001_lead_lists_as_data`, `LeadListService`, `LeadListController`, `LeadListsSettings.vue`, 13 tests; backend suite 662/662,
-schema check matches, migration verified on MySQL against enum-era data, rollback and re-run clean). **Nothing for the lead programme is pushed or deployed until the whole
-plan is complete**; then push once, let CI run on MySQL 8, review, merge and deploy (recommend releasing in batches). Local `main` is one commit ahead of `origin/main`
-(the LEADS_PLAN.md docs commit); do not push it on its own (a docs push redeploys production).
+schema check matches, migration verified on MySQL against enum-era data, rollback and re-run clean). That rule ended with the release above. A docs-only push to `main` redeploys production, so doc updates made after the release (this one included) are committed locally and go out with the next code change.
 
 ## How to continue the lead programme
 
