@@ -1,5 +1,6 @@
 <template>
   <div class="lm-wrap">
+    <div v-show="!detail" class="lm-list-part">
     <div class="lm-header">
       <div>
         <h2>Leads / Inquiries</h2>
@@ -163,6 +164,7 @@
       <button class="pg-btn" :disabled="pagination.current_page >= pagination.last_page" @click="goPage(pagination.current_page + 1)">Next →</button>
     </div>
     </template>
+    </div>
 
     <lead-merge-dialog v-if="mergeOpen && detail" :lead="detail" @close="mergeOpen = false" @merged="onMerged" />
     <lead-import-dialog v-if="importOpen" @close="importOpen = false" @changed="load()" />
@@ -261,100 +263,118 @@
       </div>
     </div>
 
-    <!-- Detail slide-over -->
-    <div v-if="detail" class="drawer-scrim" @click.self="detail = null">
-      <div class="drawer">
-        <div class="drawer-head">
-          <div>
-            <div class="d-no mono">{{ detail.lead_no }}</div>
-            <h3>{{ detail.contact_name }}</h3>
-            <div class="muted">{{ detail.company_name }}</div>
-          </div>
-          <button class="btn-close" @click="detail = null">✕</button>
+    <!-- A lead opens as its own page, not a side panel -->
+    <div v-if="detail" class="lead-page" aria-label="Lead">
+      <div class="lp-top">
+        <button class="btn btn-ghost" type="button" @click="detail = null">← Back to leads</button>
+        <span class="lp-crumb">Leads / {{ detail.lead_no }}</span>
+      </div>
+      <div class="lp-head">
+        <div class="lp-title">
+          <div class="d-no mono">{{ detail.lead_no }}</div>
+          <h3>{{ detail.contact_name }}</h3>
+          <div class="muted">{{ detail.company_name }}</div>
+            <span class="status-badge big" :class="detail.status">{{ statusLabel(detail.status) }}</span>
         </div>
-
-        <span class="status-badge big" :class="detail.status">{{ statusLabel(detail.status) }}</span>
-
-        <div v-if="detail.score_detail" class="score-box" aria-label="Lead score">
-          <div class="score-head"><span class="temp big" :class="detail.temperature">{{ detail.temperature }}</span><b>{{ detail.score_detail.score }}</b><small>out of 100</small></div>
-          <ul>
-            <li v-for="p in detail.score_detail.parts" :key="p.key"><span class="sc-l">{{ p.label }}</span><span class="sc-why">{{ p.why }}</span><b>{{ p.points }}<small>/{{ p.max }}</small></b></li>
-          </ul>
-        </div>
-
-        <div class="d-fields">
-          <div><label>Phone</label><span>{{ detail.phone || '—' }}</span></div>
-          <div><label>Email</label><span>{{ detail.email || '—' }}</span></div>
-          <div><label>City</label><span>{{ detail.city || '—' }}</span></div>
-          <div><label>Source</label><span>{{ detail.source }}</span></div>
-          <div><label>Application</label><span>{{ detail.application || '—' }}</span></div>
-          <div><label>Assigned</label><span>{{ detail.assigned_user?.name || '—' }}</span></div>
-          <div><label>Est. Qty</label><span>{{ detail.est_qty_sqm ? detail.est_qty_sqm + ' sqm' : '—' }}</span></div>
-          <div><label>Est. Value</label><span>{{ detail.est_value ? '₹ ' + fmt(detail.est_value) : '—' }}</span></div>
-          <div :class="followClass(detail)"><label>Follow-up</label><span>{{ detail.next_follow_up_date ? fmtDate(detail.next_follow_up_date) : '—' }}</span></div>
-        </div>
-        <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
-        <p v-if="engagementLine" class="eng-line" :class="engagementLine.tone" data-testid="engagement">{{ engagementLine.text }}</p>
-        <lead-contact-bar :lead="detail" @changed="onActionsChanged" />
-        <lead-requirement :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :busy="busy" @changed="onActionsChanged" @quote="startQuote" />
-        <lead-attachments :lead-id="detail.id" @changed="onActionsChanged" />
-        <lead-next-actions :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :users="users" @changed="onActionsChanged" />
-        <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.landing_page || detail.first_seen_at">
-          <label>Where it came from</label>
-          <p>{{ detail.source }}<template v-if="detail.external_id"> · ref {{ detail.external_id }}</template><template v-if="detail.campaign"> · {{ detail.campaign }}</template><template v-if="utmText"> · {{ utmText }}</template><template v-if="detail.landing_page"> · page {{ detail.landing_page }}</template><template v-if="detail.first_seen_at"> · first seen {{ fmtDateTime(detail.first_seen_at) }}</template></p>
-          <button class="link-btn" @click="togglePayload">{{ rawMsg.open ? 'Hide' : 'Show' }} original message</button>
-          <p v-if="rawMsg.open && !rawMsg.items.length" class="tl-empty">{{ rawMsg.loading ? 'Loading…' : 'No original message was kept.' }}</p>
-          <pre v-for="m in (rawMsg.open ? rawMsg.items : [])" :key="m.id" class="raw-msg">{{ JSON.stringify(m.payload, null, 2) }}</pre>
-        </div>
-        <div class="d-req" v-if="detail.lost_reason"><label>Lost reason</label><p>{{ detail.lost_reason }}<template v-if="detail.lost_note"> — {{ detail.lost_note }}</template></p></div>
-
-        <div class="d-section">
-          <label class="d-label">Move to</label>
-          <div class="status-actions">
-            <button v-for="s in moveTo(detail.status)" :key="s" :class="['btn', 'sm', s === 'lost' ? 'btn-danger' : 'btn-status']" :disabled="busy" @click="setStatus(detail, s)">{{ isClosed(detail.status) ? 'Reopen as ' + statusLabel(s) : statusLabel(s) }}</button>
-          </div>
-          <p v-if="detail.status === 'on_hold'" class="conv-note">On hold until {{ fmtDate(detail.next_follow_up_date) }}.</p>
-          <button v-if="!isClosed(detail.status) && canManage" class="btn btn-ghost sm merge-btn" type="button" @click="mergeOpen = true">Merge another lead into this one…</button>
-          <button v-if="!isClosed(detail.status)" class="btn btn-convert" :disabled="busy" @click="convertLead(detail)">
-            → Convert to Quotation
-          </button>
-          <p v-if="detail.quotation_id" class="conv-note">✓ Quotation #{{ detail.quotation_id }} linked</p>
-        </div>
-
-        <!-- Activity / follow-up timeline -->
-        <div class="d-section">
-          <label class="d-label">Log activity</label>
-          <div class="act-form">
-            <select v-model="actForm.type" class="act-type">
-              <option value="note">Note</option><option value="call">Call</option>
-              <option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="meeting">Meeting</option>
-            </select>
-            <input v-model="actForm.description" class="act-input" placeholder="What happened…" @keyup.enter="addActivity" />
-            <button class="btn btn-primary sm" :disabled="actBusy || !actForm.description" @click="addActivity">Add</button>
-          </div>
-          <div class="timeline">
-            <div v-for="a in (detail.activities || [])" :key="a.id" class="tl-item">
-              <span class="tl-type" :class="a.type">{{ a.type.replace('_', ' ') }}</span>
-              <div class="tl-body">
-                <div class="tl-desc">{{ a.description }}</div>
-                <div class="tl-meta">{{ fmtDateTime(a.activity_date) }}<span v-if="a.user"> · {{ a.user.name }}</span></div>
-              </div>
-            </div>
-            <p v-if="!(detail.activities || []).length" class="tl-empty">No activity yet.</p>
-          </div>
-        </div>
-
-        <div class="drawer-foot">
+        <div class="lp-actions">
           <button class="btn btn-ghost" @click="openEdit(detail)">Edit</button>
           <button class="btn btn-danger-ghost" @click="removeLead(detail)">Delete</button>
         </div>
+      </div>
+
+      <div class="lp-grid">
+        <div class="lp-main">
+          <section class="lp-card" aria-label="Details">
+            <div class="d-fields">
+              <div><label>Phone</label><span>{{ detail.phone || '—' }}</span></div>
+              <div><label>Email</label><span>{{ detail.email || '—' }}</span></div>
+              <div><label>City</label><span>{{ detail.city || '—' }}</span></div>
+              <div><label>Source</label><span>{{ detail.source }}</span></div>
+              <div><label>Application</label><span>{{ detail.application || '—' }}</span></div>
+              <div><label>Assigned</label><span>{{ detail.assigned_user?.name || '—' }}</span></div>
+              <div><label>Est. Qty</label><span>{{ detail.est_qty_sqm ? detail.est_qty_sqm + ' sqm' : '—' }}</span></div>
+              <div><label>Est. Value</label><span>{{ detail.est_value ? '₹ ' + fmt(detail.est_value) : '—' }}</span></div>
+              <div :class="followClass(detail)"><label>Follow-up</label><span>{{ detail.next_follow_up_date ? fmtDate(detail.next_follow_up_date) : '—' }}</span></div>
+            </div>
+            <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
+            <p v-if="engagementLine" class="eng-line" :class="engagementLine.tone" data-testid="engagement">{{ engagementLine.text }}</p>
+          </section>
+          <section class="lp-card" aria-label="Contact">
+            <lead-contact-bar :lead="detail" @changed="onActionsChanged" />
+          </section>
+          <div class="lp-block">
+            <lead-requirement :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :busy="busy" @changed="onActionsChanged" @quote="startQuote" />
+          </div>
+          <div class="lp-block">
+            <lead-attachments :lead-id="detail.id" @changed="onActionsChanged" />
+          </div>
+          <div class="lp-block">
+            <lead-next-actions :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :users="users" @changed="onActionsChanged" />
+          </div>
+          <section class="lp-card" aria-label="Activity">
+            <div class="d-section">
+              <label class="d-label">Log activity</label>
+              <div class="act-form">
+                <select v-model="actForm.type" class="act-type">
+                  <option value="note">Note</option><option value="call">Call</option>
+                  <option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="meeting">Meeting</option>
+                </select>
+                <input v-model="actForm.description" class="act-input" placeholder="What happened…" @keyup.enter="addActivity" />
+                <button class="btn btn-primary sm" :disabled="actBusy || !actForm.description" @click="addActivity">Add</button>
+              </div>
+              <div class="timeline">
+                <div v-for="a in (detail.activities || [])" :key="a.id" class="tl-item">
+                  <span class="tl-type" :class="a.type">{{ a.type.replace('_', ' ') }}</span>
+                  <div class="tl-body">
+                    <div class="tl-desc">{{ a.description }}</div>
+                    <div class="tl-meta">{{ fmtDateTime(a.activity_date) }}<span v-if="a.user"> · {{ a.user.name }}</span></div>
+                  </div>
+                </div>
+                <p v-if="!(detail.activities || []).length" class="tl-empty">No activity yet.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="lp-side">
+          <div v-if="detail.score_detail" class="score-box" aria-label="Lead score">
+            <div class="score-head"><span class="temp big" :class="detail.temperature">{{ detail.temperature }}</span><b>{{ detail.score_detail.score }}</b><small>out of 100</small></div>
+            <ul>
+              <li v-for="p in detail.score_detail.parts" :key="p.key"><span class="sc-l">{{ p.label }}</span><span class="sc-why">{{ p.why }}</span><b>{{ p.points }}<small>/{{ p.max }}</small></b></li>
+            </ul>
+          </div>
+          <section class="lp-card" aria-label="Status">
+            <div class="d-section">
+              <label class="d-label">Move to</label>
+              <div class="status-actions">
+                <button v-for="s in moveTo(detail.status)" :key="s" :class="['btn', 'sm', s === 'lost' ? 'btn-danger' : 'btn-status']" :disabled="busy" @click="setStatus(detail, s)">{{ isClosed(detail.status) ? 'Reopen as ' + statusLabel(s) : statusLabel(s) }}</button>
+              </div>
+              <p v-if="detail.status === 'on_hold'" class="conv-note">On hold until {{ fmtDate(detail.next_follow_up_date) }}.</p>
+              <button v-if="!isClosed(detail.status) && canManage" class="btn btn-ghost sm merge-btn" type="button" @click="mergeOpen = true">Merge another lead into this one…</button>
+              <button v-if="!isClosed(detail.status)" class="btn btn-convert" :disabled="busy" @click="convertLead(detail)">
+                → Convert to Quotation
+              </button>
+              <p v-if="detail.quotation_id" class="conv-note">✓ Quotation #{{ detail.quotation_id }} linked</p>
+            </div>
+          </section>
+          <section v-if="detail.external_id || detail.campaign || utmText || detail.landing_page || detail.first_seen_at || detail.lost_reason" class="lp-card" aria-label="Origin">
+            <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.landing_page || detail.first_seen_at">
+              <label>Where it came from</label>
+              <p>{{ detail.source }}<template v-if="detail.external_id"> · ref {{ detail.external_id }}</template><template v-if="detail.campaign"> · {{ detail.campaign }}</template><template v-if="utmText"> · {{ utmText }}</template><template v-if="detail.landing_page"> · page {{ detail.landing_page }}</template><template v-if="detail.first_seen_at"> · first seen {{ fmtDateTime(detail.first_seen_at) }}</template></p>
+              <button class="link-btn" @click="togglePayload">{{ rawMsg.open ? 'Hide' : 'Show' }} original message</button>
+              <p v-if="rawMsg.open && !rawMsg.items.length" class="tl-empty">{{ rawMsg.loading ? 'Loading…' : 'No original message was kept.' }}</p>
+              <pre v-for="m in (rawMsg.open ? rawMsg.items : [])" :key="m.id" class="raw-msg">{{ JSON.stringify(m.payload, null, 2) }}</pre>
+            </div>
+            <div class="d-req" v-if="detail.lost_reason"><label>Lost reason</label><p>{{ detail.lost_reason }}<template v-if="detail.lost_note"> — {{ detail.lost_note }}</template></p></div>
+          </section>
+        </aside>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import leadService, { LEAD_APPLICATIONS } from '../services/leadService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 import FormInput from './Form/FormInput.vue'
@@ -862,7 +882,7 @@ async function openById(id) {
   try { const res = await leadService.get(id); detail.value = res?.data ?? res }
   catch { toastError('That lead was not found.'); emit('detail', null) }
 }
-watch(() => detail.value?.id ?? null, (id) => emit('detail', id))
+watch(() => detail.value?.id ?? null, (id, was) => { emit('detail', id); if (id && !was) nextTick(() => document.querySelector('.lead-page')?.scrollIntoView({ block: 'start' })) })
 watch(() => props.openId, (id) => { if (id) openById(id); else detail.value = null })
 
 onMounted(async () => {
@@ -980,7 +1000,7 @@ button.vchip { cursor: pointer; font-family: inherit; padding: 5px 12px; }     /
 .status-badge.lost { background: #ffebee; color: #c62828; }
 .status-badge.on_hold { background: #fff3e0; color: #e65100; }
 .status-badge.invalid { background: #eceff1; color: #546e7a; }
-.modal-overlay.sd-overlay { z-index: 1100; }   /* above the lead drawer (1000) it is opened from */
+.modal-overlay.sd-overlay { z-index: 1100; }
 .sd-input { width: 100%; padding: 8px 10px; border: 1px solid #cfd8dc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
 .dup-box { margin-top: 12px; padding: 10px 14px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; font-size: 13px; color: #6d4c00; }
 .dup-box ul { margin: 6px 0; padding-left: 18px; }
@@ -1007,10 +1027,24 @@ button.vchip { cursor: pointer; font-family: inherit; padding: 5px 12px; }     /
 .form-group input, .form-group select, .form-group textarea { padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
 @media (max-width: 700px) { .form-grid { grid-template-columns: 1fr 1fr; } }
 
-.drawer-scrim { position: fixed; inset: 0; background: rgba(16,24,40,0.4); z-index: 1000; display: flex; justify-content: flex-end; }
-.drawer { width: 420px; max-width: 100vw; background: #fff; height: 100%; overflow-y: auto; padding: 22px 24px; box-shadow: -8px 0 30px rgba(0,0,0,0.15); }
-.drawer-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-.drawer-head h3 { margin: 2px 0; font-size: 18px; color: var(--ink); }
+.lead-page { max-width: 1280px; padding-top: 6px; scroll-margin-top: 80px; }
+.lp-top { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.lp-crumb { font-size: 12.5px; color: var(--text-3); }
+.lp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.lp-title h3 { margin: 2px 0 2px; font-size: 24px; color: var(--ink); }
+.lp-title .status-badge.big { margin: 10px 0 0; }
+.lp-actions { display: flex; gap: 10px; }
+.lp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+.lp-main, .lp-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.lp-card, .lp-block { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+.lp-block > :first-child { margin-top: 0; }
+.lp-card .d-section { margin: 0; border-top: 0; padding-top: 0; }
+.lp-card .d-fields { grid-template-columns: repeat(3, 1fr); margin-top: 0; }
+.lp-card .d-req:first-child { margin-top: 0; }
+.lp-side .score-box { background: #fff; border-radius: 12px; padding: 16px 20px; margin: 0; }
+.lp-side .score-box li { grid-template-columns: 96px 1fr auto; }
+@media (max-width: 1000px) { .lp-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .lp-card .d-fields { grid-template-columns: 1fr 1fr; } .lp-card, .lp-block { padding: 14px; } }
 .d-no { font-size: 11px; color: var(--text-3); }
 .d-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 14px 0; }
 .d-fields > div { display: flex; flex-direction: column; }
@@ -1033,7 +1067,6 @@ button.vchip { cursor: pointer; font-family: inherit; padding: 5px 12px; }     /
 .tl-meta { font-size: 10.5px; color: var(--text-3); margin-top: 1px; }
 .tl-empty { font-size: 12px; color: #aaa; font-style: italic; }
 
-.drawer-foot { display: flex; gap: 10px; justify-content: space-between; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 14px; }
 
 .btn { padding: 8px 16px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .btn.sm { padding: 5px 12px; font-size: 12px; }
