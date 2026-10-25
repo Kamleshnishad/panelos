@@ -300,19 +300,23 @@ class ReportingController extends Controller
                 'SGST Rate', 'SGST Amt', 'IGST Rate', 'IGST Amt', 'Total Amount',
                 'Sales Ledger', 'Narration',
             ]);
+            // Text columns are guarded against spreadsheet formulas (a customer called "=HYPERLINK(...)"), as in the other CSV exports.
+            $text = fn ($x) => '"' . str_replace('"', '""', ExportController::csvSafe($x)) . '"';
+            $num  = fn ($x) => '"' . $x . '"';
             foreach ($data['vouchers'] as $v) {
-                $rows[] = implode(',', array_map(fn ($x) => '"' . str_replace('"', '""', $x) . '"', [
-                    $v['voucher_type'], $v['voucher_no'], $v['date'],
-                    $v['party_name'], $v['party_gstin'], $v['party_state'],
-                    $v['taxable_value'], $v['cgst_rate'], $v['cgst_amount'],
-                    $v['sgst_rate'], $v['sgst_amount'], $v['igst_rate'], $v['igst_amount'],
-                    $v['total_amount'], $v['sales_ledger'], $v['narration'],
-                ]));
+                $rows[] = implode(',', [
+                    $text($v['voucher_type']), $text($v['voucher_no']), $text($v['date']),
+                    $text($v['party_name']), $text($v['party_gstin']), $text($v['party_state']),
+                    $num($v['taxable_value']), $num($v['cgst_rate']), $num($v['cgst_amount']),
+                    $num($v['sgst_rate']), $num($v['sgst_amount']), $num($v['igst_rate']), $num($v['igst_amount']),
+                    $num($v['total_amount']), $text($v['sales_ledger']), $text($v['narration']),
+                ]);
             }
 
             $filename = 'tally_sales_' . str_replace('-', '', $from) . '_' . str_replace('-', '', $to) . '.csv';
-            return response(implode("\n", $rows), 200, [
-                'Content-Type'        => 'text/csv',
+            // The byte-order mark makes Excel read the file as UTF-8, so Gujarati / Hindi names and the rupee sign survive.
+            return response("\xEF\xBB\xBF" . implode("\n", $rows), 200, [
+                'Content-Type'        => 'text/csv; charset=UTF-8',
                 'Content-Disposition' => "attachment; filename=\"{$filename}\"",
             ]);
         } catch (\Exception $e) {
@@ -320,31 +324,50 @@ class ReportingController extends Controller
         }
     }
 
+    /** Text for an XML element (PB-072): escaped, and stripped of the control characters XML cannot hold at all. */
+    private function x($value): string
+    {
+        return htmlspecialchars((string) preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}]/u', '', (string) $value), ENT_XML1 | ENT_QUOTES, 'UTF-8');
+    }
+
+    /** An amount for Tally: plain two-decimal number. */
+    private function amt($value): string
+    {
+        return sprintf('%.2f', (float) $value);
+    }
+
+    /** Tally writes dates as YYYYMMDD. */
+    private function tallyDate(string $date): string
+    {
+        return \Carbon\Carbon::parse($date)->format('Ymd');
+    }
+
     private function buildTallyXml(array $data): string
     {
-        $company  = e($data['company']?->name ?? 'Company');
-        $from     = e($data['from']);
-        $to       = e($data['to']);
+        $company  = $this->x($data['company']?->name ?? 'Company');
+        $from     = $this->x($this->tallyDate($data['from']));
+        $to       = $this->x($this->tallyDate($data['to']));
 
         $vouchers = '';
         foreach ($data['vouchers'] as $v) {
+            $entry = fn (string $ledger, string $positive, $amount) => '<ALLLEDGERENTRIES.LIST><LEDGERNAME>' . $this->x($ledger) . '</LEDGERNAME><ISDEEMEDPOSITIVE>' . $positive . '</ISDEEMEDPOSITIVE><AMOUNT>' . $amount . '</AMOUNT></ALLLEDGERENTRIES.LIST>';
             $ledgers = '';
             // Debit: party (debtor)
-            $ledgers .= "<ALLLEDGERENTRIES.LIST><LEDGERNAME>{$v['party_name']}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{$v['total_amount']}</AMOUNT></ALLLEDGERENTRIES.LIST>";
+            $ledgers .= $entry($v['party_name'], 'Yes', '-' . $this->amt($v['total_amount']));
             // Credit: Sales
-            $ledgers .= "<ALLLEDGERENTRIES.LIST><LEDGERNAME>{$v['sales_ledger']}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{$v['taxable_value']}</AMOUNT></ALLLEDGERENTRIES.LIST>";
+            $ledgers .= $entry($v['sales_ledger'], 'No', $this->amt($v['taxable_value']));
             // GST ledgers
-            if ($v['cgst_amount'] > 0) $ledgers .= "<ALLLEDGERENTRIES.LIST><LEDGERNAME>CGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{$v['cgst_amount']}</AMOUNT></ALLLEDGERENTRIES.LIST>";
-            if ($v['sgst_amount'] > 0) $ledgers .= "<ALLLEDGERENTRIES.LIST><LEDGERNAME>SGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{$v['sgst_amount']}</AMOUNT></ALLLEDGERENTRIES.LIST>";
-            if ($v['igst_amount'] > 0) $ledgers .= "<ALLLEDGERENTRIES.LIST><LEDGERNAME>IGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{$v['igst_amount']}</AMOUNT></ALLLEDGERENTRIES.LIST>";
+            if ($v['cgst_amount'] > 0) $ledgers .= $entry('CGST', 'No', $this->amt($v['cgst_amount']));
+            if ($v['sgst_amount'] > 0) $ledgers .= $entry('SGST', 'No', $this->amt($v['sgst_amount']));
+            if ($v['igst_amount'] > 0) $ledgers .= $entry('IGST', 'No', $this->amt($v['igst_amount']));
 
             $vouchers .= "
   <VOUCHER VCHTYPE=\"Sales\" ACTION=\"Create\">
-    <DATE>{$v['date']}</DATE>
+    <DATE>" . $this->x($v['date_tally']) . "</DATE>
     <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
-    <VOUCHERNUMBER>{$v['voucher_no']}</VOUCHERNUMBER>
-    <PARTYLEDGERNAME>{$v['party_name']}</PARTYLEDGERNAME>
-    <NARRATION>{$v['narration']}</NARRATION>
+    <VOUCHERNUMBER>" . $this->x($v['voucher_no']) . "</VOUCHERNUMBER>
+    <PARTYLEDGERNAME>" . $this->x($v['party_name']) . "</PARTYLEDGERNAME>
+    <NARRATION>" . $this->x($v['narration']) . "</NARRATION>
     {$ledgers}
   </VOUCHER>";
         }

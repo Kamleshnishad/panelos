@@ -77,8 +77,9 @@ class ReportingService
         $totalRevenue = $agg['revenue'];
         $totalTax = $agg['tax'];
 
+        // Payments received up to the END of the as-of day, by the day they were received (not the day the row was typed in): PB-073.
         $totalPaid = PaymentTransaction::where('company_id', $companyId)
-            ->where('created_at', '<=', $asOf)
+            ->where('transaction_date', '<=', \Carbon\Carbon::parse($asOf)->endOfDay())
             ->sum('amount');
 
         $accountsReceivable = ($totalRevenue + $totalTax) - $totalPaid;
@@ -111,8 +112,10 @@ class ReportingService
         $invoiceRevenue = $agg['revenue'] + $agg['tax'];
         $invoiceCount = $agg['count'];
 
+        // `transaction_date` is a date AND time, so a date-only `to` must mean the end of that day or every payment made on the last day is lost (PB-073).
+        [$dayStart, $dayEnd] = $this->dayBounds($from_date, $to_date);
         $payments = PaymentTransaction::where('company_id', $companyId)
-            ->whereBetween('transaction_date', [$from_date, $to_date])
+            ->whereBetween('transaction_date', [$dayStart, $dayEnd])
             ->get();
 
         $cashInflow = $payments->where('payment_method', '!=', 'write_off')->sum('amount');
@@ -127,11 +130,18 @@ class ReportingService
                 'invoices_issued' => $invoiceRevenue,
                 'cash_collected' => $cashInflow,
                 'write_offs' => $writeOffs,
-                'net_operating_cash_flow' => $cashInflow - $writeOffs
+                // Cash actually received. A write-off is a decision not to collect, not money that left the bank, so it is shown but never subtracted (PB-073).
+                'net_operating_cash_flow' => $cashInflow
             ],
             'invoice_count' => $invoiceCount,
             'payment_transaction_count' => $payments->count()
         ];
+    }
+
+    /** The first instant of the first day and the last instant of the last day, for columns that hold a date and a time. */
+    private function dayBounds($from, $to): array
+    {
+        return [\Carbon\Carbon::parse($from)->startOfDay(), \Carbon\Carbon::parse($to)->endOfDay()];
     }
 
     /**
@@ -692,6 +702,7 @@ class ReportingService
                 'voucher_type'   => 'Sales',
                 'voucher_no'     => $inv->invoice_no,
                 'date'           => $inv->invoice_date->format('d-M-Y'),
+                'date_tally'     => $inv->invoice_date->format('Ymd'),
                 'party_name'     => $customer?->name ?? 'Unknown',
                 'party_gstin'    => $customer?->gstin ?? '',
                 'party_state'    => $customer?->state ?? '',

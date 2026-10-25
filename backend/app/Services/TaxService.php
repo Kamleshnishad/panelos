@@ -178,30 +178,46 @@ class TaxService
         return true;
     }
 
+    /**
+     * GST for a period (PB-071). The figures are those of the invoices DATED in the period that still stand: a draft or cancelled invoice carries no GST
+     * liability, and the period is the invoice's own date, not the moment its tax row happened to be written (a late or recalculated invoice would
+     * otherwise land in the wrong return). Each detail row names the invoice, the customer and the customer's GSTIN, which is what a GSTR-1 line needs.
+     */
     public function getTaxReport($companyId, $from_date = null, $to_date = null)
     {
-        $query = TaxCalculation::whereHas('invoice', function ($q) use ($companyId) {
-            $q->where('company_id', $companyId);
-        });
+        $calculations = TaxCalculation::whereHas('invoice', function ($q) use ($companyId, $from_date, $to_date) {
+            $q->where('company_id', $companyId)->whereNotIn('status', ['draft', 'cancelled']);
+            if ($from_date) $q->whereDate('invoice_date', '>=', $from_date);
+            if ($to_date)   $q->whereDate('invoice_date', '<=', $to_date);
+        })->with('invoice.order.customer', 'invoice.dispatch.batch.order.customer')->get();
 
-        if ($from_date) {
-            $query->whereDate('created_at', '>=', $from_date);
-        }
+        $details = $calculations->map(function (TaxCalculation $c) {
+            $inv = $c->invoice;
+            $customer = $inv?->order?->customer ?? $inv?->dispatch?->batch?->order?->customer;
 
-        if ($to_date) {
-            $query->whereDate('created_at', '<=', $to_date);
-        }
-
-        $calculations = $query->get();
+            return [
+                'invoice_id'     => $c->invoice_id,
+                'invoice_no'     => $inv?->invoice_no,
+                'invoice_date'   => $inv?->invoice_date?->format('Y-m-d'),
+                'customer_name'  => $customer?->name,
+                'customer_gstin' => $customer?->gstin,
+                'tax_rate'       => (float) $c->tax_rate,
+                'taxable_amount' => (float) $c->taxable_amount,
+                'tax_amount'     => (float) $c->tax_amount,
+                'cgst_amount'    => (float) $c->cgst_amount,
+                'sgst_amount'    => (float) $c->sgst_amount,
+                'igst_amount'    => (float) $c->igst_amount,
+            ];
+        })->sortBy([['invoice_date', 'asc'], ['invoice_id', 'asc']])->values();
 
         return [
-            'total_taxable' => $calculations->sum('taxable_amount'),
-            'total_tax' => $calculations->sum('tax_amount'),
-            'total_sgst' => $calculations->sum('sgst_amount'),
-            'total_cgst' => $calculations->sum('cgst_amount'),
-            'total_igst' => $calculations->sum('igst_amount'),
-            'calculation_count' => $calculations->count(),
-            'details' => $calculations
+            'total_taxable' => round($details->sum('taxable_amount'), 2),
+            'total_tax' => round($details->sum('tax_amount'), 2),
+            'total_sgst' => round($details->sum('sgst_amount'), 2),
+            'total_cgst' => round($details->sum('cgst_amount'), 2),
+            'total_igst' => round($details->sum('igst_amount'), 2),
+            'calculation_count' => $details->count(),
+            'details' => $details,
         ];
     }
 }
