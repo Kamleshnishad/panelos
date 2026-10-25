@@ -728,6 +728,7 @@
         "notify_lead_followups": "tinyint",
         "lead_overdue_alert_days": "tinyint unsigned",
         "chase_quotations": "tinyint",
+        "lead_stale_days": "tinyint unsigned",
         "smtp_enabled": "tinyint",
         "smtp_host": "varchar(150)",
         "smtp_port": "smallint unsigned",

@@ -72,7 +72,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 5.3 | Call, WhatsApp, e-mail from the lead | done, local |
 | 5.4 | Requirement lines and one-step quote | done, local |
 | 5.5 | Quotation chasing | done, local |
-| 5.6 | Stale leads and response time | not started |
+| 5.6 | Stale leads and response time | done, local |
 | 5.7 | Attachments | not started |
 | 5.8 | Merge, bulk actions, board, stages, scoring | not started |
 | 6.1 | Lead-to-cash tracing | not started |
@@ -252,6 +252,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **5.5 Quotation chasing (LP-05):** follow-ups at +3 and +7 days and before the validity ends, as tasks. Uses the "sent" event; richer once quotations can be e-mailed from the system (FT-02). **M.**
   **Result (local):** `QuotationChaseService`, `lead_tasks.quotation_id` / `chase_step`, the *Chase sent quotations* switch, `QuotationChaseTest` (17). Decision: the "sent" event is **detected by the hourly scan, not hooked into the quotation code**, so the quotation module stays untouched and a quotation sent before this existed is chased too (only for steps still ahead). Not built: chasing off an e-mail being opened (needs FT-02), choosing the days.
 - **5.6 Stale leads and response time (LP-10):** first-response time recorded, alert after N quiet days. **S.**
+  **Result (local):** `LeadEngagement`, `LeadStaleService`, `lead_stale_days`, chips, drawer line, two views and an insights card, `LeadEngagementTest` (23). Decision: **nothing is stored**: first response and last touch are read from the timeline, so every existing lead has them and they cannot drift; a lead with a next action planned for today or later is not called quiet (someone has it in hand). Not built: an alert for a new lead waiting too long for its first reply.
 - **5.7 Attachments (LP-12):** drawings, photos, BOQ files on a lead, carried to the quotation. **M.**
 - **5.8 Merge, bulk actions, board, stages, scoring (LP-08, LP-09, LP-11, LP-06):** merge two leads, select-many actions, board view, editable stages with probabilities, hot/warm/cold and a score. **L, split in sub-PRs when we get there.**
 

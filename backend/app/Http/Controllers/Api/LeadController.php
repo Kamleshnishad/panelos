@@ -25,7 +25,7 @@ class LeadController extends Controller
     public function index(Request $r)
     {
         $cid = $this->cid($r);
-        $filters = $r->only(['status', 'source', 'assigned_to', 'follow_up', 'search', 'sort', 'dir']);
+        $filters = $r->only(['status', 'source', 'assigned_to', 'follow_up', 'search', 'sort', 'dir', 'quiet', 'unanswered']);
         $page    = (int) $r->input('page', 1);
         $perPage = (int) $r->input('per_page', 50);
 
@@ -62,6 +62,7 @@ class LeadController extends Controller
             'lost_reasons' => $reasons,
             'statuses'     => Lead::STATUSES,
             'task_types'   => \App\Models\LeadTask::TYPES,
+            'quiet_days'   => \App\Services\LeadEngagement::staleDays($cid),
             'own_only'     => $r->user()->ownLeadsOnly(),      // the screen hides the filters that cannot apply to a restricted person
             'transitions'  => Lead::transitions(),     // what each status may move to: the screen offers exactly these
         ], 'Lead options');

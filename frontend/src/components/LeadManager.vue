@@ -65,6 +65,14 @@
             <div class="fu-row"><span>Next 7 days</span><b>{{ dash.follow_ups.this_week }}</b></div>
           </div>
 
+          <div v-if="dash.response" class="ins-card" aria-label="Response time">
+            <h4>Response time <small class="muted">last 30 days</small></h4>
+            <div class="fu-row"><span>Average first response</span><b>{{ dash.response.avg_minutes == null ? '—' : fmtMins(dash.response.avg_minutes) }}</b></div>
+            <div class="fu-row"><span>Answered within an hour</span><b>{{ dash.response.within_hour_pct == null ? '—' : dash.response.within_hour_pct + '%' }}</b></div>
+            <div class="fu-row amber"><span>Waiting for a first response</span><b><button class="ins-link" type="button" :disabled="!dash.response.waiting" @click="showView({ unanswered: '1' })">{{ dash.response.waiting }}</button></b></div>
+            <div class="fu-row red"><span>Quiet for {{ dash.response.quiet_days }}+ days</span><b><button class="ins-link" type="button" :disabled="!dash.response.quiet" @click="showView({ quiet: '1' })">{{ dash.response.quiet }}</button></b></div>
+          </div>
+
           <div class="ins-card">
             <h4>Top Lost Reasons</h4>
             <div v-for="r in dash.lost_reasons" :key="r.reason" class="lr-row"><span>{{ r.reason }}</span><b>{{ r.count }}</b></div>
@@ -128,7 +136,10 @@
           <td><div class="bold">{{ l.contact_name }}</div><div class="muted">{{ l.company_name || l.phone || '—' }}</div></td>
           <td><span class="src-badge">{{ l.source }}</span></td>
           <td class="req">{{ l.requirement || '—' }}</td>
-          <td :class="followClass(l)">{{ l.next_follow_up_date ? fmtDate(l.next_follow_up_date) : '—' }}</td>
+          <td :class="followClass(l)">{{ l.next_follow_up_date ? fmtDate(l.next_follow_up_date) : '—' }}
+            <span v-if="l.quiet_days != null && l.quiet_days >= quietDays" class="eng-chip quiet" :title="'Nobody has touched this lead for ' + l.quiet_days + ' days'">quiet {{ l.quiet_days }} d</span>
+            <span v-else-if="l.response_waiting_minutes != null && l.response_waiting_minutes >= 60" class="eng-chip wait" title="Nobody has responded yet">waiting {{ fmtMins(l.response_waiting_minutes) }}</span>
+          </td>
           <td><span class="status-badge" :class="l.status">{{ statusLabel(l.status) }}</span></td>
         </tr>
       </tbody>
@@ -262,6 +273,7 @@
           <div :class="followClass(detail)"><label>Follow-up</label><span>{{ detail.next_follow_up_date ? fmtDate(detail.next_follow_up_date) : '—' }}</span></div>
         </div>
         <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
+        <p v-if="engagementLine" class="eng-line" :class="engagementLine.tone" data-testid="engagement">{{ engagementLine.text }}</p>
         <lead-contact-bar :lead="detail" @changed="onActionsChanged" />
         <lead-requirement :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :busy="busy" @changed="onActionsChanged" @quote="startQuote" />
         <lead-next-actions :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :users="users" @changed="onActionsChanged" />
@@ -360,6 +372,9 @@ const statusFilter = ref('')
 const fSource = ref('')
 const fAssigned = ref('')
 const fFollow = ref('')
+const fQuiet = ref('')
+const fUnanswered = ref('')
+const quietDays = ref(7)           // the company's setting, from the options
 const sortKey = ref('created:desc')
 const ownOnly = ref(false)          // the role may see only the leads assigned to it: the server answers for that, the screen just hides what cannot apply
 const savedViews = ref([])
@@ -378,26 +393,46 @@ const readyViews = computed(() => [
   { key: 'today', label: 'Due today', filters: { follow_up: 'today' } },
   ...(sources.value.includes('IndiaMART') ? [{ key: 'indiamart', label: 'New from IndiaMART', filters: { status: 'new', source: 'IndiaMART' } }] : []),
   ...(ownOnly.value ? [] : [{ key: 'unassigned', label: 'Unassigned', filters: { assigned_to: 'none' } }]),
+  { key: 'unanswered', label: 'Waiting for a reply', filters: { unanswered: '1' } },
+  { key: 'quiet', label: 'Quiet leads', filters: { quiet: '1' } },
 ])
 
 /** What the list is asking for right now, in the shape the server and a saved view both use. */
 function currentFilters() {
   const [sort, dir] = sortKey.value.split(':')
-  const f = { status: statusFilter.value, source: fSource.value, assigned_to: fAssigned.value, follow_up: fFollow.value, search: search.value }
+  const f = { status: statusFilter.value, source: fSource.value, assigned_to: fAssigned.value, follow_up: fFollow.value, search: search.value, quiet: fQuiet.value, unanswered: fUnanswered.value }
   if (sortKey.value !== 'created:desc') Object.assign(f, { sort, dir })
   return Object.fromEntries(Object.entries(f).filter(([, v]) => v))
 }
 const sameFilters = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort())
-const filtersActive = computed(() => !!(fSource.value || fAssigned.value || fFollow.value || statusFilter.value || search.value || sortKey.value !== 'created:desc'))
+const filtersActive = computed(() => !!(fSource.value || fAssigned.value || fFollow.value || fQuiet.value || fUnanswered.value || statusFilter.value || search.value || sortKey.value !== 'created:desc'))
 
 function setFilters(f = {}) {
   statusFilter.value = f.status || ''
   fSource.value = f.source || ''
   fAssigned.value = ownOnly.value ? '' : (f.assigned_to || '')
   fFollow.value = f.follow_up || ''
+  fQuiet.value = f.quiet || ''
+  fUnanswered.value = f.unanswered || ''
   search.value = f.search || ''
   sortKey.value = f.sort ? `${f.sort}:${f.dir || (['follow_up', 'name'].includes(f.sort) ? 'asc' : 'desc')}` : 'created:desc'
 }
+const fmtMins = (m) => m < 120 ? `${m} min` : m < 2880 ? `${(m / 60).toFixed(1).replace(/\.0$/, '')} h` : `${Math.round(m / 1440)} d`
+/** From the insights: show the leads behind a number. */
+function showView(f) { view.value = 'list'; applyView(f, '') }
+
+/** One line in the drawer: how fast it was first answered, or how long it has waited; and how long it has been quiet. */
+const engagementLine = computed(() => {
+  const d = detail.value
+  if (!d || d.response_minutes === undefined) return null
+  if (d.response_minutes != null) {
+    const quiet = d.quiet_days != null && d.quiet_days >= quietDays.value
+    return { text: `First response ${fmtMins(d.response_minutes)} after it arrived.` + (quiet ? ` Quiet for ${d.quiet_days} days.` : ''), tone: quiet ? 'bad' : 'ok' }
+  }
+  if (d.response_waiting_minutes != null) return { text: `Nobody has responded yet: waiting ${fmtMins(d.response_waiting_minutes)}.`, tone: d.response_waiting_minutes >= 60 ? 'bad' : 'warn' }
+  return null
+})
+
 function applyView(f, id) { setFilters(f); activeView.value = id; remember(); load() }
 function filterChanged() { activeView.value = ''; remember(); load() }
 function clearFilters() { setFilters({}); activeView.value = 'r:all'; remember(); load() }
@@ -753,6 +788,7 @@ async function loadOptions() {
     if (o?.transitions && typeof o.transitions === 'object') transitions.value = o.transitions
     if (Array.isArray(o?.lost_reasons)) lostReasons.value = o.lost_reasons
     ownOnly.value = !!o?.own_only
+    if (o?.quiet_days) quietDays.value = o.quiet_days
   } catch { /* keep the fallback list */ }
 }
 
@@ -817,6 +853,13 @@ onMounted(async () => {
 .fu-row.red b { color: #c62828; } .fu-row.amber b { color: #b5740a; }
 @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } .ins-grid { grid-template-columns: 1fr; } }
 
+.eng-chip { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; border-radius: 9px; padding: 1px 7px; white-space: nowrap; }
+.eng-chip.quiet { background: #fdecea; color: #b3261e; }
+.eng-chip.wait { background: #fff4e0; color: #8a5300; }
+.eng-line { font-size: 12.5px; margin: 8px 0 0; }
+.eng-line.ok { color: #2e7d32; } .eng-line.warn { color: #8a5300; } .eng-line.bad { color: #b3261e; font-weight: 600; }
+.ins-link { background: none; border: 0; font: inherit; font-weight: 700; color: inherit; cursor: pointer; text-decoration: underline; padding: 0; }
+.ins-link:disabled { cursor: default; text-decoration: none; }
 .vbadge { margin-left: 6px; background: #c62828; color: #fff; border-radius: 9px; font-size: 10.5px; padding: 0 6px; font-weight: 700; }
 .lm-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 .lm-views { display: flex; gap: 6px; flex-wrap: wrap; }

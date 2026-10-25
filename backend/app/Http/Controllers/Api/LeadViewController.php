@@ -74,6 +74,8 @@ class LeadViewController extends Controller
             'assigned_to' => preg_match('/^(me|none|\d{1,12})$/', (string) $s('assigned_to', 12)) ? $s('assigned_to', 12) : null,
             'follow_up'   => in_array($s('follow_up', 10), LeadService::FOLLOW_UPS, true) ? $s('follow_up', 10) : null,
             'search'      => $s('search', 100),
+            'quiet'       => $s('quiet', 1) === '1' ? '1' : null,
+            'unanswered'  => $s('unanswered', 1) === '1' ? '1' : null,
             'sort'        => in_array($s('sort', 12), LeadService::SORTS, true) ? $s('sort', 12) : null,
             'dir'         => in_array($s('dir', 4), ['asc', 'desc'], true) ? $s('dir', 4) : null,
         ];

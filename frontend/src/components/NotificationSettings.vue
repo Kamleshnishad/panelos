@@ -239,6 +239,15 @@
               <input v-model.number="form.lead_overdue_alert_days" type="number" min="1" max="60" class="days-input" aria-label="Days overdue before the owner is told" /> days
             </div>
           </label>
+          <div class="trigger-row">
+            <div>
+              <div class="trigger-label">Quiet leads</div>
+              <div class="trigger-sub">Tell the person when open leads have had no activity for this many days, and the admins about leads nobody owns. 0 switches the alert off; the Quiet leads view on the Leads screen always works</div>
+            </div>
+            <div class="trigger-days">
+              <input v-model.number="form.lead_stale_days" type="number" min="0" max="90" class="days-input" aria-label="Days without activity before a lead counts as quiet" /> days
+            </div>
+          </div>
           <label class="trigger-row">
             <input type="checkbox" v-model="form.chase_quotations" />
             <div>

@@ -30,7 +30,7 @@ class LeadService
      */
     public function list(int $companyId, array $filters = [], ?User $viewer = null)
     {
-        $q = $this->visible($companyId, $viewer)->with('assignedUser', 'customer');
+        $q = LeadEngagement::select($this->visible($companyId, $viewer))->with('assignedUser', 'customer');
 
         if (!empty($filters['status']))      $q->where('status', $filters['status']);
         else                                 $q->where('status', '!=', 'invalid');     // junk only shows when asked for
@@ -48,6 +48,9 @@ class LeadService
             case 'today':   $q->whereNotIn('status', Lead::CLOSED)->whereDate('next_follow_up_date', $today); break;
             case 'none':    $q->whereNotIn('status', Lead::CLOSED)->whereNull('next_follow_up_date'); break;
         }
+
+        if (!empty($filters['quiet']))       LeadEngagement::onlyQuiet($q, $companyId);
+        if (!empty($filters['unanswered']))  LeadEngagement::onlyUnanswered($q)->whereIn('leads.status', LeadEngagement::OPEN);
 
         if (!empty($filters['search'])) {
             $s = addcslashes(trim((string) $filters['search']), '\\%_');
@@ -75,6 +78,8 @@ class LeadService
 
     public function getDetails(Lead $lead): Lead
     {
+        LeadEngagement::attach($lead);
+
         return $lead->load('assignedUser', 'customer', 'quotation', 'activities.user');
     }
 
@@ -545,6 +550,7 @@ class LeadService
             'by_source'      => $bySource,
             'lost_reasons'   => $lostReasons,
             'follow_ups'     => ['overdue' => $overdue, 'today' => $dueToday, 'this_week' => $thisWeek],
+            'response'       => LeadEngagement::summary($this->visible($companyId, $viewer), $companyId),
         ];
     }
 

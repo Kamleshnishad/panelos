@@ -51,6 +51,7 @@ class NotificationSettingsController extends Controller
             'notify_dispatch_done'    => 'nullable|boolean',
             'notify_lead_followups'   => 'nullable|boolean',
             'chase_quotations'        => 'nullable|boolean',
+            'lead_stale_days'         => 'nullable|integer|min:0|max:90',
             'lead_overdue_alert_days' => 'nullable|integer|min:1|max:60',
             'admin_phone'             => 'nullable|string|max:20',
             'email_payment_reminders' => 'nullable|boolean',

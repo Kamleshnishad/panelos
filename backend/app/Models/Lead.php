@@ -29,7 +29,47 @@ class Lead extends BaseModel
         'est_value'           => 'decimal:2',
         'next_follow_up_date' => 'date',
         'first_seen_at'       => 'datetime',
+        'first_response_at'   => 'datetime',      // only present when the query asked for it (LeadEngagement::select)
+        'last_touch_at'       => 'datetime',
     ];
+
+    protected $appends = ['quiet_days', 'response_minutes', 'response_waiting_minutes'];
+
+    /** Days since a person last touched this open lead; null when the lead is closed or on hold, or the engagement columns were not loaded. */
+    public function getQuietDaysAttribute(): ?int
+    {
+        if (!array_key_exists('last_touch_at', $this->attributes) || !in_array($this->status, self::OPEN, true)) {
+            return null;
+        }
+
+        return max(0, (int) ($this->last_touch_at ?? $this->created_at)->diffInDays(now()));
+    }
+
+    /** The moment the lead counts as having arrived: the buyer's own time when it is within 6 hours before it entered PanelOS, else when it entered. */
+    private function arrivedAt()
+    {
+        return $this->first_seen_at && $this->first_seen_at->gte($this->created_at->copy()->subHours(6)) ? $this->first_seen_at : $this->created_at;
+    }
+
+    /** Minutes from arriving to the first response by a person; null when nobody has responded, or the engagement columns were not loaded. */
+    public function getResponseMinutesAttribute(): ?int
+    {
+        if (!array_key_exists('first_response_at', $this->attributes) || $this->first_response_at === null) {
+            return null;
+        }
+
+        return max(0, (int) $this->arrivedAt()->diffInMinutes($this->first_response_at));
+    }
+
+    /** Minutes an open lead has waited for its first response so far; null once answered, when closed or on hold, or when not loaded. */
+    public function getResponseWaitingMinutesAttribute(): ?int
+    {
+        if (!array_key_exists('first_response_at', $this->attributes) || $this->first_response_at !== null || !in_array($this->status, self::OPEN, true)) {
+            return null;
+        }
+
+        return max(0, (int) $this->arrivedAt()->diffInMinutes(now()));
+    }
 
     /**
      * The one table of allowed moves (LEADS_PLAN 1.2):
