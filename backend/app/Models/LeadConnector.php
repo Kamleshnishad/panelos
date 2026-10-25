@@ -2,20 +2,24 @@
 
 namespace App\Models;
 
+use App\Services\LeadConnectorHealth;
+
 /** A company's link to one outside lead channel (LEADS_PLAN 3.1). The secret is encrypted and never leaves the server. */
 class LeadConnector extends BaseModel
 {
     public const INDIAMART = 'indiamart';
 
     protected $fillable = [
-        'company_id', 'type', 'is_enabled', 'credentials', 'key_hint', 'last_test_at', 'last_test_ok', 'last_test_message',
-        'last_request_at', 'cursor_at', 'last_success_at', 'last_error_at', 'last_error',
+        'company_id', 'type', 'is_enabled', 'enabled_at', 'credentials', 'key_hint', 'key_saved_at', 'last_test_at', 'last_test_ok', 'last_test_message',
+        'last_request_at', 'cursor_at', 'last_success_at', 'last_error_at', 'last_error', 'last_error_kind',
     ];
 
     protected $hidden = ['credentials'];
 
     protected $casts = [
         'is_enabled'      => 'boolean',
+        'enabled_at'      => 'datetime',
+        'key_saved_at'    => 'datetime',
         'credentials'     => 'encrypted:array',
         'last_test_at'    => 'datetime',
         'last_test_ok'    => 'boolean',
@@ -58,6 +62,7 @@ class LeadConnector extends BaseModel
             'last_success_at'   => $this->last_success_at,
             'last_error_at'     => $this->last_error_at,
             'last_error'        => $this->last_error,
+            'health'            => LeadConnectorHealth::assess($this),
         ];
     }
 }

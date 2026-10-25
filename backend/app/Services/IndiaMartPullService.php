@@ -69,7 +69,7 @@ class IndiaMartPullService
             try {
                 $rows = $this->client->fetch($key, $from, $to);
             } catch (IndiaMartException $e) {
-                $c->forceFill(['last_error_at' => now(), 'last_error' => mb_substr($e->getMessage(), 0, 255)])->save();
+                $c->forceFill(['last_error_at' => now(), 'last_error' => mb_substr($e->getMessage(), 0, 255), 'last_error_kind' => $e->kind])->save();
                 $this->log($c, 'pull_error', null, $e->getMessage(), null);
 
                 return $this->result('failed', $e->getMessage());
@@ -80,7 +80,7 @@ class IndiaMartPullService
                 $this->one($c, $row, $n);
             }
 
-            $c->forceFill(['last_success_at' => now(), 'last_error_at' => null, 'last_error' => null] + ($moveCursor ? ['cursor_at' => $to] : []))->save();
+            $c->forceFill(['last_success_at' => now(), 'last_error_at' => null, 'last_error' => null, 'last_error_kind' => null] + ($moveCursor ? ['cursor_at' => $to] : []))->save();
 
             return $this->result('ok', $this->sentence($n), $n);
         } finally {

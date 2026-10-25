@@ -26,7 +26,8 @@ class LeadConnectorService
 
         if ($clear) {
             $c->setKey(null);
-            $c->forceFill(['is_enabled' => false, 'last_test_at' => null, 'last_test_ok' => null, 'last_test_message' => null, 'cursor_at' => null])->save();
+            $c->forceFill(['is_enabled' => false, 'last_test_at' => null, 'last_test_ok' => null, 'last_test_message' => null, 'cursor_at' => null,
+                'enabled_at' => null, 'key_saved_at' => null, 'last_error' => null, 'last_error_at' => null, 'last_error_kind' => null])->save();
 
             return $c;
         }
@@ -36,7 +37,7 @@ class LeadConnectorService
             }
             if ($key !== $c->key()) {
                 $c->setKey($key);
-                $c->forceFill(['last_test_at' => null, 'last_test_ok' => null, 'last_test_message' => null, 'last_error' => null, 'last_error_at' => null])->save();
+                $c->forceFill(['last_test_at' => null, 'last_test_ok' => null, 'last_test_message' => null, 'last_error' => null, 'last_error_at' => null, 'last_error_kind' => null, 'key_saved_at' => now()])->save();
             }
         }
 
@@ -50,7 +51,9 @@ class LeadConnectorService
         if ($on && !$c->key()) {
             throw ValidationException::withMessages(['is_enabled' => 'Save the CRM key first, then switch the import on.']);
         }
-        $c->forceFill(['is_enabled' => $on])->save();
+        if ($on !== $c->is_enabled) {
+            $c->forceFill(['is_enabled' => $on, 'enabled_at' => $on ? now() : null])->save();
+        }
 
         return $c;
     }

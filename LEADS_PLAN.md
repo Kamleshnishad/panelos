@@ -59,7 +59,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 2.5 | Lead sources screen | done, local |
 | 3.1 | IndiaMART settings and connection test | done, local (against a fake; no real key yet) |
 | 3.2 | IndiaMART pull job | done, local (against a fake; no real key yet) |
-| 3.3 | Connector health and alerts | not started |
+| 3.3 | Connector health and alerts | done, local (against a fake; no real key yet) |
 | 3.4 | IndiaMART go-live | not started |
 | 4.1 | Website enquiry form | not started |
 | 4.2 | Spreadsheet import and export | not started |
@@ -220,6 +220,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 ### 3.3 Connector health (LC-12)
 - **Build:** import log entry per run; alert to the owner when no successful pull for an hour or the key is rejected; warning before the **7-day** idle expiry (IndiaMART stops a key that has gone unused for 7 days; **corrected from 15**); a line on `/api/health` and on the uptime check.
 - **Tests:** each alert condition. **Size:** S.
+- **Result:** `LeadConnectorHealth`, bell entry for company admins via the hourly scan, banner in the IndiaMART card, `lead_pull` line on `/api/health`, `LeadConnectorHealthTest` (29). Decisions: one failed pull is not an alert (a refused key is, at once; anything else after an hour without a success); the idle warning starts on day 5 and names the stop date; `/api/health` only goes 503 when the job is not running, not when one company's key is bad. The uptime monitor needs no change: it already reads `/api/health`.
 
 ### 3.4 Go-live with the client
 - **Build:** nothing new: a checklist. Generate the key with the client, run a dry pull and compare the list with the IndiaMART app, then switch the connector on, optionally backfill the last seven days, watch the first day together.

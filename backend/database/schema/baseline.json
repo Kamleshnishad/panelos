@@ -532,8 +532,10 @@
         "company_id": "bigint unsigned",
         "type": "varchar(30)",
         "is_enabled": "tinyint",
+        "enabled_at": "timestamp",
         "credentials": "text",
         "key_hint": "varchar(8)",
+        "key_saved_at": "timestamp",
         "last_test_at": "timestamp",
         "last_test_ok": "tinyint",
         "last_test_message": "varchar(255)",
@@ -542,6 +544,7 @@
         "last_success_at": "timestamp",
         "last_error_at": "timestamp",
         "last_error": "varchar(255)",
+        "last_error_kind": "varchar(20)",
         "created_at": "timestamp",
         "updated_at": "timestamp",
         "deleted_at": "timestamp"

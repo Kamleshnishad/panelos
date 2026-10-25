@@ -6,6 +6,9 @@
       Making a new key there cancels the old one, and a key stops working after 7 days without use.
     </p>
     <div v-if="error" class="im-error" role="alert">{{ error }}</div>
+    <div v-if="state.health?.severity" class="im-health" :class="state.health.severity" role="alert" data-testid="im-health">
+      <strong>{{ state.health.title }}</strong> {{ state.health.body }}
+    </div>
 
     <div class="im-status">
       <span v-if="state.configured" class="im-set">Key saved <code>…{{ state.key_hint }}</code></span>
@@ -28,7 +31,7 @@
           <small v-else-if="state.is_enabled">Waiting for the first import.</small>
           <small v-else>Off. Nothing is imported until you switch this on.</small></span>
       </label>
-      <p v-if="state.last_error" class="im-trouble" role="alert">Last import failed {{ when(state.last_error_at) }}: {{ state.last_error }}</p>
+      <p v-if="state.last_error && state.health?.state !== 'key_rejected'" class="im-trouble" role="alert">Last import failed {{ when(state.last_error_at) }}: {{ state.last_error }}</p>
     </div>
 
     <form v-if="state.configured" class="im-range" aria-label="Pull a date range" @submit.prevent="pullRange">
@@ -54,7 +57,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { api } from '../services/api.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 
-const state = reactive({ configured: false, key_hint: null, is_enabled: false, last_success_at: null, last_error_at: null, last_error: null, last_test_at: null, last_test_ok: null, last_test_message: null })
+const state = reactive({ configured: false, key_hint: null, is_enabled: false, last_success_at: null, last_error_at: null, last_error: null, last_test_at: null, last_test_ok: null, last_test_message: null, health: null })
 const key = ref('')
 const busy = ref(false)
 const testing = ref(false)
@@ -132,6 +135,9 @@ onMounted(load)
 .im-switch { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; cursor: pointer; }
 .im-switch input { width: 17px; height: 17px; margin-top: 2px; }
 .im-switch small { display: block; color: #777; font-size: 12px; margin-top: 2px; }
+.im-health { margin: 10px 0; padding: 9px 12px; border-radius: 6px; font-size: 13px; line-height: 1.4; }
+.im-health.danger { background: #fdecea; color: #8e1b0f; border: 1px solid #f5c2bc; }
+.im-health.warning { background: #fff4e0; color: #8a5300; border: 1px solid #f3d9a4; }
 .im-trouble { margin: 8px 0 0; font-size: 12.5px; color: #bf360c; }
 .im-range { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 13px; }
 .im-range label { display: flex; gap: 6px; align-items: center; color: #555; }

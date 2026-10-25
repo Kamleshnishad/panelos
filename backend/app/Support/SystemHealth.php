@@ -58,13 +58,17 @@ class SystemHealth
         $errors = (int) self::safe(fn () => Cache::get('health:errors:' . now()->format('YmdH'), 0));
         $failedJobs = (int) self::safe(fn () => Schema::hasTable('failed_jobs') ? DB::table('failed_jobs')->count() : 0);
 
-        $ok = $db === 'OK' && $scheduler !== 'STALE' && $backup !== 'STALE' && $errors < self::ERROR_SPIKE;
+        // A tenant's refused key is theirs to fix and shows in their bell; this is only the job itself not running for a switched-on connector.
+        $leadPull = self::safe(fn () => \App\Services\LeadConnectorHealth::pullJob()) ?? 'NONE';
+
+        $ok = $db === 'OK' && $scheduler !== 'STALE' && $backup !== 'STALE' && $errors < self::ERROR_SPIKE && $leadPull !== 'STALE';
 
         return [
             'status'           => $ok ? 'OK' : 'DEGRADED',
             'database'         => $db,
             'scheduler'        => $scheduler,
             'backup'           => $backup,
+            'lead_pull'        => $leadPull,
             'errors_last_hour' => $errors,
             'failed_jobs'      => $failedJobs,
             'timestamp'        => now(),

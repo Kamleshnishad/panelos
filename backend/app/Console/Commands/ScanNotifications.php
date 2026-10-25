@@ -81,5 +81,12 @@ class ScanNotifications extends Command
         } catch (\Throwable $e) {
             report($e);
         }
+
+        // IndiaMART link health (LEADS_PLAN 3.3): key refused, nothing pulled for an hour, key about to go idle.
+        try {
+            app(\App\Services\LeadConnectorHealth::class)->sync($companyId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }
