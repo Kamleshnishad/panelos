@@ -263,6 +263,7 @@
         </div>
         <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
         <lead-contact-bar :lead="detail" @changed="onActionsChanged" />
+        <lead-requirement :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :busy="busy" @changed="onActionsChanged" @quote="startQuote" />
         <lead-next-actions :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :users="users" @changed="onActionsChanged" />
         <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.landing_page || detail.first_seen_at">
           <label>Where it came from</label>
@@ -326,10 +327,11 @@ import FormSelect from './Form/FormSelect.vue'
 import LeadImportDialog from './LeadImportDialog.vue'
 import LeadNextActions from './LeadNextActions.vue'
 import LeadContactBar from './LeadContactBar.vue'
+import LeadRequirement from './LeadRequirement.vue'
 import LeadMyDay from './LeadMyDay.vue'
 
 const props = defineProps({ openId: { type: Number, default: null } })
-const emit = defineEmits(['convert', 'detail'])
+const emit = defineEmits(['convert', 'detail', 'open-quotation', 'open-boq'])
 
 // The company's own list (Master Data -> Lead lists). The fallback below only shows if the options call fails.
 const sources = ref(['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other'])
@@ -674,7 +676,8 @@ const cv = reactive({ open: false, lead: null, state_code: '', gstin: '', addres
 // A GSTIN starts with the state's code: fill the state from it.
 watch(() => cv.gstin, (g) => { const code = String(g || '').slice(0, 2); if (/^\d{2}$/.test(code) && states.value[code]) cv.state_code = code })
 
-async function convertLead(l) {
+async function convertLead(l, quote = null) {
+  quoteOpts.value = quote                                     // set only by "Quote this lead"; the ordinary Convert button leaves it empty
   if (l.customer_id) {                                        // already linked: nothing to ask
     busy.value = true
     try { const d = await leadService.convert(l.id); finishConvert(d?.data ?? d) }
@@ -689,9 +692,31 @@ async function convertLead(l) {
 }
 
 function finishConvert(d) {
+  const q = quoteOpts.value
+  quoteOpts.value = null
   cv.open = false
+  if (q) return doQuote(d.lead_id, q)                          // the customer is ready: make the quotation from the requirement
   detail.value = null
   emit('convert', { customer_id: d.customer_id, lead_id: d.lead_id })
+}
+
+// "Quote this lead" (LEADS_PLAN 5.4): the quotation or BOQ is made on the server from the requirement lines, then opened.
+const quoteOpts = ref(null)
+async function startQuote(opts) {
+  const l = detail.value
+  if (!l) return
+  if (l.customer_id) await doQuote(l.id, opts)
+  else await convertLead(l, opts)                              // asks for the customer's state first, the same dialog as Convert
+}
+async function doQuote(leadId, opts = {}) {
+  busy.value = true
+  try {
+    const d = (await leadService.quoteLead(leadId, { as_boq: !!opts.asBoq }))?.data ?? {}
+    toastSuccess(`${d.as_boq ? 'BOQ' : 'Quotation draft'} ${d.quotation_no} made. Check the sizes and enter the rates.`)
+    detail.value = null
+    emit(d.as_boq ? 'open-boq' : 'open-quotation', d.quotation_id)
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Could not make the quotation.') }
+  finally { busy.value = false }
 }
 
 async function submitConvert(extra = {}) {

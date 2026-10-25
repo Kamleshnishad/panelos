@@ -551,6 +551,23 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "lead_requirement_lines": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "lead_id": "bigint unsigned",
+        "kind": "varchar(10)",
+        "panel_type_id": "bigint unsigned",
+        "accessory_id": "bigint unsigned",
+        "application": "varchar(40)",
+        "thickness": "smallint unsigned",
+        "area_sqm": "decimal(12,2)",
+        "qty": "decimal(12,2)",
+        "description": "varchar(150)",
+        "sort_order": "smallint unsigned",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
     "lead_message_templates": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

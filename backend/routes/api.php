@@ -137,6 +137,10 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     // Spreadsheet in and out (LEADS_PLAN 4.2). Before /leads/{id} so "export" is not read as an id.
+    // What a lead wants, and "Quote this lead" (LEADS_PLAN 5.4). Calls the quotation module, never changes it.
+    Route::get('/leads/{id}/requirement', [\App\Http\Controllers\Api\LeadRequirementController::class, 'show'])->name('leads.requirement.show');
+    Route::put('/leads/{id}/requirement', [\App\Http\Controllers\Api\LeadRequirementController::class, 'save'])->name('leads.requirement.save');
+    Route::post('/leads/{id}/quote', [\App\Http\Controllers\Api\LeadRequirementController::class, 'quote'])->name('leads.requirement.quote');
     // Contacting a lead from its screen (LEADS_PLAN 5.3).
     Route::get('/leads/{id}/message-templates', [\App\Http\Controllers\Api\LeadMessageController::class, 'templates'])->name('leads.messages.templates');
     Route::post('/leads/{id}/whatsapp', [\App\Http\Controllers\Api\LeadMessageController::class, 'whatsapp'])->middleware('throttle:lead-contact')->name('leads.messages.whatsapp');

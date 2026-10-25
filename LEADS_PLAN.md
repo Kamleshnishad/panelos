@@ -70,7 +70,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 5.1 | List filters, saved views, search, address | done, local |
 | 5.2 | Next actions and my day | done, local |
 | 5.3 | Call, WhatsApp, e-mail from the lead | done, local |
-| 5.4 | Requirement lines and one-step quote | not started |
+| 5.4 | Requirement lines and one-step quote | done, local |
 | 5.5 | Quotation chasing | not started |
 | 5.6 | Stale leads and response time | not started |
 | 5.7 | Attachments | not started |
@@ -248,6 +248,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **5.3 Call, WhatsApp and e-mail from the lead (LP-02):** tap-to-call, WhatsApp templates, e-mail through the company mailbox, each logged on the timeline. **M.**
   **Result (local):** contact bar in the lead drawer, `LeadMessageService`, `lead_message_templates` and the *Lead messages* tab in Master Data, mail type `lead_message`, `LeadMessageTest` (17) and a browser run. Decisions: WhatsApp uses click-to-chat (`wa.me`), not the Twilio API, so it works without any account and the client's answer on WhatsApp automation is not needed for this step (the timeline says "opened", not "sent"); e-mail needs the company's own mailbox and is refused with a plain message otherwise; it writes only to the lead's own address. Not built: Twilio sending, attachments, bulk messages.
 - **5.4 Requirement lines and one-step quote (LP-03, LP-04):** structured requirement (panel type, thickness, application, area, accessories) prefilling the quotation rows; "Quote this lead" creates the draft. **M.**
+  **Result (local):** `lead_requirement_lines`, `LeadRequirementService`, `LeadRequirement.vue`, `LeadRequirementTest` (14) and a browser run. Decisions: the quotation and BOQ modules are called, not changed (`QuotationService::create`); a draft quotation by default and a BOQ on request (both paths stay); sizes are a starting point (3000 mm lengths), the specification starts from the form's defaults and **rates stay pending** so nothing is priced silently; the customer step reuses Convert; needs `quotations.manage` as well. Not built: per-line density and skins, sizes per line.
 - **5.5 Quotation chasing (LP-05):** follow-ups at +3 and +7 days and before the validity ends, as tasks. Uses the "sent" event; richer once quotations can be e-mailed from the system (FT-02). **M.**
 - **5.6 Stale leads and response time (LP-10):** first-response time recorded, alert after N quiet days. **S.**
 - **5.7 Attachments (LP-12):** drawings, photos, BOQ files on a lead, carried to the quotation. **M.**

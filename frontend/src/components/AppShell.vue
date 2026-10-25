@@ -94,7 +94,7 @@
 
       <main class="content">
         <home-dashboard        v-if="active === 'dashboard'"   @navigate="go" />
-        <lead-manager          v-else-if="active === 'leads'" :key="navNonce" :open-id="leadOpenId" @detail="(id) => onDetail('leads', id)" @convert="onLeadConvert" />
+        <lead-manager          v-else-if="active === 'leads'" :key="navNonce" :open-id="leadOpenId" @detail="(id) => onDetail('leads', id)" @convert="onLeadConvert" @open-quotation="openQuotation" @open-boq="go('boq')" />
         <customer-manager      v-else-if="active === 'customers'" :key="navNonce" :open-id="customerOpenId" @detail="(id) => onDetail('customers', id)" @open-quotation="openQuotation" @view-orders="go('orders')" />
         <quotation-manager     v-else-if="active === 'quotations'" :key="navNonce" :open-id="quotationOpenId" :prefill="quotationPrefill" @detail="(id) => onDetail('quotations', id)" @order-created="go('orders')" />
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />

@@ -25,6 +25,11 @@ export default {
   convert(id, data = {})   { return api('post', `/api/leads/${id}/convert`, data) },
   states()                 { return api('get',  '/api/gst/states') },
 
+  // What they want, and "Quote this lead" (LEADS_PLAN 5.4)
+  requirement(id)               { return api('get', `/api/leads/${id}/requirement`) },
+  saveRequirement(id, lines)    { return api('put', `/api/leads/${id}/requirement`, { lines }) },
+  quoteLead(id, data = {})      { return api('post', `/api/leads/${id}/quote`, data) },
+
   // Contacting a lead (LEADS_PLAN 5.3)
   messageTemplates(id, channel) { return api('get', `/api/leads/${id}/message-templates`, null, { channel }) },
   whatsappLead(id, message)     { return api('post', `/api/leads/${id}/whatsapp`, { message }) },
