@@ -185,7 +185,7 @@ class LeadListViewsTest extends TestCase
 
         $f = $this->getJson('/api/leads/views')->json('data.0.filters');
 
-        $this->assertSame(['source', 'search'], array_keys($f));
+        $this->assertEqualsCanonicalizing(['source', 'search'], array_keys($f));     // MySQL 8 sorts JSON keys; MariaDB does not
         $this->assertSame(100, mb_strlen($f['search']));
     }
 
