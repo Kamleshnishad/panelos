@@ -14,7 +14,7 @@ class LeadConnectorService
 {
     public const TEST_WINDOW_HOURS = 6;
 
-    public function __construct(private IndiaMartClient $indiaMart)
+    public function __construct(private IndiaMartClient $indiaMart, private IndiaMartPullService $pull)
     {
     }
 
@@ -41,6 +41,51 @@ class LeadConnectorService
         }
 
         return $c;
+    }
+
+    /** Switch the automatic pull (every 10 minutes) on or off. It needs a saved key. */
+    public function setEnabled(int $companyId, bool $on): LeadConnector
+    {
+        $c = LeadConnector::forCompany($companyId);
+        if ($on && !$c->key()) {
+            throw ValidationException::withMessages(['is_enabled' => 'Save the CRM key first, then switch the import on.']);
+        }
+        $c->forceFill(['is_enabled' => $on])->save();
+
+        return $c;
+    }
+
+    /**
+     * Pull a date range by hand (whole Indian days, at most 7 of them, within the last 365 days). Does not move the automatic pull's place.
+     * @throws ValidationException for a bad range, no key, or IndiaMART asked less than 5 minutes ago
+     */
+    public function pullIndiaMartRange(int $companyId, string $fromDate, string $toDate): array
+    {
+        $c = LeadConnector::forCompany($companyId);
+        if (!$c->key()) {
+            throw ValidationException::withMessages(['crm_key' => 'Save the CRM key first.']);
+        }
+        $from = Carbon::parse($fromDate, 'Asia/Kolkata')->startOfDay();
+        $to = Carbon::parse($toDate, 'Asia/Kolkata')->endOfDay();
+        if ($to->isFuture()) {
+            $to = now();
+        }
+        if ($from->gte($to)) {
+            throw ValidationException::withMessages(['from' => 'Choose a start day that is not in the future and not after the end day.']);
+        }
+        if ($from->diffInSeconds($to) > IndiaMartClient::MAX_WINDOW_DAYS * 86400) {
+            throw ValidationException::withMessages(['to' => 'IndiaMART answers for at most 7 days at a time. Pull a shorter range, then the next.']);
+        }
+        if ($from->lt(now()->subDays(365))) {
+            throw ValidationException::withMessages(['from' => 'IndiaMART keeps only the last 365 days.']);
+        }
+
+        $r = $this->pull->pullRange($c, $from, $to);
+        if ($r['status'] === 'skipped') {
+            throw ValidationException::withMessages(['pull' => $r['message']]);
+        }
+
+        return $r + ['ok' => $r['status'] === 'ok'];
     }
 
     /**

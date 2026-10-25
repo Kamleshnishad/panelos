@@ -57,6 +57,10 @@ RateLimiter::for('signup', function (Request $request) {
     ];
 });
 
+// Manual IndiaMART pull: 6 a minute per person. Its own limiter, because a second `throttle:N,M` on a route shares its counter key with the
+// group-wide throttle and would count every request twice.
+RateLimiter::for('lead-pull', fn (Request $request) => Limit::perMinute(6)->by('lead-pull:' . ($request->user()?->id ?? $request->ip())));
+
 // Inbound lead address (LEADS_PLAN 2.3): 60 messages a minute per token. There is deliberately no per-address limit here: behind the proxies the
 // address may be the proxy's, shared by everyone, so a limit on it would let one noisy sender block all real ones. Wrong-token guesses are
 // counted per address inside LeadInboundService instead (valid tokens never count against it).
@@ -151,6 +155,7 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::delete('/settings/lead-assignment-rules/{id}', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'destroy'])->name('leadassign.destroy');
     Route::get('/settings/lead-connectors/indiamart', [\App\Http\Controllers\Api\LeadConnectorController::class, 'showIndiaMart'])->name('leadconn.indiamart.show');
     Route::put('/settings/lead-connectors/indiamart', [\App\Http\Controllers\Api\LeadConnectorController::class, 'updateIndiaMart'])->name('leadconn.indiamart.update');
+    Route::post('/settings/lead-connectors/indiamart/pull', [\App\Http\Controllers\Api\LeadConnectorController::class, 'pullIndiaMart'])->middleware('throttle:lead-pull')->name('leadconn.indiamart.pull');
     Route::post('/settings/lead-connectors/indiamart/test', [\App\Http\Controllers\Api\LeadConnectorController::class, 'testIndiaMart'])->name('leadconn.indiamart.test');
     Route::post('/settings/lead-sources', [\App\Http\Controllers\Api\LeadListController::class, 'storeSource'])->name('leadlists.sources.store');
     Route::put('/settings/lead-sources/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'updateSource'])->name('leadlists.sources.update');

@@ -20,12 +20,32 @@
       <button v-if="state.configured" class="link" type="button" :disabled="busy" @click="remove">Remove key</button>
     </form>
 
+    <div v-if="state.configured" class="im-auto">
+      <label class="im-switch">
+        <input type="checkbox" :checked="state.is_enabled" :disabled="busy" aria-label="Import IndiaMART enquiries automatically" @change="setEnabled($event.target.checked)" />
+        <span><strong>Import automatically every 10 minutes</strong>
+          <small v-if="state.is_enabled && state.last_success_at">Last import {{ when(state.last_success_at) }}.</small>
+          <small v-else-if="state.is_enabled">Waiting for the first import.</small>
+          <small v-else>Off. Nothing is imported until you switch this on.</small></span>
+      </label>
+      <p v-if="state.last_error" class="im-trouble" role="alert">Last import failed {{ when(state.last_error_at) }}: {{ state.last_error }}</p>
+    </div>
+
+    <form v-if="state.configured" class="im-range" aria-label="Pull a date range" @submit.prevent="pullRange">
+      <strong>Pull a date range</strong>
+      <label>From <input v-model="range.from" type="date" required :max="today" /></label>
+      <label>To <input v-model="range.to" type="date" required :max="today" /></label>
+      <button class="btn btn-ghost" type="submit" :disabled="busy || !range.from || !range.to">{{ pulling ? 'Pulling…' : 'Pull now' }}</button>
+      <small>Up to 7 days at a time, for enquiries from before you switched on, or ones that were missed.</small>
+    </form>
+    <div v-if="pullResult" class="im-result" :class="pullResult.ok ? 'ok' : 'bad'" role="status">{{ pullResult.ok ? '✓' : '✗' }} {{ pullResult.message }}</div>
+
     <div v-if="result" class="im-result" :class="result.ok ? 'ok' : 'bad'" role="status">{{ result.ok ? '✓' : '✗' }} {{ result.message }}</div>
     <p v-else-if="state.last_test_at" class="im-last">
       Last test, {{ when(state.last_test_at) }}: <span :class="state.last_test_ok ? 'okt' : 'badt'">{{ state.last_test_message }}</span>
     </p>
-    <p class="im-note">A test looks at the last 6 hours and only counts the enquiries; nothing is imported. IndiaMART allows one request every 5 minutes, so you can test once in 5 minutes.
-      Automatic import is the next step and is not switched on yet.</p>
+    <p class="im-note">A test looks at the last 6 hours and only counts the enquiries; nothing is imported. IndiaMART allows one request every 5 minutes, so a test or a pull can be done once in 5 minutes.
+      Each enquiry becomes a lead (or a note on that buyer's open lead); the same enquiry is never added twice.</p>
   </section>
 </template>
 
@@ -34,12 +54,16 @@ import { ref, reactive, onMounted } from 'vue'
 import { api } from '../services/api.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 
-const state = reactive({ configured: false, key_hint: null, last_test_at: null, last_test_ok: null, last_test_message: null })
+const state = reactive({ configured: false, key_hint: null, is_enabled: false, last_success_at: null, last_error_at: null, last_error: null, last_test_at: null, last_test_ok: null, last_test_message: null })
 const key = ref('')
 const busy = ref(false)
 const testing = ref(false)
 const error = ref('')
 const result = ref(null)
+const pulling = ref(false)
+const pullResult = ref(null)
+const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })   // IndiaMART works in Indian time
+const range = reactive({ from: '', to: '' })
 
 const when = (d) => new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 const apply = (res) => Object.assign(state, res?.data?.data ?? res?.data ?? {})
@@ -62,6 +86,20 @@ async function test() {
   try { result.value = (await api.post('/settings/lead-connectors/indiamart/test'))?.data?.data ?? null; await load() }
   catch (e) { error.value = e?.response?.data?.message ?? 'The test could not run.' }
   finally { busy.value = false; testing.value = false }
+}
+
+async function setEnabled(on) {
+  busy.value = true; error.value = ''
+  try { apply(await api.put('/settings/lead-connectors/indiamart', { is_enabled: on })); toastSuccess(on ? 'Automatic import switched on.' : 'Automatic import switched off.') }
+  catch (e) { error.value = e?.response?.data?.message ?? 'Could not change that.'; await load() }
+  finally { busy.value = false }
+}
+
+async function pullRange() {
+  busy.value = true; pulling.value = true; error.value = ''; pullResult.value = null
+  try { pullResult.value = (await api.post('/settings/lead-connectors/indiamart/pull', { from: range.from, to: range.to }))?.data?.data ?? null; await load() }
+  catch (e) { pullResult.value = { ok: false, message: e?.response?.data?.message ?? 'The pull could not run.' } }
+  finally { busy.value = false; pulling.value = false }
 }
 
 async function remove() {
@@ -90,6 +128,15 @@ onMounted(load)
 .im-result { margin-top: 12px; padding: 9px 12px; border-radius: 7px; font-size: 13px; }
 .im-result.ok { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; }
 .im-result.bad { background: #fff3e0; border: 1px solid #ffcc80; color: #bf360c; }
+.im-auto { margin: 14px 0 4px; padding: 10px 12px; background: #f7f9fa; border-radius: 8px; }
+.im-switch { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+.im-switch input { width: 17px; height: 17px; margin-top: 2px; }
+.im-switch small { display: block; color: #777; font-size: 12px; margin-top: 2px; }
+.im-trouble { margin: 8px 0 0; font-size: 12.5px; color: #bf360c; }
+.im-range { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 13px; }
+.im-range label { display: flex; gap: 6px; align-items: center; color: #555; }
+.im-range input { padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+.im-range small { color: #888; font-size: 12px; }
 .im-last { margin: 12px 0 0; font-size: 12.5px; color: #666; }
 .okt { color: #2e7d32; }
 .badt { color: #bf360c; }

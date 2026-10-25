@@ -58,7 +58,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 2.4 | Assignment rules and instant alert | done, local (no screen yet: 2.5) |
 | 2.5 | Lead sources screen | done, local |
 | 3.1 | IndiaMART settings and connection test | done, local (against a fake; no real key yet) |
-| 3.2 | IndiaMART pull job | not started |
+| 3.2 | IndiaMART pull job | done, local (against a fake; no real key yet) |
 | 3.3 | Connector health and alerts | not started |
 | 3.4 | IndiaMART go-live | not started |
 | 4.1 | Website enquiry form | not started |
@@ -214,6 +214,8 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **Build:** scheduled every ten minutes (IndiaMART asks for 10 to 15 and refuses more than one request in 5; **corrected from "every five minutes"** after reading their help page); asks for the period since the last success minus a 5-minute overlap, never more than 7 days at a time, and skips a run if the last request was under 5 minutes ago; maps IndiaMART's fields (to be confirmed against IndiaMART's current documentation first) to the intake service with source IndiaMART and `external_id` = IndiaMART's enquiry id; manual "pull this date range" button; runs as the app user so the lock problem of PB-062 cannot recur.
 - **Tests:** overlap does not duplicate, repeat enquiry becomes an activity, rate limit respected, job survives an API error.
 - **Size:** M.
+- **Result:** `IndiaMartMapper`, `IndiaMartPullService`, `leads:pull-indiamart` (every 10 minutes), switch and date-range pull in the IndiaMART card, `IndiaMartPullTest` (24, all against `Http::fake`). Not seen with a real key: time format, company/city/product field names, error wording (3.4).
+  Decisions: the first automatic pull looks back 24 hours (IndiaMART's own default); a manual range never moves the cursor; repeats from the overlap are not logged.
 
 ### 3.3 Connector health (LC-12)
 - **Build:** import log entry per run; alert to the owner when no successful pull for an hour or the key is rejected; warning before the **7-day** idle expiry (IndiaMART stops a key that has gone unused for 7 days; **corrected from 15**); a line on `/api/health` and on the uptime check.

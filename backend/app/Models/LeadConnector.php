@@ -51,6 +51,7 @@ class LeadConnector extends BaseModel
             'configured'        => $this->key() !== null,
             'key_hint'          => $this->key_hint,
             'is_enabled'        => $this->is_enabled,
+            'cursor_at'         => $this->cursor_at,
             'last_test_at'      => $this->last_test_at,
             'last_test_ok'      => $this->last_test_ok,
             'last_test_message' => $this->last_test_message,
