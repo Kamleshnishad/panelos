@@ -547,6 +547,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import quotationService from '../services/quotationService.js'
+import { todayLocal } from '../services/dates.js'
 import { confirmDialog, toastSuccess, toastError } from '../services/ui.js'
 import CustomerEditModal from './CustomerEditModal.vue'
 import FormInput from './Form/FormInput.vue'
@@ -615,7 +616,7 @@ const form = reactive({
   site_contact_phone: '',
   quality_grade: 'High',
   validity_days: 10,
-  quoted_on: new Date().toISOString().slice(0, 10),
+  quoted_on: todayLocal(),               // the local day: the UTC date is yesterday in India until 05:30 (PB-083)
   discount_pct: 0,
   advance_pct: 50,
   transport_fixed: false,
