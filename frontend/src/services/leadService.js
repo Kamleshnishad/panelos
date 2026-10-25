@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { downloadFile } from './transfers.js'
+import { todayLocal } from './dates.js'
 
 function authHeaders() {
   const token = localStorage.getItem('token')
@@ -75,7 +76,7 @@ export default {
   importUndo(id)           { return api('post', `/api/leads/import/${id}/undo`) },
   importLast()             { return api('get',  '/api/leads/import/last') },
   /** The list as the screen shows it (same status and search), as a CSV file. */
-  exportList(params = {})  { return downloadFile('/api/leads/export', `leads_${new Date().toISOString().slice(0, 10)}.csv`, { label: 'Exporting leads', kind: 'leads-export', params, type: 'text/csv' }) },
+  exportList(params = {})  { return downloadFile('/api/leads/export', `leads_${todayLocal()}.csv`, { label: 'Exporting leads', kind: 'leads-export', params, type: 'text/csv' }) },
   remove(id)               { return api('delete', `/api/leads/${id}`) },
 
   users()                  { return api('get',  '/api/users') },

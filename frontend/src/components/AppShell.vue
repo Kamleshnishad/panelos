@@ -108,7 +108,7 @@
         <dispatch-manager      v-else-if="active === 'dispatches'"  :key="navNonce" :open-id="dispatchOpenId"  @detail="(id) => onDetail('dispatches', id)" @view-batch="(id) => go('batches', id)" />
         <invoice-manager       v-else-if="active === 'invoices'" :key="navNonce" :open-id="invoiceOpenId" @detail="(id) => onDetail('invoices', id)" />
         <accounts-receivable   v-else-if="active === 'receivables'" @view-invoice="go('invoices')" />
-        <business-reports      v-else-if="active === 'reports'" />
+        <business-reports      v-else-if="active === 'reports'" @navigate="go" />
         <company-settings      v-else-if="active === 'company'" />
         <notification-settings v-else-if="active === 'notifications'" />
         <billing-settings      v-else-if="active === 'billing'" />

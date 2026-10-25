@@ -276,6 +276,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import invoiceService from '../services/invoiceService.js'
+import { todayLocal } from '../services/dates.js'
 
 const props = defineProps({ invoiceId: { type: Number, required: true } })
 const emit  = defineEmits(['back', 'view'])
@@ -353,7 +354,7 @@ const showPayment = ref(false)
 const paySaving   = ref(false)
 const payError    = ref(null)
 const payForm     = reactive({ amount: null, payment_method: 'bank_transfer', reference_no: '', transaction_date: '' })
-const todayIso    = () => new Date().toISOString().slice(0, 10)
+const todayIso    = () => todayLocal()
 
 const editForm = reactive({ due_date: '', notes: '', terms: '' })
 

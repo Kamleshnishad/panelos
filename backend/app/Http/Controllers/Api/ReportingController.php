@@ -3,6 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AccountStatementService;
+use App\Services\GstRegisterService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Str;
+use App\Services\PaymentsRegisterService;
 use App\Services\ReportingService;
 use App\Services\TaxService;
 use Illuminate\Http\Request;
@@ -130,6 +135,98 @@ class ReportingController extends Controller
         return $this->ok($this->reportingService->getPanelTypeMix(auth()->user()->company_id, $request->query('from_date'), $request->query('to_date')));
     }
 
+    /** GST sales register for filing: invoices, totals by rate, HSN summary and warnings (FR-010). */
+    public function gstRegister(Request $request, GstRegisterService $register)
+    {
+        $this->period($request, 'from', 'to');
+
+        return $this->ok($register->build(auth()->user()->company_id, $request->query('from', now()->startOfMonth()->toDateString()), $request->query('to', now()->toDateString())));
+    }
+
+    /** One table of the GST register as a CSV file (part = invoices | hsn). */
+    public function gstRegisterCsv(Request $request, GstRegisterService $register)
+    {
+        $this->period($request, 'from', 'to');
+        $request->validate(['part' => 'nullable|in:invoices,hsn'], ['part.in' => 'Choose invoices or hsn.']);
+        $from = $request->query('from', now()->startOfMonth()->toDateString());
+        $to   = $request->query('to', now()->toDateString());
+        $part = $request->query('part', 'invoices');
+        $csv  = $register->csv($register->build(auth()->user()->company_id, $from, $to), $part);
+
+        return response($csv, 200, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="gst_register_' . $part . '_' . str_replace('-', '', $from) . '_' . str_replace('-', '', $to) . '.csv"',
+        ]);
+    }
+
+    /** Payments received in the period, with the invoice and customer (FR-010). */
+    public function paymentsRegister(Request $request, PaymentsRegisterService $register)
+    {
+        $this->period($request, 'from', 'to');
+
+        return $this->ok($register->build(auth()->user()->company_id, $request->query('from', now()->startOfMonth()->toDateString()), $request->query('to', now()->toDateString())));
+    }
+
+    public function paymentsRegisterCsv(Request $request, PaymentsRegisterService $register)
+    {
+        $this->period($request, 'from', 'to');
+        $from = $request->query('from', now()->startOfMonth()->toDateString());
+        $to   = $request->query('to', now()->toDateString());
+
+        return response($register->csv($register->build(auth()->user()->company_id, $from, $to)), 200, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="payments_' . str_replace('-', '', $from) . '_' . str_replace('-', '', $to) . '.csv"',
+        ]);
+    }
+
+    /** The company's financial year start month (Company settings, 4 = April by default). */
+    private function fyMonth(): int
+    {
+        return (int) (\App\Models\Company::withoutGlobalScope('tenant')->whereKey(auth()->user()->company_id)->value('financial_year_start') ?: 4);
+    }
+
+    private function statementData(Request $request, int $customerId, AccountStatementService $statements): array
+    {
+        $this->period($request, 'from', 'to');
+        $from = $request->query('from', ReportingService::financialYearStart(null, $this->fyMonth())->toDateString());
+        $to   = $request->query('to', now()->toDateString());
+
+        return $statements->build(auth()->user()->company_id, $customerId, $from, $to);
+    }
+
+    /** A customer's statement of account as data, for the screen (FR-010). */
+    public function customerStatement(Request $request, int $customerId, AccountStatementService $statements)
+    {
+        return $this->ok($this->statementData($request, $customerId, $statements));
+    }
+
+    /** The same statement as a printable PDF. */
+    public function customerStatementPdf(Request $request, int $customerId, AccountStatementService $statements)
+    {
+        $data = $this->statementData($request, $customerId, $statements);
+
+        return Pdf::loadView('reports.statement', $data)->setPaper('a4')
+            ->download('statement_' . Str::slug($data['customer']['name']) . '_' . str_replace('-', '', $data['period']['to']) . '.pdf');
+    }
+
+    /** The receivables ageing, every invoice with a balance, as a printable PDF (FR-010). */
+    public function arAgeingPdf(Request $request)
+    {
+        $request->validate(['as_of' => 'nullable|date_format:Y-m-d'], ['as_of.date_format' => 'Use the date format YYYY-MM-DD for the date.']);
+        $asOf = $request->query('as_of', now()->toDateString());
+        $rows = [];
+        $page = 1;
+        do {
+            $ar = $this->reportingService->getAccountsReceivable(auth()->user()->company_id, $asOf, $page, 500);
+            $rows = array_merge($rows, $ar['details']->all());
+            $page++;
+        } while ($page <= $ar['pagination']['last_page']);
+        $company = \App\Models\Company::withoutGlobalScope('tenant')->find(auth()->user()->company_id);
+
+        return Pdf::loadView('reports.ar_ageing', ['company' => $company?->legal_name ?: $company?->name, 'as_of' => $asOf, 'summary' => $ar['summary'], 'rows' => $rows])
+            ->setPaper('a4', 'landscape')->download('receivables_ageing_' . str_replace('-', '', $asOf) . '.pdf');
+    }
+
     /** Order-to-invoice reconciliation (revenue leakage). */
     public function reconciliation(Request $request)
     {
@@ -234,9 +331,9 @@ class ReportingController extends Controller
             // Credit: Sales
             $ledgers .= $entry($v['sales_ledger'], 'No', $this->amt($v['taxable_value']));
             // GST ledgers
-            if ($v['cgst_amount'] > 0) $ledgers .= $entry('CGST', 'No', $this->amt($v['cgst_amount']));
-            if ($v['sgst_amount'] > 0) $ledgers .= $entry('SGST', 'No', $this->amt($v['sgst_amount']));
-            if ($v['igst_amount'] > 0) $ledgers .= $entry('IGST', 'No', $this->amt($v['igst_amount']));
+            if ($v['cgst_amount'] > 0) $ledgers .= $entry($data['ledgers']['cgst'], 'No', $this->amt($v['cgst_amount']));
+            if ($v['sgst_amount'] > 0) $ledgers .= $entry($data['ledgers']['sgst'], 'No', $this->amt($v['sgst_amount']));
+            if ($v['igst_amount'] > 0) $ledgers .= $entry($data['ledgers']['igst'], 'No', $this->amt($v['igst_amount']));
 
             $vouchers .= "
   <VOUCHER VCHTYPE=\"Sales\" ACTION=\"Create\">

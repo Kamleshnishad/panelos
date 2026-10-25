@@ -30,6 +30,7 @@ class CompanyMail
         'payment_reminder' => ['label' => 'Payment reminders (automatic)', 'default' => CompanyMailbox::NOTIFICATIONS],
         'payment_receipt' => ['label' => 'Payment receipts (automatic)', 'default' => CompanyMailbox::NOTIFICATIONS],
         'lead_message'    => ['label' => 'E-mails your team writes to a lead', 'default' => CompanyMailbox::MAIN],
+        'monthly_mis'     => ['label' => 'Monthly MIS report to the owners (automatic)', 'default' => CompanyMailbox::NOTIFICATIONS],
     ];
 
     /** @var callable|null  replaces the real SMTP mailer; tests only */

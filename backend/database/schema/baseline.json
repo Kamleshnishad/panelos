@@ -754,6 +754,8 @@
         "created_at": "timestamp",
         "updated_at": "timestamp",
         "email_payment_reminders": "tinyint",
+        "email_monthly_mis": "tinyint",
+        "mis_last_sent_month": "varchar(7)",
         "notify_lead_followups": "tinyint",
         "lead_overdue_alert_days": "tinyint unsigned",
         "chase_quotations": "tinyint",

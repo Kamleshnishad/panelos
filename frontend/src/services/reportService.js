@@ -18,4 +18,10 @@ export default {
   salesReport(params = {})   { return api('get', '/api/reports/sales', params) },
   mis(params = {})           { return api('get', '/api/reports/mis', params) },
   reconciliation(params = {}) { return api('get', '/api/reports/reconciliation', params) },
+  gstRegister(params = {})   { return api('get', '/api/reports/gst-register', params) },
+  paymentsRegister(params = {}) { return api('get', '/api/reports/payments', params) },
+  customerStatement(id, params = {}) { return api('get', `/api/reports/customer-statement/${id}`, params) },
+  tallyLedgers()             { return api('get', '/api/settings/tally-ledgers') },
+  saveTallyLedgers(data)     { return axios({ method: 'put', url: '/api/settings/tally-ledgers', data, headers: authHeaders() }).then(r => r.data) },
+  customers(search = '')     { return api('get', '/api/customers', { search, per_page: 15 }) },
 }

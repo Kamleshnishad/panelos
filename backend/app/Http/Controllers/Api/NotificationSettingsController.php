@@ -55,6 +55,7 @@ class NotificationSettingsController extends Controller
             'lead_overdue_alert_days' => 'nullable|integer|min:1|max:60',
             'admin_phone'             => 'nullable|string|max:20',
             'email_payment_reminders' => 'nullable|boolean',
+            'email_monthly_mis'       => 'nullable|boolean',
             'mail_routing'            => 'nullable|array',
             'mail_routing.*'          => 'in:main,notifications',
         ] + $this->mailboxRules('smtp_') + $this->mailboxRules('notif_smtp_'));

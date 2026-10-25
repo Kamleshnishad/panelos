@@ -100,6 +100,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import stockService from '../services/stockService.js'
+import { todayLocal, addDaysLocal } from '../services/dates.js'
 
 const rows       = ref([])
 const loading    = ref(false)
@@ -143,10 +144,8 @@ function goPage(p) { load(p) }
 
 function setQuickRange(days) {
   quickRange.value = days
-  const to   = new Date()
-  const from = new Date(Date.now() - days * 86400000)
-  filters.to_date   = to.toISOString().slice(0, 10)
-  filters.from_date = from.toISOString().slice(0, 10)
+  filters.to_date   = todayLocal()
+  filters.from_date = addDaysLocal(-days)
   load()
 }
 

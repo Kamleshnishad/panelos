@@ -17,7 +17,7 @@ class NotificationSetting extends Model
         'notify_order_confirmed', 'notify_dispatch_done',
         'notify_lead_followups', 'lead_overdue_alert_days', 'chase_quotations', 'lead_stale_days',
         'admin_phone',
-        'email_payment_reminders',
+        'email_payment_reminders', 'email_monthly_mis', 'mis_last_sent_month',
         'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password', 'smtp_from_address', 'smtp_from_name',
         'notif_smtp_enabled', 'notif_smtp_host', 'notif_smtp_port', 'notif_smtp_encryption', 'notif_smtp_username', 'notif_smtp_password', 'notif_smtp_from_address', 'notif_smtp_from_name',
         'mail_routing',
@@ -37,6 +37,7 @@ class NotificationSetting extends Model
         'lead_stale_days'        => 'integer',
         'payment_due_days_before'=> 'integer',
         'email_payment_reminders'=> 'boolean',
+        'email_monthly_mis'      => 'boolean',
         'smtp_enabled'           => 'boolean',
         'smtp_port'              => 'integer',
         'smtp_password'          => 'encrypted',   // never stored in the clear, never returned by the API
@@ -53,7 +54,7 @@ class NotificationSetting extends Model
     {
         return static::firstOrCreate(
             ['company_id' => $companyId],
-            ['sms_enabled' => false, 'whatsapp_enabled' => false, 'email_payment_reminders' => false, 'notify_lead_followups' => true, 'lead_overdue_alert_days' => 3, 'chase_quotations' => true, 'lead_stale_days' => 7]
+            ['sms_enabled' => false, 'whatsapp_enabled' => false, 'email_payment_reminders' => false, 'email_monthly_mis' => false, 'notify_lead_followups' => true, 'lead_overdue_alert_days' => 3, 'chase_quotations' => true, 'lead_stale_days' => 7]
         );
     }
 

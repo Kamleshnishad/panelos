@@ -69,6 +69,13 @@
           overdue invoice you have scheduled a reminder for. When off, nothing is sent automatically. Sending a
           reminder by hand from an invoice always works.
         </p>
+        <label class="mis-row">
+          <input type="checkbox" v-model="form.email_monthly_mis" aria-label="E-mail the monthly MIS report to the admins" />
+          <div>
+            <div class="mis-title">Monthly MIS report</div>
+            <div class="mis-sub">On the 1st of each month (about 8 am) the previous month's figures are e-mailed to every admin with an e-mail address: invoiced, money received, still unpaid, GST, orders, production and receivables. It goes out through your own mailbox below, once a month, and only when this is on and a mailbox is set up.</div>
+          </div>
+        </label>
         <div class="mail-status" :class="form.mail?.delivers ? 'ok' : 'off'" role="status">
           <span class="status-dot"></span>
           <span>{{ form.mail?.headline }}</span>
@@ -402,6 +409,10 @@ onMounted(load)
 </script>
 
 <style scoped>
+.mis-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; margin: 0 0 12px; background: var(--surface-2, #f5f7fa); border: 1px solid var(--border, #e3e6ec); border-radius: 10px; cursor: pointer; }
+.mis-row input { margin-top: 3px; }
+.mis-title { font-size: 13.5px; font-weight: 700; }
+.mis-sub { font-size: 12.5px; color: #667085; line-height: 1.5; margin-top: 2px; }
 .ns-wrap { padding: 24px 32px 48px; max-width: 900px; margin: 0 auto; }
 .ns-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; gap: 12px; }
 .ns-header h2 { margin: 0; font-size: 22px; color: var(--primary); }

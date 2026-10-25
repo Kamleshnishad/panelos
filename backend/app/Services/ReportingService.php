@@ -8,6 +8,8 @@ use App\Models\PaymentTransaction;
 use App\Models\ProductionRun;
 use App\Models\TaxCalculation;
 use App\Support\Days;
+use App\Support\InvoiceFigures;
+use App\Support\TallyLedgers;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -349,12 +351,16 @@ class ReportingService
         return $this->taxService->getTaxReport($companyId, $from_date, $to_date);
     }
 
-    /** First day of the Indian financial year (1 April) that contains $on (today by default). */
-    public static function financialYearStart(?Carbon $on = null): Carbon
+    /**
+     * First day of the financial year that contains $on (today by default). It starts on the first of the company's `financial_year_start` month
+     * (Company settings, 4 = April, the Indian default), so a company on a calendar year, or one starting in July, gets its own year.
+     */
+    public static function financialYearStart(?Carbon $on = null, int $startMonth = 4): Carbon
     {
         $on = ($on ?? now())->copy();
+        $startMonth = max(1, min(12, $startMonth));
 
-        return Carbon::create($on->month >= 4 ? $on->year : $on->year - 1, 4, 1)->startOfDay();
+        return Carbon::create($on->month >= $startMonth ? $on->year : $on->year - 1, $startMonth, 1)->startOfDay();
     }
 
     /**
@@ -365,7 +371,7 @@ class ReportingService
     {
         $companyId = $companyId ?? auth()->user()->company_id;
 
-        $fyStart = self::financialYearStart();
+        $fyStart = self::financialYearStart(null, (int) (\App\Models\Company::withoutGlobalScope('tenant')->whereKey($companyId)->value('financial_year_start') ?: 4));
         $thisMonth = now()->startOfMonth();
 
         $plStatement = $this->getProfitLossStatement($companyId, $fyStart, now());
@@ -455,7 +461,7 @@ class ReportingService
         $invoiced = Invoice::where('company_id', $companyId)
             ->whereNotIn('status', ['draft', 'cancelled'])
             ->where('invoice_date', '>=', $start)
-            ->selectRaw("DATE_FORMAT(invoice_date, '%Y-%m') as k, SUM(total_amount) as t")
+            ->selectRaw("DATE_FORMAT(invoice_date, '%Y-%m') as k, SUM(" . InvoiceFigures::TOTAL_SQL . ") as t")
             ->groupBy('k')->pluck('t', 'k');
 
         // Collected per month (by payment date, excluding write-offs)
@@ -513,7 +519,7 @@ class ReportingService
                 $byCustomer[$cid] = ['customer_id' => $cid, 'customer_name' => $cname, 'invoiced' => 0, 'paid' => 0, 'invoice_count' => 0];
             }
             $paid = (float) ($paidMap[$inv->id] ?? 0);
-            $byCustomer[$cid]['invoiced'] += (float) $inv->total_amount;
+            $byCustomer[$cid]['invoiced'] += $inv->getTotal();
             $byCustomer[$cid]['paid']     += (float) $paid;
             $byCustomer[$cid]['invoice_count']++;
         }
@@ -611,7 +617,7 @@ class ReportingService
             $oid = $inv->order_id ?: $inv->dispatch?->batch?->order_id;
             if (!$oid) continue;
             if (!isset($byOrder[$oid])) $byOrder[$oid] = ['invoiced' => 0.0, 'paid' => 0.0];
-            $byOrder[$oid]['invoiced'] += (float) $inv->total_amount;
+            $byOrder[$oid]['invoiced'] += $inv->getTotal();
             $byOrder[$oid]['paid']     += (float) $inv->payments->sum('amount');
         }
 
@@ -779,7 +785,9 @@ class ReportingService
 
         $company = $invoices->first()?->company;
 
-        $vouchers = $invoices->map(function (Invoice $inv) {
+        $ledgers = TallyLedgers::for($companyId);          // the company's own ledger names and fallback HSN (FR-010)
+
+        $vouchers = $invoices->map(function (Invoice $inv) use ($ledgers) {
             $tc       = $inv->taxCalculation;
             $customer = $inv->dispatch?->batch?->order?->customer ?? $inv->order?->customer;
             $cgst     = (float) ($tc->cgst_amount ?? 0);
@@ -805,11 +813,11 @@ class ReportingService
                 'sgst_amount'    => round($sgst, 2),
                 'igst_rate'      => $isInter ? $taxRate : 0,
                 'igst_amount'    => round($igst, 2),
-                'total_amount'   => round((float) $inv->total_amount, 2),
-                'sales_ledger'   => 'Sales @ ' . $taxRate . '%',
+                'total_amount'   => round($inv->getTotal(), 2),
+                'sales_ledger'   => TallyLedgers::salesLedger($ledgers, $taxRate),
                 'hsn_summary'    => $inv->items->map(fn ($it) => [
-                    'hsn'  => $it->panelType?->hsn_code ?? '39259010',
-                    'desc' => ($it->panelType?->name ?? 'Panel') . ($it->panelType?->thickness ? ' ' . $it->panelType->thickness . 'mm' : ''),
+                    'hsn'  => $it->panelType?->hsn_code ?: $ledgers['hsn'],
+                    'desc' => $it->panel_type_id === null ? ($it->description ?: 'Accessories & other') : (($it->panelType?->name ?? 'Panel') . ($it->panelType?->thickness ? ' ' . $it->panelType->thickness . 'mm' : '')),
                     'qty'  => (float) $it->quantity,
                     'rate' => (float) $it->unit_price,
                     'amt'  => (float) $it->amount,
@@ -826,6 +834,6 @@ class ReportingService
             'count'    => count($vouchers),
         ];
 
-        return compact('company', 'vouchers', 'totals', 'from', 'to');
+        return compact('company', 'vouchers', 'totals', 'from', 'to', 'ledgers');
     }
 }

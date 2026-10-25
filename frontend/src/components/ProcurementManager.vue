@@ -197,6 +197,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import procurementService from '../services/procurementService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 import FormInput from './Form/FormInput.vue'
+import { todayLocal } from '../services/dates.js'
 
 const pos = ref([])
 const loading = ref(false)
@@ -214,7 +215,7 @@ const saving = ref(false)
 const suggesting = ref(false)
 const createError = ref(null)
 let _k = 1
-const form = reactive({ supplier_id: null, order_date: new Date().toISOString().slice(0, 10), expected_date: '', tax_pct: 18, notes: '', items: [] })
+const form = reactive({ supplier_id: null, order_date: todayLocal(), expected_date: '', tax_pct: 18, notes: '', items: [] })
 
 const tab = ref('pos')
 const showSupplier = ref(false)
@@ -255,7 +256,7 @@ async function loadRefs() {
 }
 
 function openCreate() {
-  Object.assign(form, { supplier_id: null, order_date: new Date().toISOString().slice(0, 10), expected_date: '', tax_pct: 18, notes: '', items: [] })
+  Object.assign(form, { supplier_id: null, order_date: todayLocal(), expected_date: '', tax_pct: 18, notes: '', items: [] })
   createError.value = null
   addLine()
   showCreate.value = true
@@ -274,7 +275,7 @@ async function openReorderSuggestion() {
     const items = sug.items ?? []
     if (!items.length) { toastSuccess('All stock is above reorder level — nothing to reorder.'); return }
     Object.assign(form, {
-      supplier_id: null, order_date: new Date().toISOString().slice(0, 10), expected_date: '',
+      supplier_id: null, order_date: todayLocal(), expected_date: '',
       tax_pct: 18, notes: 'Reorder — items at/below reorder level', items: [],
     })
     items.forEach(it => {

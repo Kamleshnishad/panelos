@@ -188,6 +188,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import dispatchService from '../services/dispatchService.js'
+import { todayLocal } from '../services/dates.js'
 
 const props = defineProps({ dispatchId: { type: Number, required: true } })
 const emit  = defineEmits(['back', 'view-batch'])
@@ -203,7 +204,7 @@ const actionError   = ref(null)
 const actionSuccess = ref(null)
 const showComplete  = ref(false)
 const showCancel    = ref(false)
-const completeDate  = ref(new Date().toISOString().slice(0, 10))
+const completeDate  = ref(todayLocal())
 
 const editForm = reactive({ customer_address: '', expected_delivery_date: '', tracking_number: '',
   transporter_name: '', vehicle_no: '', transport_amount: null, notes: '' })

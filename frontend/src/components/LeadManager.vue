@@ -388,6 +388,7 @@ import LeadBulkBar from './LeadBulkBar.vue'
 import LeadBoard from './LeadBoard.vue'
 import LeadMergeDialog from './LeadMergeDialog.vue'
 import LeadMyDay from './LeadMyDay.vue'
+import { todayLocal } from '../services/dates.js'
 
 const props = defineProps({ openId: { type: Number, default: null } })
 const emit = defineEmits(['convert', 'detail', 'open-quotation', 'open-boq'])
@@ -565,7 +566,7 @@ function followClass(l) {
 const isClosed = (status) => CLOSED.includes(status)
 const statusLabel = (status) => stages.value.find(s => s.key === status)?.name ?? FIXED_NAMES[status] ?? String(status || '').replace(/_/g, ' ')
 const moveTo = (status) => transitions.value[status] || []
-const today = new Date().toISOString().slice(0, 10)
+const today = todayLocal()
 
 // Guards against out-of-order responses: switching status tabs or searching
 // quickly can let an earlier request resolve after a later one and overwrite
