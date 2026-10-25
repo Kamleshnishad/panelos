@@ -25,6 +25,11 @@ export default {
   convert(id, data = {})   { return api('post', `/api/leads/${id}/convert`, data) },
   states()                 { return api('get',  '/api/gst/states') },
 
+  // A person's own saved views of the list (LEADS_PLAN 5.1)
+  views()                  { return api('get',  '/api/leads/views') },
+  saveView(name, filters)  { return api('post', '/api/leads/views', { name, filters }) },
+  deleteView(id)           { return api('delete', `/api/leads/views/${id}`) },
+
   // Spreadsheet in and out (LEADS_PLAN 4.2)
   importCheck(file, source) {
     const form = new FormData()

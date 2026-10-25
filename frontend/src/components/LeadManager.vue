@@ -10,7 +10,7 @@
           <button :class="{ on: view === 'list' }" @click="view = 'list'">List</button>
           <button :class="{ on: view === 'insights' }" @click="showInsights">📊 Insights</button>
         </div>
-        <input v-if="view === 'list'" v-model="search" class="lm-search" placeholder="Search name / company / phone…" @keyup.enter="load" />
+        <input v-if="view === 'list'" v-model="search" class="lm-search" placeholder="Search name / company / phone / e-mail…" @keyup.enter="filterChanged" />
         <button class="btn btn-primary" @click="openCreate">+ New Lead</button>
         <button v-if="can('leads.manage')" class="btn btn-ghost" @click="importOpen = true">Import</button>
         <button v-if="can('reports.view')" class="btn btn-ghost" :disabled="exporting" @click="exportCsv">{{ exporting ? 'Exporting…' : 'Export' }}</button>
@@ -70,15 +70,48 @@
       </template>
     </div>
 
+    <!-- Views and filters (LEADS_PLAN 5.1) -->
+    <div v-if="view === 'list'" class="lm-filters" aria-label="Views and filters">
+      <div class="lm-views" role="group" aria-label="Views">
+        <button v-for="v in readyViews" :key="v.key" type="button" :class="['vchip', { on: activeView === 'r:' + v.key }]" @click="applyView(v.filters, 'r:' + v.key)">{{ v.label }}</button>
+        <span v-for="v in savedViews" :key="v.id" :class="['vchip saved', { on: activeView === 's:' + v.id }]">
+          <button type="button" class="vname" @click="applyView(v.filters, 's:' + v.id)">{{ v.name }}</button>
+          <button type="button" class="vx" :aria-label="'Delete the view ' + v.name" @click="deleteSavedView(v)">✕</button>
+        </span>
+      </div>
+      <div class="lm-controls">
+        <select v-model="fSource" aria-label="Source" @change="filterChanged"><option value="">All sources</option><option v-for="s in sources" :key="s" :value="s">{{ s }}</option></select>
+        <select v-if="!ownOnly" v-model="fAssigned" aria-label="Assigned to" @change="filterChanged">
+          <option value="">Everyone</option><option value="me">Me</option><option value="none">Unassigned</option>
+          <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
+        </select>
+        <select v-model="fFollow" aria-label="Follow-up" @change="filterChanged">
+          <option value="">Any follow-up</option><option value="overdue">Overdue</option><option value="today">Due today</option>
+          <option value="due">Due or overdue</option><option value="none">No date set</option>
+        </select>
+        <select v-model="sortKey" aria-label="Sort by" @change="filterChanged">
+          <option v-for="o in SORTS" :key="o.key" :value="o.key">{{ o.label }}</option>
+        </select>
+        <button v-if="filtersActive" class="link" type="button" @click="clearFilters">Clear filters</button>
+        <button v-if="!saveAs.open" class="btn btn-ghost" type="button" @click="saveAs.open = true; saveAs.name = ''">Save this view</button>
+        <form v-else class="lm-saveas" @submit.prevent="saveCurrentView">
+          <input v-model.trim="saveAs.name" maxlength="60" placeholder="Name this view" aria-label="Name of the view" required />
+          <button class="btn btn-primary" type="submit" :disabled="!saveAs.name">Save</button>
+          <button class="link" type="button" @click="saveAs.open = false">Cancel</button>
+        </form>
+      </div>
+    </div>
+
     <!-- Status filter tabs -->
     <div v-if="view === 'list'" class="status-tabs">
-      <button v-for="s in statusTabs" :key="s.key" :class="['stab', { active: statusFilter === s.key }]" @click="statusFilter = s.key; load()">
+      <button v-for="s in statusTabs" :key="s.key" :class="['stab', { active: statusFilter === s.key }]" @click="statusFilter = s.key; filterChanged()">
         {{ s.label }}<span v-if="counts[s.key]" class="stab-count">{{ counts[s.key] }}</span>
       </button>
     </div>
 
     <template v-if="view === 'list'">
     <div v-if="loading" class="lm-loading">Loading…</div>
+    <p v-else-if="!leads.length && (filtersActive || search)" class="empty">No leads match these filters. <button class="link" type="button" @click="clearFilters">Show everything</button></p>
     <p v-else-if="!leads.length" class="empty">No leads here. Click <strong>+ New Lead</strong> to add an inquiry.</p>
 
     <table v-else class="lead-table">
@@ -286,7 +319,8 @@ import FormInput from './Form/FormInput.vue'
 import FormSelect from './Form/FormSelect.vue'
 import LeadImportDialog from './LeadImportDialog.vue'
 
-const emit = defineEmits(['convert'])
+const props = defineProps({ openId: { type: Number, default: null } })
+const emit = defineEmits(['convert', 'detail'])
 
 // The company's own list (Master Data -> Lead lists). The fallback below only shows if the options call fails.
 const sources = ref(['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other'])
@@ -312,6 +346,82 @@ const allCount = ref({})
 const loading = ref(false)
 const search = ref('')
 const statusFilter = ref('')
+const fSource = ref('')
+const fAssigned = ref('')
+const fFollow = ref('')
+const sortKey = ref('created:desc')
+const ownOnly = ref(false)          // the role may see only the leads assigned to it: the server answers for that, the screen just hides what cannot apply
+const savedViews = ref([])
+const activeView = ref('')
+const saveAs = reactive({ open: false, name: '' })
+
+const SORTS = [
+  { key: 'created:desc', label: 'Newest first' }, { key: 'created:asc', label: 'Oldest first' }, { key: 'follow_up:asc', label: 'Follow-up soonest' },
+  { key: 'name:asc', label: 'Name A to Z' }, { key: 'updated:desc', label: 'Recently changed' },
+]
+// Ready-made views: plain filters, the same shape as a saved one. "Me" and "none" are understood by the server.
+const readyViews = computed(() => [
+  { key: 'all', label: 'All leads', filters: {} },
+  ...(ownOnly.value ? [] : [{ key: 'my', label: 'My leads', filters: { assigned_to: 'me' } }]),
+  { key: 'my_overdue', label: ownOnly.value ? 'Overdue' : 'My overdue', filters: ownOnly.value ? { follow_up: 'overdue' } : { assigned_to: 'me', follow_up: 'overdue' } },
+  { key: 'today', label: 'Due today', filters: { follow_up: 'today' } },
+  ...(sources.value.includes('IndiaMART') ? [{ key: 'indiamart', label: 'New from IndiaMART', filters: { status: 'new', source: 'IndiaMART' } }] : []),
+  ...(ownOnly.value ? [] : [{ key: 'unassigned', label: 'Unassigned', filters: { assigned_to: 'none' } }]),
+])
+
+/** What the list is asking for right now, in the shape the server and a saved view both use. */
+function currentFilters() {
+  const [sort, dir] = sortKey.value.split(':')
+  const f = { status: statusFilter.value, source: fSource.value, assigned_to: fAssigned.value, follow_up: fFollow.value, search: search.value }
+  if (sortKey.value !== 'created:desc') Object.assign(f, { sort, dir })
+  return Object.fromEntries(Object.entries(f).filter(([, v]) => v))
+}
+const sameFilters = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort())
+const filtersActive = computed(() => !!(fSource.value || fAssigned.value || fFollow.value || statusFilter.value || search.value || sortKey.value !== 'created:desc'))
+
+function setFilters(f = {}) {
+  statusFilter.value = f.status || ''
+  fSource.value = f.source || ''
+  fAssigned.value = ownOnly.value ? '' : (f.assigned_to || '')
+  fFollow.value = f.follow_up || ''
+  search.value = f.search || ''
+  sortKey.value = f.sort ? `${f.sort}:${f.dir || (['follow_up', 'name'].includes(f.sort) ? 'asc' : 'desc')}` : 'created:desc'
+}
+function applyView(f, id) { setFilters(f); activeView.value = id; remember(); load() }
+function filterChanged() { activeView.value = ''; remember(); load() }
+function clearFilters() { setFilters({}); activeView.value = 'r:all'; remember(); load() }
+
+// The last view is remembered per person on this browser; a first visit opens "My leads" for people who are not admins (the sales team), everything for admins.
+const me = (() => { try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null } })()
+const memoryKey = `leads.view.${me?.id ?? 'x'}`
+function remember() { try { const f = currentFilters(); delete f.search; localStorage.setItem(memoryKey, JSON.stringify(f)) } catch { /* private window: fine */ } }
+function restore() {
+  let f = null
+  try { f = JSON.parse(localStorage.getItem(memoryKey) || 'null') } catch { f = null }
+  if (!f || typeof f !== 'object') f = (me && !(me.is_admin || me.is_company_admin || me.is_super_admin)) ? { assigned_to: 'me' } : {}
+  setFilters(f)
+  const hit = readyViews.value.find(v => sameFilters(v.filters, currentFilters()))
+  activeView.value = hit ? 'r:' + hit.key : ''
+}
+
+async function loadViews() {
+  try { savedViews.value = (await leadService.views())?.data ?? [] } catch { savedViews.value = [] }
+}
+async function saveCurrentView() {
+  try {
+    await leadService.saveView(saveAs.name, currentFilters())
+    toastSuccess('View saved.')
+    saveAs.open = false
+    await loadViews()
+    activeView.value = 's:' + (savedViews.value.find(v => v.name === saveAs.name)?.id ?? '')
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Could not save the view.') }
+}
+async function deleteSavedView(v) {
+  const ok = await confirmDialog({ title: `Delete the view "${v.name}"?`, message: 'Only the saved view goes; no lead is touched.', confirmLabel: 'Delete', cancelLabel: 'Cancel', danger: true })
+  if (!ok) return
+  try { await leadService.deleteView(v.id); if (activeView.value === 's:' + v.id) activeView.value = ''; await loadViews() }
+  catch (e) { toastError(e?.response?.data?.message ?? 'Could not delete the view.') }
+}
 const users = ref([])
 
 const showForm = ref(false)
@@ -379,10 +489,7 @@ function can(key) {
 async function exportCsv() {
   exporting.value = true
   try {
-    const params = {}
-    if (statusFilter.value) params.status = statusFilter.value
-    if (search.value) params.search = search.value
-    await leadService.exportList(params)
+    await leadService.exportList(currentFilters())
   } catch (e) { toastError(e?.response?.data?.message ?? 'Could not export the leads.') }
   finally { exporting.value = false }
 }
@@ -392,8 +499,7 @@ async function load(page = 1) {
   loading.value = true
   try {
     const params = { page, per_page: 50 }
-    if (statusFilter.value) params.status = statusFilter.value
-    if (search.value) params.search = search.value
+    Object.assign(params, currentFilters())
     const res  = await leadService.list(params)
     if (seq !== reqSeq) return
     const body = res?.data ?? {}
@@ -610,10 +716,26 @@ async function loadOptions() {
     if (Array.isArray(o?.sources) && o.sources.length) sources.value = o.sources
     if (o?.transitions && typeof o.transitions === 'object') transitions.value = o.transitions
     if (Array.isArray(o?.lost_reasons)) lostReasons.value = o.lost_reasons
+    ownOnly.value = !!o?.own_only
   } catch { /* keep the fallback list */ }
 }
 
-onMounted(() => { load(); loadOptions() })
+// A lead's own address (/leads/12) and a search result open the lead; one that is not there, or not yours, says so instead of opening an empty drawer.
+async function openById(id) {
+  try { const res = await leadService.get(id); detail.value = res?.data ?? res }
+  catch { toastError('That lead was not found.'); emit('detail', null) }
+}
+watch(() => detail.value?.id ?? null, (id) => emit('detail', id))
+watch(() => props.openId, (id) => { if (id) openById(id); else detail.value = null })
+
+onMounted(async () => {
+  await loadOptions()
+  restore()
+  load()
+  loadViews()
+  loadUsers()                       // for the "assigned to" filter
+  if (props.openId) openById(props.openId)
+})
 </script>
 
 <style scoped>
@@ -650,6 +772,20 @@ onMounted(() => { load(); loadOptions() })
 .fu-row.red b { color: #c62828; } .fu-row.amber b { color: #b5740a; }
 @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } .ins-grid { grid-template-columns: 1fr; } }
 
+.lm-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.lm-views { display: flex; gap: 6px; flex-wrap: wrap; }
+.vchip { display: inline-flex; align-items: center; border: 1px solid #d5d9e0; background: var(--surface); color: #555; border-radius: 16px; font-size: 12.5px; font-weight: 600; padding: 0; overflow: hidden; }
+.vchip > button { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 5px 12px; }
+.vchip.saved .vname { padding-right: 6px; }
+.vchip .vx { padding: 5px 9px 5px 2px; color: #aaa; font-weight: 400; }
+.vchip .vx:hover { color: #c62828; }
+.vchip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.vchip.on .vx { color: #ffd0d0; }
+.lm-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.lm-controls select, .lm-saveas input { padding: 6px 9px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; background: var(--surface); }
+.lm-saveas { display: inline-flex; gap: 8px; align-items: center; }
+.lm-controls .link { background: none; border: 0; color: var(--primary); font-size: 12.5px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.empty .link { background: none; border: 0; color: var(--primary); font-style: normal; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .status-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 2px solid #e0e0e0; flex-wrap: wrap; }
 .stab { padding: 8px 16px; border: none; background: none; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
 .stab.active { color: var(--primary); border-bottom-color: var(--primary); }

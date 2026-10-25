@@ -134,6 +134,10 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     // Spreadsheet in and out (LEADS_PLAN 4.2). Before /leads/{id} so "export" is not read as an id.
+    // A person's own saved views of the list (LEADS_PLAN 5.1).
+    Route::get('/leads/views', [\App\Http\Controllers\Api\LeadViewController::class, 'index'])->name('leads.views.index');
+    Route::post('/leads/views', [\App\Http\Controllers\Api\LeadViewController::class, 'store'])->name('leads.views.store');
+    Route::delete('/leads/views/{id}', [\App\Http\Controllers\Api\LeadViewController::class, 'destroy'])->name('leads.views.destroy');
     Route::get('/leads/export', [\App\Http\Controllers\Api\LeadSheetController::class, 'export'])->name('leads.export');
     Route::get('/leads/import/template', [\App\Http\Controllers\Api\LeadSheetController::class, 'template'])->name('leads.import.template');
     Route::get('/leads/import/last', [\App\Http\Controllers\Api\LeadSheetController::class, 'last'])->name('leads.import.last');

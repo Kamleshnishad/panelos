@@ -551,6 +551,16 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "lead_views": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "user_id": "bigint unsigned",
+        "name": "varchar(60)",
+        "filters": "json",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
     "lead_imports": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

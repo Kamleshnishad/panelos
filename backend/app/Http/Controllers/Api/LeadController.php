@@ -25,14 +25,14 @@ class LeadController extends Controller
     public function index(Request $r)
     {
         $cid = $this->cid($r);
-        $filters = $r->only(['status', 'source', 'assigned_to', 'follow_up', 'search']);
+        $filters = $r->only(['status', 'source', 'assigned_to', 'follow_up', 'search', 'sort', 'dir']);
         $page    = (int) $r->input('page', 1);
         $perPage = (int) $r->input('per_page', 50);
 
-        $paginated = $this->leads->list($cid, $filters)->paginate($perPage, ['*'], 'page', $page);
+        $paginated = $this->leads->list($cid, $filters, $r->user())->paginate($perPage, ['*'], 'page', $page);
 
         // Per-status counts for the tabs — unfiltered, server-side (cheap groupBy). "All" leaves the junk (invalid) out; it has its own tab.
-        $byStatus = Lead::where('company_id', $cid)
+        $byStatus = $this->leads->visible($cid, $r->user())
             ->selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status');
         $counts = ['' => (int) $byStatus->except('invalid')->sum()];
         foreach ($byStatus as $st => $c) $counts[(string) $st] = (int) $c;
@@ -61,20 +61,29 @@ class LeadController extends Controller
             'sources'      => $this->lists->activeNames('source', $cid),
             'lost_reasons' => $reasons,
             'statuses'     => Lead::STATUSES,
+            'own_only'     => $r->user()->ownLeadsOnly(),      // the screen hides the filters that cannot apply to a restricted person
             'transitions'  => Lead::transitions(),     // what each status may move to: the screen offers exactly these
         ], 'Lead options');
     }
 
+    /** A lead this person may open: any of the company's, or only their own when their role is restricted (a lead of someone else is simply not found). */
+    private function mine(Request $r, int $id): Lead
+    {
+        return $this->leads->visible($this->cid($r), $r->user())->findOrFail($id);
+    }
+
     public function dashboard(Request $r)
     {
-        return $this->successResponse($this->leads->dashboard($this->cid($r)), 'Lead dashboard');
+        return $this->successResponse($this->leads->dashboard($this->cid($r), $r->user()), 'Lead dashboard');
     }
 
     public function show(Request $r, int $id)
     {
         try {
-            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $lead = $this->mine($r, $id);
             return $this->successResponse($this->leads->getDetails($lead), 'Lead retrieved');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);        // someone else's lead, another company's, or none: always the same plain answer
         } catch (\Exception $e) {
             return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);
         }
@@ -84,8 +93,10 @@ class LeadController extends Controller
     public function payloads(Request $r, int $id)
     {
         try {
-            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $lead = $this->mine($r, $id);
             return $this->successResponse($lead->payloads()->get(['id', 'source', 'external_id', 'payload', 'received_at']), 'Original messages retrieved');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);        // someone else's lead, another company's, or none: always the same plain answer
         } catch (\Exception $e) {
             return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);
         }
@@ -117,6 +128,10 @@ class LeadController extends Controller
             if ($dupes = $this->duplicatesToWarnAbout($r, $data)) {
                 return $this->duplicateResponse($dupes);
             }
+            // A restricted person would never see a lead made for nobody: it is theirs unless they chose someone else.
+            if ($r->user()->ownLeadsOnly() && empty($data['assigned_to_user_id'])) {
+                $data['assigned_to_user_id'] = $r->user()->id;
+            }
             return $this->createdResponse($this->leads->create($this->cid($r), $data), 'Lead created', 201);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
@@ -126,7 +141,7 @@ class LeadController extends Controller
     public function update(Request $r, int $id)
     {
         try {
-            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $lead = $this->mine($r, $id);
             $this->normaliseSource($r, $lead->source);
             $data = $r->validate($this->rules(true, $this->cid($r), $lead->source));
             if ($r->has('status') && $r->input('status') !== $lead->status) {
@@ -141,6 +156,8 @@ class LeadController extends Controller
             return $this->successResponse($this->leads->update($lead, $data), 'Lead updated');
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);        // someone else's lead, another company's, or none: always the same plain answer
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'UPDATE_ERROR', 400);
         }
@@ -149,7 +166,7 @@ class LeadController extends Controller
     public function changeStatus(Request $r, int $id)
     {
         try {
-            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $lead = $this->mine($r, $id);
             $data = $r->validate([
                 'status'         => ['required', Rule::in(Lead::STATUSES)],
                 'reason'         => 'nullable|string|max:500',
@@ -180,6 +197,8 @@ class LeadController extends Controller
             ], $r->user()->id), 'Status updated');
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);        // someone else's lead, another company's, or none: always the same plain answer
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'STATUS_ERROR', 400);
         }
@@ -188,7 +207,7 @@ class LeadController extends Controller
     public function addActivity(Request $r, int $id)
     {
         try {
-            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $lead = $this->mine($r, $id);
             $data = $r->validate([
                 'type'        => 'required|in:note,call,email,whatsapp,meeting',
                 'description' => 'nullable|string|max:2000',
@@ -198,6 +217,8 @@ class LeadController extends Controller
             return $this->successResponse($this->leads->getDetails($lead), 'Activity added');
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);        // someone else's lead, another company's, or none: always the same plain answer
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'ACTIVITY_ERROR', 400);
         }
@@ -207,7 +228,7 @@ class LeadController extends Controller
     public function convert(Request $r, int $id)
     {
         try {
-            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $lead = $this->mine($r, $id);
             $o = $r->validate([
                 'customer_id'   => 'nullable|integer',
                 'create_new'    => 'nullable|boolean',
@@ -222,6 +243,8 @@ class LeadController extends Controller
             return $this->errorResponse(['customers' => $e->matches], $e->getMessage(), 'CUSTOMER_EXISTS', 409);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->errors(), collect($e->errors())->flatten()->first() ?: 'Validation failed', 'VALIDATION_ERROR', 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);        // someone else's lead, another company's, or none: always the same plain answer
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'CONVERT_ERROR', 400);
         }
@@ -230,9 +253,11 @@ class LeadController extends Controller
     public function destroy(Request $r, int $id)
     {
         try {
-            $lead = Lead::where('company_id', $this->cid($r))->findOrFail($id);
+            $lead = $this->mine($r, $id);
             $this->leads->delete($lead);
             return $this->noContentResponse('Lead deleted');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return $this->errorResponse([], 'Lead not found', 'NOT_FOUND', 404);        // someone else's lead, another company's, or none: always the same plain answer
         } catch (\Exception $e) {
             return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'DELETE_ERROR', 400);
         }

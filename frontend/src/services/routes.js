@@ -1,10 +1,10 @@
-// Page addresses for the app shell (UX-01). A screen is /<section>, and a record on the four screens that open one
+// Page addresses for the app shell (UX-01). A screen is /<section>, and a record on the screens that open one
 // is /<section>/<id>, e.g. /quotations/17. The server already answers every unknown path with index.html, so a
 // refresh, a bookmark or a link pasted into a chat lands on the same screen. No router dependency: the shell keeps
 // its section keys as the route names and only mirrors them into the address bar.
 
 /** Sections whose records have their own address. */
-export const DETAIL_SECTIONS = ['quotations', 'orders', 'batches', 'dispatches', 'invoices', 'customers']
+export const DETAIL_SECTIONS = ['quotations', 'orders', 'batches', 'dispatches', 'invoices', 'customers', 'leads']
 
 export function buildPath(key, id = null) {
   if (key === 'dashboard') return '/'

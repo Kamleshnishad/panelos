@@ -3,19 +3,20 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildPath, parsePath, DETAIL_SECTIONS } from './routes.js'
 
-const KEYS = ['dashboard', 'quotations', 'orders', 'batches', 'dispatches', 'invoices', 'customers', 'company', 'superadmin']
+const KEYS = ['dashboard', 'quotations', 'orders', 'batches', 'dispatches', 'invoices', 'customers', 'leads', 'company', 'superadmin']
 
 test('the dashboard lives at the root and every other screen at /<section>', () => {
   assert.equal(buildPath('dashboard'), '/')
   assert.equal(buildPath('invoices'), '/invoices')
 })
 
-test('a record has its own address on the four screens that open one', () => {
-  assert.deepEqual(DETAIL_SECTIONS, ['quotations', 'orders', 'batches', 'dispatches', 'invoices', 'customers'])
+test('a record has its own address on the screens that open one', () => {
+  assert.deepEqual(DETAIL_SECTIONS, ['quotations', 'orders', 'batches', 'dispatches', 'invoices', 'customers', 'leads'])
   assert.equal(buildPath('quotations', 17), '/quotations/17')
   assert.equal(buildPath('dispatches', 3), '/dispatches/3')
   assert.equal(buildPath('invoices', 9), '/invoices/9')
   assert.equal(buildPath('customers', 4), '/customers/4')
+  assert.equal(buildPath('leads', 12), '/leads/12')
   assert.equal(buildPath('company', 9), '/company', 'a screen without record pages ignores the id')
 })
 

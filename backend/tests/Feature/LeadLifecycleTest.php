@@ -370,11 +370,12 @@ class LeadLifecycleTest extends TestCase
         $this->assertCount(0, $this->getJson('/api/leads')->json('data'));
         $this->assertSame(0, $this->getJson('/api/leads/dashboard')->json('data.total'));
         $this->getJson("/api/leads/{$lead->id}")->assertStatus(404);
-        $this->putJson("/api/leads/{$lead->id}", ['contact_name' => 'Hijacked'])->assertStatus(400);
-        $this->postJson("/api/leads/{$lead->id}/status", ['status' => 'won'])->assertStatus(400);
-        $this->postJson("/api/leads/{$lead->id}/activities", ['type' => 'note', 'description' => 'x'])->assertStatus(400);
-        $this->postJson("/api/leads/{$lead->id}/convert")->assertStatus(400);
-        $this->deleteJson("/api/leads/{$lead->id}")->assertStatus(400);
+        // Not found, like every other record of another company (PB-068: these used to answer 400 with the model name in the message).
+        $this->putJson("/api/leads/{$lead->id}", ['contact_name' => 'Hijacked'])->assertStatus(404);
+        $this->postJson("/api/leads/{$lead->id}/status", ['status' => 'won'])->assertStatus(404);
+        $this->postJson("/api/leads/{$lead->id}/activities", ['type' => 'note', 'description' => 'x'])->assertStatus(404);
+        $this->postJson("/api/leads/{$lead->id}/convert")->assertStatus(404);
+        $this->deleteJson("/api/leads/{$lead->id}")->assertStatus(404);
 
         $fresh = $lead->fresh();
         $this->assertSame('Ravi Patel', $fresh->contact_name);

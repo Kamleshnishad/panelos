@@ -67,7 +67,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 4.4 | Meta lead ads, Google Ads | not started |
 | 4.5 | Justdial, TradeIndia, ExportersIndia | not started |
 | 4.6 | Missed-call leads | not started |
-| 5.1 | List filters, saved views, search, address | not started |
+| 5.1 | List filters, saved views, search, address | done, local |
 | 5.2 | Next actions and my day | not started |
 | 5.3 | Call, WhatsApp, e-mail from the lead | not started |
 | 5.4 | Requirement lines and one-step quote | not started |
@@ -242,6 +242,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 ## Phase 5: working the lead
 
 - **5.1 List filters, saved views, search and address (LD-10, LX-02, LD-12, LD-08):** source, assignee, overdue filters on screen; sorting; saved and ready-made views (my overdue, due today, new from IndiaMART, unassigned); "my leads" default for sales roles and an optional own-leads-only permission; leads in the header search; `/leads/12` addresses. **M.**
+  **Result (local):** filter bar, ready-made and saved views, sort, `leads.own_only`, leads in the header search, `/leads/12`, `LeadListViewsTest` (23) and a browser run. Decisions: the own-leads restriction is a role key that is read directly (admins and `*` are never restricted); a restricted person's new lead is theirs unless they pick someone; ready-made views are plain filters, only saved ones are stored; "My leads" is the first view for anyone who is not an admin (admins open on all leads). Not built: views shared across the team (each person keeps their own), column sorting by clicking headings. Found on the way: PB-068.
 - **5.2 Next actions and my day (LP-01, LX-05):** tasks with type, due date and time, assignee, reminders; completing one prompts the next; a "my day" list. **M.**
 - **5.3 Call, WhatsApp and e-mail from the lead (LP-02):** tap-to-call, WhatsApp templates, e-mail through the company mailbox, each logged on the timeline. **M.**
 - **5.4 Requirement lines and one-step quote (LP-03, LP-04):** structured requirement (panel type, thickness, application, area, accessories) prefilling the quotation rows; "Quote this lead" creates the draft. **M.**

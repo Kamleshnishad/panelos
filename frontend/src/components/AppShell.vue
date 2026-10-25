@@ -94,7 +94,7 @@
 
       <main class="content">
         <home-dashboard        v-if="active === 'dashboard'"   @navigate="go" />
-        <lead-manager          v-else-if="active === 'leads'" @convert="onLeadConvert" />
+        <lead-manager          v-else-if="active === 'leads'" :key="navNonce" :open-id="leadOpenId" @detail="(id) => onDetail('leads', id)" @convert="onLeadConvert" />
         <customer-manager      v-else-if="active === 'customers'" :key="navNonce" :open-id="customerOpenId" @detail="(id) => onDetail('customers', id)" @open-quotation="openQuotation" @view-orders="go('orders')" />
         <quotation-manager     v-else-if="active === 'quotations'" :key="navNonce" :open-id="quotationOpenId" :prefill="quotationPrefill" @detail="(id) => onDetail('quotations', id)" @order-created="go('orders')" />
         <boq-manager           v-else-if="active === 'boq'" @open-quotation="openQuotation" />
@@ -246,6 +246,7 @@ const batchOpenId    = ref(null)
 const dispatchOpenId = ref(null)
 const invoiceOpenId  = ref(null)
 const customerOpenId = ref(null)
+const leadOpenId = ref(null)
 
 function onLeadConvert(payload) {
   quotationPrefill.value = payload   // { customer_id, lead_id }
@@ -353,6 +354,7 @@ function show(key, id = null) {
   dispatchOpenId.value   = null
   invoiceOpenId.value    = null
   customerOpenId.value   = null
+  leadOpenId.value       = null
   if (id != null) {
     const numId = typeof id === 'object' ? id?.id : id
     if (key === 'quotations') quotationOpenId.value = numId
@@ -361,6 +363,7 @@ function show(key, id = null) {
     else if (key === 'dispatches') dispatchOpenId.value = numId
     else if (key === 'invoices') invoiceOpenId.value = numId
     else if (key === 'customers') customerOpenId.value = numId
+    else if (key === 'leads') leadOpenId.value = numId
   }
   active.value = key
   mobileOpen.value = false
@@ -452,8 +455,9 @@ onMounted(async () => {
     if (p?.summary?.alert_count) badges.value = { ...badges.value, planner: p.summary.alert_count }
   } catch { /* ignore */ }
   try {
-    const due = (await leadService.list({ follow_up: 'due' }))?.data ?? []
-    if (due.length) badges.value = { ...badges.value, leads: due.length }
+    const due = await leadService.list({ follow_up: 'due', per_page: 1 })       // only the count is wanted: the total, not the first page
+    const n = due?.meta?.pagination?.total ?? (due?.data ?? []).length
+    if (n) badges.value = { ...badges.value, leads: n }
   } catch { /* ignore */ }
   try {
     const c = (await companyService.get())?.data ?? {}

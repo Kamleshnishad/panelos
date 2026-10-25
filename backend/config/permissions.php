@@ -9,6 +9,7 @@ return [
     'CRM' => [
         'leads.view'        => 'View leads',
         'leads.manage'      => 'Add / edit leads',
+        'leads.own_only'    => 'Restriction: see and work only on leads assigned to them',
         'customers.view'    => 'View customers & 360 profile',
         'customers.manage'  => 'Add / edit customers',
     ],

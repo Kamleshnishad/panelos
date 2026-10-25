@@ -5,34 +5,72 @@ namespace App\Services;
 use App\Models\Customer;
 use App\Models\Lead;
 use App\Models\LeadActivity;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class LeadService
 {
-    public function list(int $companyId, array $filters = [])
+    public const FOLLOW_UPS = ['due', 'overdue', 'today', 'none'];
+    public const SORTS = ['created', 'follow_up', 'name', 'updated'];
+
+    /** The leads a person may see: all of the company's, or only the ones assigned to them when their role carries the "own leads only" restriction (5.1). */
+    public function visible(int $companyId, ?User $viewer = null): Builder
     {
-        $q = Lead::where('company_id', $companyId)->with('assignedUser', 'customer');
+        $q = Lead::where('company_id', $companyId);
+
+        return $viewer && $viewer->ownLeadsOnly() ? $q->where('assigned_to_user_id', $viewer->id) : $q;
+    }
+
+    /**
+     * The list as the screen asks for it. Filters: status, source, assigned_to (an id, `me` or `none`), follow_up (due = today or before,
+     * overdue = before today, today, none = no date; open leads only), search (name, company, e-mail, lead no, phone in any format), sort + dir.
+     */
+    public function list(int $companyId, array $filters = [], ?User $viewer = null)
+    {
+        $q = $this->visible($companyId, $viewer)->with('assignedUser', 'customer');
 
         if (!empty($filters['status']))      $q->where('status', $filters['status']);
         else                                 $q->where('status', '!=', 'invalid');     // junk only shows when asked for
         if (!empty($filters['source']))      $q->where('source', $filters['source']);
-        if (!empty($filters['assigned_to'])) $q->where('assigned_to_user_id', $filters['assigned_to']);
-        if (!empty($filters['follow_up']) && $filters['follow_up'] === 'due') {
-            $q->whereNotNull('next_follow_up_date')
-              ->whereDate('next_follow_up_date', '<=', Carbon::today())
-              ->whereNotIn('status', Lead::CLOSED);
-        }
-        if (!empty($filters['search'])) {
-            $s = $filters['search'];
-            $q->where(fn ($w) => $w->where('contact_name', 'like', "%{$s}%")
-                ->orWhere('company_name', 'like', "%{$s}%")
-                ->orWhere('phone', 'like', "%{$s}%")
-                ->orWhere('lead_no', 'like', "%{$s}%"));
+
+        $to = $filters['assigned_to'] ?? null;
+        if ($to === 'none')                  $q->whereNull('assigned_to_user_id');
+        elseif ($to === 'me')                $q->where('assigned_to_user_id', $viewer?->id ?? 0);
+        elseif (!empty($to))                 $q->where('assigned_to_user_id', $to);
+
+        $today = Carbon::today();
+        switch ($filters['follow_up'] ?? null) {
+            case 'due':     $q->whereNotIn('status', Lead::CLOSED)->whereNotNull('next_follow_up_date')->whereDate('next_follow_up_date', '<=', $today); break;
+            case 'overdue': $q->whereNotIn('status', Lead::CLOSED)->whereNotNull('next_follow_up_date')->whereDate('next_follow_up_date', '<', $today); break;
+            case 'today':   $q->whereNotIn('status', Lead::CLOSED)->whereDate('next_follow_up_date', $today); break;
+            case 'none':    $q->whereNotIn('status', Lead::CLOSED)->whereNull('next_follow_up_date'); break;
         }
 
-        return $q->orderByDesc('created_at');
+        if (!empty($filters['search'])) {
+            $s = addcslashes(trim((string) $filters['search']), '\\%_');
+            $digits = preg_replace('/\D+/', '', (string) $filters['search']);
+            $q->where(function ($w) use ($s, $digits) {
+                $w->where('contact_name', 'like', "%{$s}%")->orWhere('company_name', 'like', "%{$s}%")
+                  ->orWhere('phone', 'like', "%{$s}%")->orWhere('lead_no', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%");
+                if (strlen($digits) >= 4) {
+                    $w->orWhere('phone_key', 'like', '%' . $digits . '%');           // "98765 43210" finds +91-9876543210
+                }
+            });
+        }
+
+        $sort = in_array($filters['sort'] ?? null, self::SORTS, true) ? $filters['sort'] : 'created';
+        $dir = in_array($filters['dir'] ?? null, ['asc', 'desc'], true) ? $filters['dir'] : (in_array($sort, ['follow_up', 'name'], true) ? 'asc' : 'desc');
+        match ($sort) {
+            'follow_up' => $q->orderByRaw('next_follow_up_date is null')->orderBy('next_follow_up_date', $dir),    // leads with no date last, whichever way
+            'name'      => $q->orderBy('contact_name', $dir),
+            'updated'   => $q->orderBy('updated_at', $dir),
+            default     => $q->orderBy('created_at', $dir),
+        };
+
+        return $q->orderByDesc('id');
     }
 
     public function getDetails(Lead $lead): Lead
@@ -451,9 +489,9 @@ class LeadService
     }
 
     /** Funnel + source conversion + follow-up + lost-reason summary. Invalid (junk) leads are counted on their own and left out of everything else. */
-    public function dashboard(int $companyId): array
+    public function dashboard(int $companyId, ?User $viewer = null): array
     {
-        $byStatus = Lead::where('company_id', $companyId)
+        $byStatus = $this->visible($companyId, $viewer)
             ->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status')->toArray();
 
         $funnelOut = [];
@@ -467,7 +505,7 @@ class LeadService
         $total = (int) array_sum($byStatus) - $invalid;
         $closed = $won + $lost;
 
-        $real = fn () => Lead::where('company_id', $companyId)->where('status', '!=', 'invalid');
+        $real = fn () => $this->visible($companyId, $viewer)->where('status', '!=', 'invalid');
 
         $bySource = $real()
             ->selectRaw('source, count(*) as total, sum(case when status = "won" then 1 else 0 end) as won')
@@ -479,14 +517,14 @@ class LeadService
                 'conv_pct' => $r->total > 0 ? round($r->won / $r->total * 100, 1) : 0,
             ]);
 
-        $lostReasons = Lead::where('company_id', $companyId)->where('status', 'lost')
+        $lostReasons = $this->visible($companyId, $viewer)->where('status', 'lost')
             ->whereNotNull('lost_reason')->where('lost_reason', '!=', '')
             ->selectRaw('lost_reason, count(*) as c')->groupBy('lost_reason')
             ->orderByDesc('c')->limit(5)->get()
             ->map(fn ($r) => ['reason' => $r->lost_reason, 'count' => (int) $r->c]);
 
         $today = Carbon::today();
-        $openFollow = Lead::where('company_id', $companyId)->whereNotIn('status', Lead::CLOSED)->whereNotNull('next_follow_up_date');
+        $openFollow = $this->visible($companyId, $viewer)->whereNotIn('status', Lead::CLOSED)->whereNotNull('next_follow_up_date');
         $overdue = (clone $openFollow)->whereDate('next_follow_up_date', '<', $today)->count();
         $dueToday = (clone $openFollow)->whereDate('next_follow_up_date', $today)->count();
         $thisWeek = (clone $openFollow)->whereDate('next_follow_up_date', '>', $today)
