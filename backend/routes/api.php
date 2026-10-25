@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AccessoryController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\QuotationController;
+use App\Http\Controllers\Api\LeadStageController;
 use App\Http\Controllers\Api\ProductionBatchController;
 use App\Http\Controllers\Api\ProductionStageController;
 use App\Http\Controllers\Api\AttachmentController;
@@ -55,6 +56,33 @@ RateLimiter::for('signup', function (Request $request) {
         Limit::perHour(5)->by($request->ip()),
         Limit::perDay(15)->by($request->ip()),
     ];
+});
+
+// Manual IndiaMART pull: 6 a minute per person. Its own limiter, because a second `throttle:N,M` on a route shares its counter key with the
+// group-wide throttle and would count every request twice.
+RateLimiter::for('lead-pull', fn (Request $request) => Limit::perMinute(6)->by('lead-pull:' . ($request->user()?->id ?? $request->ip())));
+
+// Inbound lead address (LEADS_PLAN 2.3): 60 messages a minute per token. There is deliberately no per-address limit here: behind the proxies the
+// address may be the proxy's, shared by everyone, so a limit on it would let one noisy sender block all real ones. Wrong-token guesses are
+// counted per address inside LeadInboundService instead (valid tokens never count against it).
+// Checking and running a spreadsheet are heavy: a few a minute per person is plenty.
+// E-mails and WhatsApp links written from a lead: a person sends a few a minute, not hundreds.
+// Select-many actions: a few a minute per person (each can touch up to 200 leads).
+RateLimiter::for('lead-bulk', fn (Request $request) => Limit::perMinute(10)->by('lead-bulk:' . ($request->user()?->id ?? $request->ip())));
+
+// Files put on leads: a few a minute per person is plenty.
+RateLimiter::for('lead-upload', fn (Request $request) => Limit::perMinute(20)->by('lead-upload:' . ($request->user()?->id ?? $request->ip())));
+
+RateLimiter::for('lead-contact', fn (Request $request) => Limit::perMinute(30)->by('lead-contact:' . ($request->user()?->id ?? $request->ip())));
+
+RateLimiter::for('lead-import', fn (Request $request) => Limit::perMinute(10)->by('lead-import:' . ($request->user()?->id ?? $request->ip())));
+
+RateLimiter::for('inbound-leads', function (Request $request) {
+    return Limit::perMinute(60)->by('token:' . sha1((string) $request->route('token')))->response(
+        fn (Request $r, array $headers) => response()->json(
+            ['success' => false, 'error_code' => 'RATE_LIMITED', 'message' => 'Too many messages. Wait a minute and try again.'], 429, $headers
+        )
+    );
 });
 
 // Publicly-readable uploaded files (logos, product images). The path goes
@@ -115,14 +143,84 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
 
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
+    // Spreadsheet in and out (LEADS_PLAN 4.2). Before /leads/{id} so "export" is not read as an id.
+    // Many leads at once, and merging two (LEADS_PLAN 5.8).
+    Route::post('/leads/bulk', [\App\Http\Controllers\Api\LeadBulkController::class, 'run'])->middleware('throttle:lead-bulk')->name('leads.bulk');
+    Route::get('/leads/{id}/merge-candidates', [\App\Http\Controllers\Api\LeadMergeController::class, 'candidates'])->name('leads.merge.candidates');
+    Route::post('/leads/{id}/merge', [\App\Http\Controllers\Api\LeadMergeController::class, 'merge'])->name('leads.merge');
+    // Files on a lead (LEADS_PLAN 5.7). Before /leads/{id}: "attachments" must not be read as an id.
+    Route::get('/leads/attachments/{id}', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'download'])->name('leads.attachments.download');
+    Route::delete('/leads/attachments/{id}', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'destroy'])->name('leads.attachments.destroy');
+    Route::get('/leads/{id}/attachments', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'index'])->name('leads.attachments.index');
+    Route::post('/leads/{id}/attachments', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'store'])->middleware('throttle:lead-upload')->name('leads.attachments.store');
+    // What a lead wants, and "Quote this lead" (LEADS_PLAN 5.4). Calls the quotation module, never changes it.
+    Route::get('/leads/{id}/requirement', [\App\Http\Controllers\Api\LeadRequirementController::class, 'show'])->name('leads.requirement.show');
+    Route::put('/leads/{id}/requirement', [\App\Http\Controllers\Api\LeadRequirementController::class, 'save'])->name('leads.requirement.save');
+    Route::post('/leads/{id}/quote', [\App\Http\Controllers\Api\LeadRequirementController::class, 'quote'])->name('leads.requirement.quote');
+    // Contacting a lead from its screen (LEADS_PLAN 5.3).
+    Route::get('/leads/{id}/message-templates', [\App\Http\Controllers\Api\LeadMessageController::class, 'templates'])->name('leads.messages.templates');
+    Route::post('/leads/{id}/whatsapp', [\App\Http\Controllers\Api\LeadMessageController::class, 'whatsapp'])->middleware('throttle:lead-contact')->name('leads.messages.whatsapp');
+    Route::post('/leads/{id}/email', [\App\Http\Controllers\Api\LeadMessageController::class, 'email'])->middleware('throttle:lead-contact')->name('leads.messages.email');
+    // Next actions (LEADS_PLAN 5.2). Before /leads/{id}: "tasks" must not be read as an id.
+    Route::get('/leads/tasks', [\App\Http\Controllers\Api\LeadTaskController::class, 'index'])->name('leads.tasks.index');
+    Route::put('/leads/tasks/{id}', [\App\Http\Controllers\Api\LeadTaskController::class, 'update'])->name('leads.tasks.update');
+    Route::post('/leads/tasks/{id}/complete', [\App\Http\Controllers\Api\LeadTaskController::class, 'complete'])->name('leads.tasks.complete');
+    Route::delete('/leads/tasks/{id}', [\App\Http\Controllers\Api\LeadTaskController::class, 'destroy'])->name('leads.tasks.destroy');
+    Route::get('/leads/{id}/tasks', [\App\Http\Controllers\Api\LeadTaskController::class, 'forLead'])->name('leads.tasks.for_lead');
+    Route::post('/leads/{id}/tasks', [\App\Http\Controllers\Api\LeadTaskController::class, 'store'])->name('leads.tasks.store');
+    // A person's own saved views of the list (LEADS_PLAN 5.1).
+    Route::get('/leads/views', [\App\Http\Controllers\Api\LeadViewController::class, 'index'])->name('leads.views.index');
+    Route::post('/leads/views', [\App\Http\Controllers\Api\LeadViewController::class, 'store'])->name('leads.views.store');
+    Route::delete('/leads/views/{id}', [\App\Http\Controllers\Api\LeadViewController::class, 'destroy'])->name('leads.views.destroy');
+    Route::get('/leads/export', [\App\Http\Controllers\Api\LeadSheetController::class, 'export'])->name('leads.export');
+    Route::get('/leads/import/template', [\App\Http\Controllers\Api\LeadSheetController::class, 'template'])->name('leads.import.template');
+    Route::get('/leads/import/last', [\App\Http\Controllers\Api\LeadSheetController::class, 'last'])->name('leads.import.last');
+    Route::post('/leads/import/preview', [\App\Http\Controllers\Api\LeadSheetController::class, 'preview'])->middleware('throttle:lead-import')->name('leads.import.preview');
+    Route::post('/leads/import/{id}/commit', [\App\Http\Controllers\Api\LeadSheetController::class, 'commit'])->middleware('throttle:lead-import')->name('leads.import.commit');
+    Route::post('/leads/import/{id}/undo', [\App\Http\Controllers\Api\LeadSheetController::class, 'undo'])->name('leads.import.undo');
+    Route::get('/leads/board', [\App\Http\Controllers\Api\LeadController::class, 'board'])->name('leads.board');
     Route::get('/leads/dashboard', [\App\Http\Controllers\Api\LeadController::class, 'dashboard'])->name('leads.dashboard');
+    Route::get('/leads/options', [\App\Http\Controllers\Api\LeadController::class, 'options'])->name('leads.options');
     Route::post('/leads', [\App\Http\Controllers\Api\LeadController::class, 'store'])->name('leads.store');
     Route::get('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'show'])->name('leads.show');
+    Route::get('/leads/{id}/payloads', [\App\Http\Controllers\Api\LeadController::class, 'payloads'])->name('leads.payloads');
     Route::put('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'update'])->name('leads.update');
     Route::post('/leads/{id}/status', [\App\Http\Controllers\Api\LeadController::class, 'changeStatus'])->name('leads.status');
     Route::post('/leads/{id}/activities', [\App\Http\Controllers\Api\LeadController::class, 'addActivity'])->name('leads.activities');
     Route::post('/leads/{id}/convert', [\App\Http\Controllers\Api\LeadController::class, 'convert'])->name('leads.convert');
     Route::delete('/leads/{id}', [\App\Http\Controllers\Api\LeadController::class, 'destroy'])->name('leads.destroy');
+
+    // The company's lead lists (sources, lost reasons). /settings is read-open and write-guarded by settings.manage.
+    Route::get('/settings/lead-lists', [\App\Http\Controllers\Api\LeadListController::class, 'index'])->name('leadlists.index');
+    Route::get('/settings/lead-inbound-tokens', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'index'])->name('leadinbound.index');
+    Route::post('/settings/lead-inbound-tokens', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'store'])->name('leadinbound.store');
+    Route::put('/settings/lead-inbound-tokens/{id}', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'update'])->name('leadinbound.update');
+    Route::post('/settings/lead-inbound-tokens/{id}/regenerate', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'regenerate'])->name('leadinbound.regenerate');
+    Route::delete('/settings/lead-inbound-tokens/{id}', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'destroy'])->name('leadinbound.destroy');
+    Route::get('/settings/lead-import-logs', [\App\Http\Controllers\Api\LeadInboundTokenController::class, 'logs'])->name('leadinbound.logs');
+    Route::get('/settings/lead-stages', [LeadStageController::class, 'index'])->name('leadstages.index');
+    Route::post('/settings/lead-stages', [LeadStageController::class, 'store'])->name('leadstages.store');
+    Route::put('/settings/lead-stages/order', [LeadStageController::class, 'reorder'])->name('leadstages.order');
+    Route::put('/settings/lead-stages/{id}', [LeadStageController::class, 'update'])->name('leadstages.update');
+    Route::delete('/settings/lead-stages/{id}', [LeadStageController::class, 'destroy'])->name('leadstages.destroy');
+    Route::get('/settings/lead-message-templates', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'index'])->name('leadmsg.index');
+    Route::post('/settings/lead-message-templates', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'store'])->name('leadmsg.store');
+    Route::put('/settings/lead-message-templates/{id}', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'update'])->name('leadmsg.update');
+    Route::delete('/settings/lead-message-templates/{id}', [\App\Http\Controllers\Api\LeadMessageTemplateController::class, 'destroy'])->name('leadmsg.destroy');
+    Route::get('/settings/lead-assignment-rules', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'index'])->name('leadassign.index');
+    Route::post('/settings/lead-assignment-rules', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'store'])->name('leadassign.store');
+    Route::put('/settings/lead-assignment-rules/{id}', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'update'])->name('leadassign.update');
+    Route::delete('/settings/lead-assignment-rules/{id}', [\App\Http\Controllers\Api\LeadAssignmentRuleController::class, 'destroy'])->name('leadassign.destroy');
+    Route::get('/settings/lead-connectors/indiamart', [\App\Http\Controllers\Api\LeadConnectorController::class, 'showIndiaMart'])->name('leadconn.indiamart.show');
+    Route::put('/settings/lead-connectors/indiamart', [\App\Http\Controllers\Api\LeadConnectorController::class, 'updateIndiaMart'])->name('leadconn.indiamart.update');
+    Route::post('/settings/lead-connectors/indiamart/pull', [\App\Http\Controllers\Api\LeadConnectorController::class, 'pullIndiaMart'])->middleware('throttle:lead-pull')->name('leadconn.indiamart.pull');
+    Route::post('/settings/lead-connectors/indiamart/test', [\App\Http\Controllers\Api\LeadConnectorController::class, 'testIndiaMart'])->name('leadconn.indiamart.test');
+    Route::post('/settings/lead-sources', [\App\Http\Controllers\Api\LeadListController::class, 'storeSource'])->name('leadlists.sources.store');
+    Route::put('/settings/lead-sources/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'updateSource'])->name('leadlists.sources.update');
+    Route::delete('/settings/lead-sources/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'destroySource'])->name('leadlists.sources.destroy');
+    Route::post('/settings/lead-lost-reasons', [\App\Http\Controllers\Api\LeadListController::class, 'storeReason'])->name('leadlists.reasons.store');
+    Route::put('/settings/lead-lost-reasons/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'updateReason'])->name('leadlists.reasons.update');
+    Route::delete('/settings/lead-lost-reasons/{id}', [\App\Http\Controllers\Api\LeadListController::class, 'destroyReason'])->name('leadlists.reasons.destroy');
 
     // Customer Management
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
@@ -474,6 +572,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
 });
 
 // Public routes
+// Enquiries from outside (website form, partners): no login, the token in the address is the credential. See LeadInboundService.
+Route::post('/inbound/leads/{token}', [\App\Http\Controllers\Api\InboundLeadController::class, 'store'])
+    ->middleware('throttle:inbound-leads')->name('inbound.leads');
 Route::post('/webhooks/stripe', [PaymentController::class, 'handleStripeWebhook'])->name('webhooks.stripe');
 Route::post('/webhooks/razorpay', [\App\Http\Controllers\Api\BillingController::class, 'webhook'])->name('billing.webhook');
 

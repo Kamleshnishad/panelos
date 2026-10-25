@@ -135,8 +135,8 @@ class TwoMailboxesTest extends TestCase
         $this->save($this->main() + $this->notifications())->assertOk();
 
         $res = $this->getJson('/api/settings/notifications')->assertOk();
-        $this->assertSame(['invoice' => 'main', 'payment_reminder' => 'notifications', 'payment_receipt' => 'notifications'], $res->json('data.mail_routing'), 'Sensible defaults until the admin chooses.');
-        $this->assertSame(['invoice', 'payment_reminder', 'payment_receipt'], array_column($res->json('data.mail_types'), 'type'));
+        $this->assertSame(['invoice' => 'main', 'payment_reminder' => 'notifications', 'payment_receipt' => 'notifications', 'lead_message' => 'main'], $res->json('data.mail_routing'), 'Sensible defaults until the admin chooses.');
+        $this->assertSame(['invoice', 'payment_reminder', 'payment_receipt', 'lead_message'], array_column($res->json('data.mail_types'), 'type'));
 
         // The admin sends reminders through the main mailbox too.
         $this->save(['mail_routing' => ['payment_reminder' => 'main']])->assertOk();

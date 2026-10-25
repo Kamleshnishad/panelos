@@ -46,6 +46,11 @@ Schedule::command('notifications:scan')
     ->hourly()
     ->withoutOverlapping(10);
 
+// IndiaMART enquiries into Leads every ten minutes (they ask for 10 to 15, and refuse more than one request in 5). Only companies that switched it on.
+Schedule::command('leads:pull-indiamart')
+    ->everyTenMinutes()
+    ->withoutOverlapping(9);
+
 // Nightly database backup, retaining the last 14 dumps.
 Schedule::command('db:backup --keep=14')
     ->dailyAt('01:30')

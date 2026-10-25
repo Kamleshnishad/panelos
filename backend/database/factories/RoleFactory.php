@@ -14,7 +14,8 @@ class RoleFactory extends Factory
     {
         return [
             'company_id' => Company::factory(),
-            'name' => $this->faker->jobTitle(),
+            // Role names are unique per company, and a test often makes two (the user factory makes one of its own): a random job title alone collides now and then (PB-070).
+            'name' => $this->faker->jobTitle() . ' ' . strtoupper(\Illuminate\Support\Str::random(5)),
             'guard_name' => 'web',
             'permissions' => ['*.view'],
             'description' => $this->faker->sentence(),

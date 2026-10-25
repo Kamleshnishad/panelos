@@ -97,6 +97,20 @@ class User extends Authenticatable
         return in_array('*', $perms, true) || in_array($key, $perms, true);
     }
 
+    /**
+     * Does this person's role carry the restriction "see and work only on leads assigned to them" (LEADS_PLAN 5.1)? Read from the role itself, not
+     * through hasPermission(): that answers yes to everything for admins and for a "*" role, and a restriction must not.
+     */
+    public function ownLeadsOnly(): bool
+    {
+        if ($this->isAdmin()) {
+            return false;
+        }
+        $perms = $this->effectivePermissions();
+
+        return !in_array('*', $perms, true) && in_array('leads.own_only', $perms, true);
+    }
+
     /** Gate for cost / margin / valuation fields. */
     public function canViewCost(): bool
     {

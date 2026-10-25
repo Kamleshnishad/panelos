@@ -36,6 +36,7 @@ class GlobalSearchService
             ['orders', 'Orders', 'orders.view', fn () => $this->orders($like, $cid)],
             ['invoices', 'Invoices', 'invoices.view', fn () => $this->invoices($like, $cid)],
             ['customers', 'Customers', 'customers.view', fn () => $this->customers($like, $cid)],
+            ['leads', 'Leads', 'leads.view', fn () => $this->leads($like, $cid, $user)],
             ['batches', 'Production batches', 'production.view', fn () => $this->batches($like, $cid)],
             ['dispatches', 'Dispatches', 'dispatch.view', fn () => $this->dispatches($like, $cid)],
         ];
@@ -112,6 +113,24 @@ class GlobalSearchService
                 ->orWhere('email', 'like', $like)->orWhere('gstin', 'like', $like)->orWhere('city', 'like', $like))
             ->orderBy('name')->limit(self::PER_GROUP)->get()
             ->map(fn ($c) => $this->item($c->id, $c->name, [$c->code, $c->city], [$c->phone]))
+            ->all();
+    }
+
+    /** Name, company, lead number, e-mail or phone. A person restricted to their own leads finds only those. */
+    private function leads(string $like, int $cid, User $user): array
+    {
+        $q = app(LeadService::class)->visible($cid, $user);
+        $digits = preg_replace('/\D+/', '', str_replace('%', '', $like));
+
+        return $q->where(function ($w) use ($like, $digits) {
+                $w->where('lead_no', 'like', $like)->orWhere('contact_name', 'like', $like)->orWhere('company_name', 'like', $like)
+                  ->orWhere('phone', 'like', $like)->orWhere('email', 'like', $like);
+                if (strlen($digits) >= 4) {
+                    $w->orWhere('phone_key', 'like', '%' . $digits . '%');
+                }
+            })
+            ->where('status', '!=', 'invalid')->orderByDesc('id')->limit(self::PER_GROUP)->get()
+            ->map(fn ($l) => $this->item($l->id, $l->lead_no . ' ' . $l->contact_name, [$l->company_name, $l->city], [$this->status($l->status), $l->source]))
             ->all();
     }
 

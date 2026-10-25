@@ -9,7 +9,7 @@ class LeadActivity extends BaseModel
     use SoftDeletes;
 
     protected $fillable = [
-        'company_id', 'lead_id', 'user_id', 'type', 'description', 'activity_date',
+        'company_id', 'lead_id', 'user_id', 'type', 'from_status', 'to_status', 'description', 'activity_date',
     ];
 
     protected $casts = [

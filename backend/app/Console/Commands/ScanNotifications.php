@@ -30,6 +30,8 @@ class ScanNotifications extends Command
 
         $pruned = AppNotification::withoutGlobalScope('tenant')
             ->where('read_at', '<', now()->subDays(30))->delete();
+        app(\App\Services\LeadInboundService::class)->pruneLogs();      // inbound lead log rows older than 90 days
+        app(\App\Services\LeadImportService::class)->prune();             // spreadsheet checks nobody imported, after two days
         $this->info("Scan complete; pruned {$pruned} old read notification(s).");
 
         return 0;
@@ -73,5 +75,40 @@ class ScanNotifications extends Command
                 'severity' => 'danger',
             ],
         ] : []);
+
+        // Lead follow-ups due or overdue (LEADS_PLAN 1.7). A problem here must not stop the other scans.
+        try {
+            app(\App\Services\LeadReminderService::class)->sync($companyId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        // Open leads nobody has touched for N days (LEADS_PLAN 5.6).
+        try {
+            app(\App\Services\LeadStaleService::class)->sync($companyId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        // Sent quotations are chased with next actions (LEADS_PLAN 5.5), before the reminders so a step due today rings in this run.
+        try {
+            app(\App\Services\QuotationChaseService::class)->sync($companyId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        // Next actions due or overdue (LEADS_PLAN 5.2).
+        try {
+            app(\App\Services\LeadTaskReminderService::class)->sync($companyId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        // IndiaMART link health (LEADS_PLAN 3.3): key refused, nothing pulled for an hour, key about to go idle.
+        try {
+            app(\App\Services\LeadConnectorHealth::class)->sync($companyId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

@@ -41,14 +41,14 @@ class AppNotificationService
 
     /**
      * Make the set of standing notifications of one type match `$items`
-     * (dedupe key => [title, body, section, link_id, severity]): add or refresh
+     * (dedupe key => [title, body, section, link_id, severity, to]): `to` overrides the recipients for that one item. Add or refresh
      * the ones present, remove the ones whose condition has cleared.
      */
     public function syncStanding(int $companyId, string|array $to, string $type, array $items): void
     {
         try {
             foreach ($items as $key => $i) {
-                $this->notify($companyId, $to, $type, $i['title'], $i['body'] ?? null,
+                $this->notify($companyId, $i['to'] ?? $to, $type, $i['title'], $i['body'] ?? null,
                     $i['section'] ?? null, $i['link_id'] ?? null, $i['severity'] ?? 'warning', (string) $key);
             }
             AppNotification::withoutGlobalScope('tenant')

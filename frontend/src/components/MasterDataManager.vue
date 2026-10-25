@@ -7,6 +7,10 @@
       <button :class="['md-tab', { active: tab === 'stages' }]"      @click="tab = 'stages'">Production Stages</button>
       <button :class="['md-tab', { active: tab === 'tax' }]"         @click="tab = 'tax'">Tax / GST</button>
       <button :class="['md-tab', { active: tab === 'gst' }]"         @click="tab = 'gst'">GST Compliance</button>
+      <button :class="['md-tab', { active: tab === 'leadlists' }]"   @click="tab = 'leadlists'">Lead lists</button>
+      <button :class="['md-tab', { active: tab === 'leadintake' }]"  @click="tab = 'leadintake'">Lead intake</button>
+      <button :class="['md-tab', { active: tab === 'leadmessages' }]" @click="tab = 'leadmessages'">Lead messages</button>
+      <button :class="['md-tab', { active: tab === 'leadstages' }]"   @click="tab = 'leadstages'">Lead stages</button>
     </div>
 
     <panel-type-master       v-if="tab === 'panels'" />
@@ -14,6 +18,10 @@
     <production-stage-master  v-else-if="tab === 'stages'" />
     <tax-configuration       v-else-if="tab === 'tax'" />
     <gst-config-manager      v-else-if="tab === 'gst'" />
+    <lead-lists-settings     v-else-if="tab === 'leadlists'" />
+    <lead-inbound-settings   v-else-if="tab === 'leadintake'"><india-mart-settings /><lead-assignment-settings /></lead-inbound-settings>
+    <lead-message-settings   v-else-if="tab === 'leadmessages'" />
+    <lead-stage-settings     v-else-if="tab === 'leadstages'" />
   </div>
 </template>
 
@@ -24,6 +32,12 @@ import AccessoryMaster       from './AccessoryMaster.vue'
 import ProductionStageMaster from './ProductionStageMaster.vue'
 import TaxConfiguration      from './TaxConfiguration.vue'
 import GstConfigManager      from './GstConfigManager.vue'
+import LeadListsSettings     from './LeadListsSettings.vue'
+import LeadInboundSettings   from './LeadInboundSettings.vue'
+import LeadMessageSettings   from './LeadMessageSettings.vue'
+import LeadStageSettings     from './LeadStageSettings.vue'
+import LeadAssignmentSettings from './LeadAssignmentSettings.vue'
+import IndiaMartSettings from './IndiaMartSettings.vue'
 
 const tab = ref('panels')
 </script>

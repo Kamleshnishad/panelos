@@ -34,6 +34,24 @@ class Customer extends BaseModel
         'is_active',
     ];
 
+    /**
+     * The next free customer code for a company: the first four letters of the name plus a number that counts up (RAVI101, RAVI102...).
+     * It used to be the letters plus a random 3-digit number, which collides after a few hundred customers and then fails on the
+     * unique (company_id, code) index. Callers should still retry once on a unique-key error: two requests can ask at the same moment.
+     */
+    public static function nextCode(int $companyId, string $name): string
+    {
+        $prefix = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $name), 0, 4)) ?: 'CUST';
+        $max = 100;
+        foreach (static::withoutGlobalScope('tenant')->withTrashed()->where('company_id', $companyId)->where('code', 'like', $prefix . '%')->pluck('code') as $code) {
+            if (preg_match('/^' . preg_quote($prefix, '/') . '(\d+)$/', (string) $code, $m)) {
+                $max = max($max, (int) $m[1]);
+            }
+        }
+
+        return $prefix . ($max + 1);
+    }
+
     protected $appends = ['derived_state_code'];
 
     protected $casts = [

@@ -8,13 +8,20 @@
       <div class="lm-head-actions">
         <div class="view-toggle">
           <button :class="{ on: view === 'list' }" @click="view = 'list'">List</button>
+          <button :class="{ on: view === 'board' }" @click="view = 'board'">Board</button>
+          <button :class="{ on: view === 'myday' }" @click="view = 'myday'">My day<span v-if="dayCount" class="vbadge">{{ dayCount }}</span></button>
           <button :class="{ on: view === 'insights' }" @click="showInsights">📊 Insights</button>
         </div>
-        <input v-if="view === 'list'" v-model="search" class="lm-search" placeholder="Search name / company / phone…" @keyup.enter="load" />
+        <input v-if="view === 'list' || view === 'board'" v-model="search" class="lm-search" placeholder="Search name / company / phone / e-mail…" @keyup.enter="filterChanged" />
         <button class="btn btn-primary" @click="openCreate">+ New Lead</button>
+        <button v-if="can('leads.manage')" class="btn btn-ghost" @click="importOpen = true">Import</button>
+        <button v-if="can('reports.view')" class="btn btn-ghost" :disabled="exporting" @click="exportCsv">{{ exporting ? 'Exporting…' : 'Export' }}</button>
         <button class="btn btn-ghost" :disabled="loading" @click="load">↻</button>
       </div>
     </div>
+
+    <!-- My day: the next actions due, in three buckets (LEADS_PLAN 5.2) -->
+    <lead-my-day v-if="view === 'myday'" ref="myDay" :users="users" :own-only="ownOnly" @open-lead="openFromDay" @changed="load()" @counted="n => dayCount = n" />
 
     <!-- Insights dashboard -->
     <div v-if="view === 'insights'" class="insights">
@@ -26,13 +33,17 @@
           <div class="kpi"><label>Won</label><span class="green">{{ dash.won }}</span></div>
           <div class="kpi"><label>Lost</label><span class="red">{{ dash.lost }}</span></div>
           <div class="kpi"><label>Win Rate</label><span>{{ dash.win_rate }}%</span></div>
+          <div class="kpi"><label>On hold</label><span>{{ dash.on_hold || 0 }}</span></div>
+        </div>
+        <div v-if="dash.temperature" class="temp-row" aria-label="Open leads by temperature">
+          <button v-for="t in ['hot', 'warm', 'cold']" :key="t" type="button" class="temp-tile" :class="t" @click="showView({ temperature: t, sort: 'score', dir: 'desc' })"><span>{{ dash.temperature[t] }}</span> {{ t }} leads</button>
         </div>
 
         <div class="ins-grid">
           <div class="ins-card">
             <h4>Funnel</h4>
             <div v-for="f in dash.funnel" :key="f.status" class="funnel-row">
-              <span class="funnel-label" :class="f.status">{{ f.status }}</span>
+              <span class="funnel-label" :class="f.status" :title="f.name || f.status">{{ f.name || f.status }}</span>
               <div class="funnel-bar-track"><div class="funnel-bar" :class="f.status" :style="{ width: barPct(f.count) + '%' }"></div></div>
               <span class="funnel-count">{{ f.count }}</span>
             </div>
@@ -58,6 +69,14 @@
             <div class="fu-row"><span>Next 7 days</span><b>{{ dash.follow_ups.this_week }}</b></div>
           </div>
 
+          <div v-if="dash.response" class="ins-card" aria-label="Response time">
+            <h4>Response time <small class="muted">last 30 days</small></h4>
+            <div class="fu-row"><span>Average first response</span><b>{{ dash.response.avg_minutes == null ? '—' : fmtMins(dash.response.avg_minutes) }}</b></div>
+            <div class="fu-row"><span>Answered within an hour</span><b>{{ dash.response.within_hour_pct == null ? '—' : dash.response.within_hour_pct + '%' }}</b></div>
+            <div class="fu-row amber"><span>Waiting for a first response</span><b><button class="ins-link" type="button" :disabled="!dash.response.waiting" @click="showView({ unanswered: '1' })">{{ dash.response.waiting }}</button></b></div>
+            <div class="fu-row red"><span>Quiet for {{ dash.response.quiet_days }}+ days</span><b><button class="ins-link" type="button" :disabled="!dash.response.quiet" @click="showView({ quiet: '1' })">{{ dash.response.quiet }}</button></b></div>
+          </div>
+
           <div class="ins-card">
             <h4>Top Lost Reasons</h4>
             <div v-for="r in dash.lost_reasons" :key="r.reason" class="lr-row"><span>{{ r.reason }}</span><b>{{ r.count }}</b></div>
@@ -67,29 +86,74 @@
       </template>
     </div>
 
+    <!-- Views and filters (LEADS_PLAN 5.1) -->
+    <div v-if="view === 'list' || view === 'board'" class="lm-filters" aria-label="Views and filters">
+      <div class="lm-views" role="group" aria-label="Views">
+        <button v-for="v in readyViews" :key="v.key" type="button" :class="['vchip', { on: activeView === 'r:' + v.key }]" @click="applyView(v.filters, 'r:' + v.key)">{{ v.label }}</button>
+        <span v-for="v in savedViews" :key="v.id" :class="['vchip saved', { on: activeView === 's:' + v.id }]">
+          <button type="button" class="vname" @click="applyView(v.filters, 's:' + v.id)">{{ v.name }}</button>
+          <button type="button" class="vx" :aria-label="'Delete the view ' + v.name" @click="deleteSavedView(v)">✕</button>
+        </span>
+      </div>
+      <div class="lm-controls">
+        <select v-model="fSource" aria-label="Source" @change="filterChanged"><option value="">All sources</option><option v-for="s in sources" :key="s" :value="s">{{ s }}</option></select>
+        <select v-if="!ownOnly" v-model="fAssigned" aria-label="Assigned to" @change="filterChanged">
+          <option value="">Everyone</option><option value="me">Me</option><option value="none">Unassigned</option>
+          <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
+        </select>
+        <select v-model="fFollow" aria-label="Follow-up" @change="filterChanged">
+          <option value="">Any follow-up</option><option value="overdue">Overdue</option><option value="today">Due today</option>
+          <option value="due">Due or overdue</option><option value="none">No date set</option>
+        </select>
+        <select v-model="fTemp" aria-label="Temperature" @change="filterChanged"><option value="">Any temperature</option><option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option></select>
+        <select v-model="sortKey" aria-label="Sort by" @change="filterChanged">
+          <option v-for="o in SORTS" :key="o.key" :value="o.key">{{ o.label }}</option>
+        </select>
+        <button v-if="filtersActive" class="link" type="button" @click="clearFilters">Clear filters</button>
+        <button v-if="!saveAs.open" class="btn btn-ghost" type="button" @click="saveAs.open = true; saveAs.name = ''">Save this view</button>
+        <form v-else class="lm-saveas" @submit.prevent="saveCurrentView">
+          <input v-model.trim="saveAs.name" maxlength="60" placeholder="Name this view" aria-label="Name of the view" required />
+          <button class="btn btn-primary" type="submit" :disabled="!saveAs.name">Save</button>
+          <button class="link" type="button" @click="saveAs.open = false">Cancel</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- The board: one column per stage (LEADS_PLAN 5.8). The same filters as the list; its status tabs do not apply. -->
+    <lead-board v-if="view === 'board'" ref="board" :filters="boardFilters" :quiet-days="quietDays" @open="openDetail" @move="onBoardMove" @open-list="showStage" />
+
     <!-- Status filter tabs -->
     <div v-if="view === 'list'" class="status-tabs">
-      <button v-for="s in statusTabs" :key="s.key" :class="['stab', { active: statusFilter === s.key }]" @click="statusFilter = s.key; load()">
+      <button v-for="s in statusTabs" :key="s.key" :class="['stab', { active: statusFilter === s.key }]" @click="statusFilter = s.key; filterChanged()">
         {{ s.label }}<span v-if="counts[s.key]" class="stab-count">{{ counts[s.key] }}</span>
       </button>
     </div>
 
     <template v-if="view === 'list'">
+    <lead-bulk-bar v-if="view === 'list' && canManage && selected.length" :ids="selected" :users="users" :stages="stages" @clear="selected = []" @done="onBulkDone" />
     <div v-if="loading" class="lm-loading">Loading…</div>
+    <p v-else-if="!leads.length && (filtersActive || search)" class="empty">No leads match these filters. <button class="link" type="button" @click="clearFilters">Show everything</button></p>
     <p v-else-if="!leads.length" class="empty">No leads here. Click <strong>+ New Lead</strong> to add an inquiry.</p>
 
     <table v-else class="lead-table">
       <thead>
-        <tr><th>Lead</th><th>Contact</th><th>Source</th><th>Requirement</th><th>Follow-up</th><th>Status</th></tr>
+        <tr>
+          <th v-if="canManage" class="sel-col"><input type="checkbox" :checked="allSelected" :indeterminate.prop="someSelected && !allSelected" aria-label="Select every lead on this page" @change="toggleAll($event.target.checked)" /></th>
+          <th>Lead</th><th>Contact</th><th>Source</th><th>Requirement</th><th>Follow-up</th><th>Status</th>
+        </tr>
       </thead>
       <tbody>
-        <tr v-for="l in leads" :key="l.id" class="lead-row" tabindex="0" role="button" @click="openDetail(l)" @keyup.enter="openDetail(l)">
+        <tr v-for="l in leads" :key="l.id" class="lead-row" :class="{ picked: selected.includes(l.id) }" tabindex="0" role="button" @click="openDetail(l)" @keyup.enter="openDetail(l)">
+          <td v-if="canManage" class="sel-col" @click.stop><input type="checkbox" :checked="selected.includes(l.id)" :aria-label="'Select ' + l.lead_no" @change="toggle(l.id, $event.target.checked)" /></td>
           <td class="mono">{{ l.lead_no }}</td>
           <td><div class="bold">{{ l.contact_name }}</div><div class="muted">{{ l.company_name || l.phone || '—' }}</div></td>
           <td><span class="src-badge">{{ l.source }}</span></td>
           <td class="req">{{ l.requirement || '—' }}</td>
-          <td :class="followClass(l)">{{ l.next_follow_up_date ? fmtDate(l.next_follow_up_date) : '—' }}</td>
-          <td><span class="status-badge" :class="l.status">{{ l.status }}</span></td>
+          <td :class="followClass(l)">{{ l.next_follow_up_date ? fmtDate(l.next_follow_up_date) : '—' }}
+            <span v-if="l.quiet_days != null && l.quiet_days >= quietDays" class="eng-chip quiet" :title="'Nobody has touched this lead for ' + l.quiet_days + ' days'">quiet {{ l.quiet_days }} d</span>
+            <span v-else-if="l.response_waiting_minutes != null && l.response_waiting_minutes >= 60" class="eng-chip wait" title="Nobody has responded yet">waiting {{ fmtMins(l.response_waiting_minutes) }}</span>
+          </td>
+          <td><span class="status-badge" :class="l.status">{{ statusLabel(l.status) }}</span><span v-if="l.temperature" class="temp" :class="l.temperature" :title="'Score ' + l.score + ' of 100'">{{ l.temperature }}</span></td>
         </tr>
       </tbody>
     </table>
@@ -99,6 +163,60 @@
       <button class="pg-btn" :disabled="pagination.current_page >= pagination.last_page" @click="goPage(pagination.current_page + 1)">Next →</button>
     </div>
     </template>
+
+    <lead-merge-dialog v-if="mergeOpen && detail" :lead="detail" @close="mergeOpen = false" @merged="onMerged" />
+    <lead-import-dialog v-if="importOpen" @close="importOpen = false" @changed="load()" />
+
+    <!-- Hold / junk / lost / reopen: the moves that need a date or a reason -->
+    <div v-if="sd.open" class="modal-overlay sd-overlay" @click.self="sd.open = false">
+      <div class="modal-box">
+        <div class="modal-header"><h3>{{ sd.title }}</h3><button class="btn-close" @click="sd.open = false">✕</button></div>
+        <div class="form-grid one">
+          <div v-if="sd.isLost && lostReasons.length" class="form-group"><label for="sd-lost">Reason *</label>
+            <select id="sd-lost" v-model="sd.lostReasonId" class="sd-input"><option value="">Choose a reason…</option><option v-for="r in lostReasons" :key="r.id" :value="r.id">{{ r.name }}</option></select>
+          </div>
+          <div v-if="sd.needsDate" class="form-group"><label for="sd-date">Comes back on *</label><input id="sd-date" v-model="sd.hold_until" type="date" :min="today" class="sd-input" /></div>
+          <div class="form-group"><label for="sd-reason">{{ sd.reasonLabel }}</label><input id="sd-reason" v-model="sd.reason" type="text" maxlength="500" class="sd-input" /></div>
+        </div>
+        <p v-if="sd.error" class="sd-error">{{ sd.error }}</p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" @click="sd.open = false">Cancel</button>
+          <button class="btn btn-primary" :disabled="busy" @click="submitStatusDialog">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Convert: the customer's state, and the look-alike customers if there are any -->
+    <div v-if="cv.open" class="modal-overlay sd-overlay" @click.self="cv.open = false">
+      <div class="modal-box">
+        <div class="modal-header"><h3>Convert to quotation</h3><button class="btn-close" @click="cv.open = false">✕</button></div>
+        <template v-if="!cv.matches.length">
+          <p class="cv-note">A customer is created from this lead. The state decides whether the quotation charges CGST + SGST or IGST.</p>
+          <div class="form-grid one">
+            <div class="form-group"><label for="cv-state">State *</label>
+              <select id="cv-state" v-model="cv.state_code" class="sd-input"><option value="">Choose a state…</option><option v-for="(name, code) in states" :key="code" :value="code">{{ name }}</option></select>
+            </div>
+            <div class="form-group"><label for="cv-gstin">GSTIN (optional, fills the state)</label><input id="cv-gstin" v-model="cv.gstin" type="text" maxlength="15" class="sd-input" /></div>
+            <div class="form-group"><label for="cv-address">Address (optional)</label><input id="cv-address" v-model="cv.address_line1" type="text" maxlength="255" class="sd-input" /></div>
+          </div>
+        </template>
+        <template v-else>
+          <p class="cv-note"><strong>This buyer looks like a customer you already have.</strong> Use that customer, or create a new one.</p>
+          <ul class="cv-matches">
+            <li v-for="m in cv.matches" :key="m.id">
+              <span><strong>{{ m.name }}</strong> ({{ m.code }})<span v-if="m.city"> · {{ m.city }}</span> · same {{ m.matched_on.join(' and ') }}</span>
+              <button class="btn btn-primary sm" :disabled="cv.busy" @click="submitConvert({ customer_id: m.id })">Use this customer</button>
+            </li>
+          </ul>
+        </template>
+        <p v-if="cv.error" class="sd-error">{{ cv.error }}</p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" @click="cv.open = false">Cancel</button>
+          <button v-if="cv.matches.length" class="btn btn-ghost" :disabled="cv.busy" @click="cv.matches = []; cv.create_new = true">None of these: create a new customer</button>
+          <button v-else class="btn btn-primary" :disabled="cv.busy" @click="submitConvert()">{{ cv.busy ? 'Working…' : 'Convert' }}</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Create / Edit modal -->
     <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
@@ -126,9 +244,19 @@
           <div class="form-group full"><label>Notes</label><FormInput v-model="form.notes" name="notes" :rules="[{ maxLength: 1000 }]" /></div>
         </div>
         <div v-if="formError" class="error-msg">{{ formError }}</div>
+        <div v-if="dupes.length" class="dup-box" role="alert">
+          <strong>This looks like a buyer you already have:</strong>
+          <ul>
+            <li v-for="d in dupes" :key="d.id">
+              <a href="#" @click.prevent="openDuplicate(d)">{{ d.lead_no }}</a> — {{ d.contact_name }}<span v-if="d.company_name">, {{ d.company_name }}</span>
+              · {{ statusLabel(d.status) }}<span v-if="d.assigned_to"> · {{ d.assigned_to }}</span> · same {{ d.matched_on.join(' and ') }}
+            </li>
+          </ul>
+          <span class="dup-hint">Open it, or save this one anyway.</span>
+        </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" @click="showForm = false">Cancel</button>
-          <button class="btn btn-primary" :disabled="saving || !form.contact_name" @click="save">{{ saving ? 'Saving…' : (form.id ? 'Save' : 'Create Lead') }}</button>
+          <button class="btn btn-primary" :disabled="saving || !form.contact_name" @click="save">{{ saving ? 'Saving…' : (dupes.length ? (form.id ? 'Save anyway' : 'Create anyway') : (form.id ? 'Save' : 'Create Lead')) }}</button>
         </div>
       </div>
     </div>
@@ -145,7 +273,14 @@
           <button class="btn-close" @click="detail = null">✕</button>
         </div>
 
-        <span class="status-badge big" :class="detail.status">{{ detail.status }}</span>
+        <span class="status-badge big" :class="detail.status">{{ statusLabel(detail.status) }}</span>
+
+        <div v-if="detail.score_detail" class="score-box" aria-label="Lead score">
+          <div class="score-head"><span class="temp big" :class="detail.temperature">{{ detail.temperature }}</span><b>{{ detail.score_detail.score }}</b><small>out of 100</small></div>
+          <ul>
+            <li v-for="p in detail.score_detail.parts" :key="p.key"><span class="sc-l">{{ p.label }}</span><span class="sc-why">{{ p.why }}</span><b>{{ p.points }}<small>/{{ p.max }}</small></b></li>
+          </ul>
+        </div>
 
         <div class="d-fields">
           <div><label>Phone</label><span>{{ detail.phone || '—' }}</span></div>
@@ -159,15 +294,28 @@
           <div :class="followClass(detail)"><label>Follow-up</label><span>{{ detail.next_follow_up_date ? fmtDate(detail.next_follow_up_date) : '—' }}</span></div>
         </div>
         <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
-        <div class="d-req" v-if="detail.lost_reason"><label>Lost reason</label><p>{{ detail.lost_reason }}</p></div>
+        <p v-if="engagementLine" class="eng-line" :class="engagementLine.tone" data-testid="engagement">{{ engagementLine.text }}</p>
+        <lead-contact-bar :lead="detail" @changed="onActionsChanged" />
+        <lead-requirement :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :busy="busy" @changed="onActionsChanged" @quote="startQuote" />
+        <lead-attachments :lead-id="detail.id" @changed="onActionsChanged" />
+        <lead-next-actions :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :users="users" @changed="onActionsChanged" />
+        <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.landing_page || detail.first_seen_at">
+          <label>Where it came from</label>
+          <p>{{ detail.source }}<template v-if="detail.external_id"> · ref {{ detail.external_id }}</template><template v-if="detail.campaign"> · {{ detail.campaign }}</template><template v-if="utmText"> · {{ utmText }}</template><template v-if="detail.landing_page"> · page {{ detail.landing_page }}</template><template v-if="detail.first_seen_at"> · first seen {{ fmtDateTime(detail.first_seen_at) }}</template></p>
+          <button class="link-btn" @click="togglePayload">{{ rawMsg.open ? 'Hide' : 'Show' }} original message</button>
+          <p v-if="rawMsg.open && !rawMsg.items.length" class="tl-empty">{{ rawMsg.loading ? 'Loading…' : 'No original message was kept.' }}</p>
+          <pre v-for="m in (rawMsg.open ? rawMsg.items : [])" :key="m.id" class="raw-msg">{{ JSON.stringify(m.payload, null, 2) }}</pre>
+        </div>
+        <div class="d-req" v-if="detail.lost_reason"><label>Lost reason</label><p>{{ detail.lost_reason }}<template v-if="detail.lost_note"> — {{ detail.lost_note }}</template></p></div>
 
         <div class="d-section">
           <label class="d-label">Move to</label>
           <div class="status-actions">
-            <button v-for="s in moveTo(detail.status)" :key="s" class="btn btn-status sm" :disabled="busy" @click="setStatus(detail, s)">{{ s }}</button>
-            <button v-if="detail.status !== 'lost' && detail.status !== 'won'" class="btn btn-danger sm" :disabled="busy" @click="markLost(detail)">Lost</button>
+            <button v-for="s in moveTo(detail.status)" :key="s" :class="['btn', 'sm', s === 'lost' ? 'btn-danger' : 'btn-status']" :disabled="busy" @click="setStatus(detail, s)">{{ isClosed(detail.status) ? 'Reopen as ' + statusLabel(s) : statusLabel(s) }}</button>
           </div>
-          <button v-if="!['won','lost'].includes(detail.status)" class="btn btn-convert" :disabled="busy" @click="convertLead(detail)">
+          <p v-if="detail.status === 'on_hold'" class="conv-note">On hold until {{ fmtDate(detail.next_follow_up_date) }}.</p>
+          <button v-if="!isClosed(detail.status) && canManage" class="btn btn-ghost sm merge-btn" type="button" @click="mergeOpen = true">Merge another lead into this one…</button>
+          <button v-if="!isClosed(detail.status)" class="btn btn-convert" :disabled="busy" @click="convertLead(detail)">
             → Convert to Quotation
           </button>
           <p v-if="detail.quotation_id" class="conv-note">✓ Quotation #{{ detail.quotation_id }} linked</p>
@@ -206,26 +354,151 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import leadService from '../services/leadService.js'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
+import leadService, { LEAD_APPLICATIONS } from '../services/leadService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 import FormInput from './Form/FormInput.vue'
 import FormSelect from './Form/FormSelect.vue'
+import LeadImportDialog from './LeadImportDialog.vue'
+import LeadNextActions from './LeadNextActions.vue'
+import LeadContactBar from './LeadContactBar.vue'
+import LeadRequirement from './LeadRequirement.vue'
+import LeadAttachments from './LeadAttachments.vue'
+import LeadBulkBar from './LeadBulkBar.vue'
+import LeadBoard from './LeadBoard.vue'
+import LeadMergeDialog from './LeadMergeDialog.vue'
+import LeadMyDay from './LeadMyDay.vue'
 
-const emit = defineEmits(['convert'])
+const props = defineProps({ openId: { type: Number, default: null } })
+const emit = defineEmits(['convert', 'detail', 'open-quotation', 'open-boq'])
 
-const sources = ['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other']
-const applications = ['Wall', 'Roof', 'Cold Room', 'Partition', 'Clean Room', 'Ceiling', 'PEB Shade', 'Architectural']
-const statusTabs = [
-  { key: '', label: 'All' }, { key: 'new', label: 'New' }, { key: 'contacted', label: 'Contacted' },
-  { key: 'qualified', label: 'Qualified' }, { key: 'quoted', label: 'Quoted' }, { key: 'won', label: 'Won' }, { key: 'lost', label: 'Lost' },
-]
+// The company's own list (Master Data -> Lead lists). The fallback below only shows if the options call fails.
+const sources = ref(['Website', 'Phone', 'WhatsApp', 'Referral', 'IndiaMART', 'Justdial', 'Exhibition', 'Walk-in', 'Other'])
+const applications = LEAD_APPLICATIONS
+// The open stages are the company's own (Master Data -> Lead stages); the options call replaces this starter set. On hold, won, lost and invalid are fixed.
+const FIXED_NAMES = { on_hold: 'On hold', won: 'Won', lost: 'Lost', invalid: 'Invalid' }
+const stages = ref([{ key: 'new', name: 'New' }, { key: 'contacted', name: 'Contacted' }, { key: 'qualified', name: 'Qualified' }, { key: 'quoted', name: 'Quoted' }])
+const statusTabs = computed(() => [
+  { key: '', label: 'All' }, ...stages.value.map(s => ({ key: s.key, label: s.name })), ...Object.entries(FIXED_NAMES).map(([key, label]) => ({ key, label })),
+])
+const CLOSED = ['won', 'lost', 'invalid']
+// What each status may move to. The server sends the real table with the options; this is only the fallback.
+const transitions = ref({
+  new: ['contacted', 'qualified', 'quoted', 'on_hold', 'won', 'lost', 'invalid'],
+  contacted: ['new', 'qualified', 'quoted', 'on_hold', 'won', 'lost', 'invalid'],
+  qualified: ['new', 'contacted', 'quoted', 'on_hold', 'won', 'lost', 'invalid'],
+  quoted: ['new', 'contacted', 'qualified', 'on_hold', 'won', 'lost', 'invalid'],
+  on_hold: ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost', 'invalid'],
+  won: ['new', 'contacted', 'qualified', 'quoted'], lost: ['new', 'contacted', 'qualified', 'quoted'], invalid: ['new', 'contacted', 'qualified', 'quoted'],
+})
 
 const leads = ref([])
 const allCount = ref({})
 const loading = ref(false)
 const search = ref('')
 const statusFilter = ref('')
+const fSource = ref('')
+const fAssigned = ref('')
+const fFollow = ref('')
+const fQuiet = ref('')
+const fUnanswered = ref('')
+const fTemp = ref('')              // hot, warm or cold: from the score (LeadScoring)
+const quietDays = ref(7)           // the company's setting, from the options
+const sortKey = ref('created:desc')
+const ownOnly = ref(false)          // the role may see only the leads assigned to it: the server answers for that, the screen just hides what cannot apply
+const savedViews = ref([])
+const activeView = ref('')
+const saveAs = reactive({ open: false, name: '' })
+
+const SORTS = [
+  { key: 'created:desc', label: 'Newest first' }, { key: 'created:asc', label: 'Oldest first' }, { key: 'follow_up:asc', label: 'Follow-up soonest' },
+  { key: 'score:desc', label: 'Hottest first' }, { key: 'name:asc', label: 'Name A to Z' }, { key: 'updated:desc', label: 'Recently changed' },
+]
+// Ready-made views: plain filters, the same shape as a saved one. "Me" and "none" are understood by the server.
+const readyViews = computed(() => [
+  { key: 'all', label: 'All leads', filters: {} },
+  ...(ownOnly.value ? [] : [{ key: 'my', label: 'My leads', filters: { assigned_to: 'me' } }]),
+  { key: 'my_overdue', label: ownOnly.value ? 'Overdue' : 'My overdue', filters: ownOnly.value ? { follow_up: 'overdue' } : { assigned_to: 'me', follow_up: 'overdue' } },
+  { key: 'today', label: 'Due today', filters: { follow_up: 'today' } },
+  ...(sources.value.includes('IndiaMART') ? [{ key: 'indiamart', label: 'New from IndiaMART', filters: { status: 'new', source: 'IndiaMART' } }] : []),
+  ...(ownOnly.value ? [] : [{ key: 'unassigned', label: 'Unassigned', filters: { assigned_to: 'none' } }]),
+  { key: 'unanswered', label: 'Waiting for a reply', filters: { unanswered: '1' } },
+  { key: 'hot', label: 'Hot leads', filters: { temperature: 'hot', sort: 'score', dir: 'desc' } },
+  { key: 'quiet', label: 'Quiet leads', filters: { quiet: '1' } },
+])
+
+/** What the list is asking for right now, in the shape the server and a saved view both use. */
+function currentFilters() {
+  const [sort, dir] = sortKey.value.split(':')
+  const f = { status: statusFilter.value, source: fSource.value, assigned_to: fAssigned.value, follow_up: fFollow.value, search: search.value, quiet: fQuiet.value, unanswered: fUnanswered.value, temperature: fTemp.value }
+  if (sortKey.value !== 'created:desc') Object.assign(f, { sort, dir })
+  return Object.fromEntries(Object.entries(f).filter(([, v]) => v))
+}
+const sameFilters = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort())
+const filtersActive = computed(() => !!(fSource.value || fAssigned.value || fFollow.value || fQuiet.value || fUnanswered.value || fTemp.value || statusFilter.value || search.value || sortKey.value !== 'created:desc'))
+
+function setFilters(f = {}) {
+  statusFilter.value = f.status || ''
+  fSource.value = f.source || ''
+  fAssigned.value = ownOnly.value ? '' : (f.assigned_to || '')
+  fFollow.value = f.follow_up || ''
+  fQuiet.value = f.quiet || ''
+  fUnanswered.value = f.unanswered || ''
+  fTemp.value = f.temperature || ''
+  search.value = f.search || ''
+  sortKey.value = f.sort ? `${f.sort}:${f.dir || (['follow_up', 'name'].includes(f.sort) ? 'asc' : 'desc')}` : 'created:desc'
+}
+const fmtMins = (m) => m < 120 ? `${m} min` : m < 2880 ? `${(m / 60).toFixed(1).replace(/\.0$/, '')} h` : `${Math.round(m / 1440)} d`
+/** From the insights: show the leads behind a number. */
+function showView(f) { view.value = 'list'; applyView(f, '') }
+
+/** One line in the drawer: how fast it was first answered, or how long it has waited; and how long it has been quiet. */
+const engagementLine = computed(() => {
+  const d = detail.value
+  if (!d || d.response_minutes === undefined) return null
+  if (d.response_minutes != null) {
+    const quiet = d.quiet_days != null && d.quiet_days >= quietDays.value
+    return { text: `First response ${fmtMins(d.response_minutes)} after it arrived.` + (quiet ? ` Quiet for ${d.quiet_days} days.` : ''), tone: quiet ? 'bad' : 'ok' }
+  }
+  if (d.response_waiting_minutes != null) return { text: `Nobody has responded yet: waiting ${fmtMins(d.response_waiting_minutes)}.`, tone: d.response_waiting_minutes >= 60 ? 'bad' : 'warn' }
+  return null
+})
+
+function applyView(f, id) { setFilters(f); activeView.value = id; remember(); load() }
+function filterChanged() { activeView.value = ''; remember(); load() }
+function clearFilters() { setFilters({}); activeView.value = 'r:all'; remember(); load() }
+
+// The last view is remembered per person on this browser; a first visit opens "My leads" for people who are not admins (the sales team), everything for admins.
+const me = (() => { try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null } })()
+const memoryKey = `leads.view.${me?.id ?? 'x'}`
+function remember() { try { const f = currentFilters(); delete f.search; localStorage.setItem(memoryKey, JSON.stringify(f)) } catch { /* private window: fine */ } }
+function restore() {
+  let f = null
+  try { f = JSON.parse(localStorage.getItem(memoryKey) || 'null') } catch { f = null }
+  if (!f || typeof f !== 'object') f = (me && !(me.is_admin || me.is_company_admin || me.is_super_admin)) ? { assigned_to: 'me' } : {}
+  setFilters(f)
+  const hit = readyViews.value.find(v => sameFilters(v.filters, currentFilters()))
+  activeView.value = hit ? 'r:' + hit.key : ''
+}
+
+async function loadViews() {
+  try { savedViews.value = (await leadService.views())?.data ?? [] } catch { savedViews.value = [] }
+}
+async function saveCurrentView() {
+  try {
+    await leadService.saveView(saveAs.name, currentFilters())
+    toastSuccess('View saved.')
+    saveAs.open = false
+    await loadViews()
+    activeView.value = 's:' + (savedViews.value.find(v => v.name === saveAs.name)?.id ?? '')
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Could not save the view.') }
+}
+async function deleteSavedView(v) {
+  const ok = await confirmDialog({ title: `Delete the view "${v.name}"?`, message: 'Only the saved view goes; no lead is touched.', confirmLabel: 'Delete', cancelLabel: 'Cancel', danger: true })
+  if (!ok) return
+  try { await leadService.deleteView(v.id); if (activeView.value === 's:' + v.id) activeView.value = ''; await loadViews() }
+  catch (e) { toastError(e?.response?.data?.message ?? 'Could not delete the view.') }
+}
 const users = ref([])
 
 const showForm = ref(false)
@@ -239,6 +512,8 @@ const actForm = reactive({ type: 'note', description: '' })
 const actBusy = ref(false)
 
 const view = ref('list')
+const dayCount = ref(0)
+const myDay = ref(null)
 const dash = ref(null)
 const dashLoading = ref(false)
 
@@ -261,28 +536,72 @@ function fmt(n) { return Number(n || 0).toLocaleString('en-IN', { maximumFractio
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '—' }
 function fmtDateTime(d) { return d ? new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—' }
 function followClass(l) {
-  if (!l.next_follow_up_date || ['won', 'lost'].includes(l.status)) return ''
+  if (!l.next_follow_up_date || CLOSED.includes(l.status)) return ''
   const days = Math.ceil((new Date(l.next_follow_up_date) - new Date().setHours(0, 0, 0, 0)) / 86400000)
   if (days < 0) return 'follow-over'
   if (days === 0) return 'follow-today'
   return ''
 }
-function moveTo(status) {
-  const flow = { new: ['contacted'], contacted: ['qualified'], qualified: ['quoted'], quoted: ['won'] }
-  return flow[status] || []
-}
+const isClosed = (status) => CLOSED.includes(status)
+const statusLabel = (status) => stages.value.find(s => s.key === status)?.name ?? FIXED_NAMES[status] ?? String(status || '').replace(/_/g, ' ')
+const moveTo = (status) => transitions.value[status] || []
+const today = new Date().toISOString().slice(0, 10)
 
 // Guards against out-of-order responses: switching status tabs or searching
 // quickly can let an earlier request resolve after a later one and overwrite
 // the table with stale data (MD8).
 let reqSeq = 0
+const importOpen = ref(false)
+const mergeOpen = ref(false)
+const board = ref(null)
+/** The list's filters for the board: its status tabs and sort do not apply (the columns are the statuses). */
+const boardFilters = computed(() => { const { status, sort, dir, ...rest } = currentFilters(); return rest })
+const direct = computed(() => stages.value.map(s => s.key))     // moves that need nothing more (any open stage); hold, lost and junk ask their question first
+async function onBoardMove({ lead, to }) {
+  if (!direct.value.includes(to)) return setStatus(lead, to)
+  try { await leadService.changeStatus(lead.id, { status: to }); toastSuccess(`${lead.lead_no} moved to ${statusLabel(to)}.`) }
+  catch (e) { toastError(e?.response?.data?.message ?? 'That move did not work.') }
+  board.value?.load()
+}
+/** "+ N more" on a column: the list, on that stage. */
+function showStage(status) { statusFilter.value = status; view.value = 'list'; filterChanged() }
+const selected = ref([])                                  // ids ticked on the list, for the bulk bar (LEADS_PLAN 5.8)
+const canManage = can('leads.manage')
+const allSelected = computed(() => leads.value.length > 0 && leads.value.every(l => selected.value.includes(l.id)))
+const someSelected = computed(() => selected.value.length > 0)
+const toggle = (id, on) => { selected.value = on ? [...new Set([...selected.value, id])] : selected.value.filter(x => x !== id) }
+const toggleAll = (on) => { selected.value = on ? [...new Set([...selected.value, ...leads.value.map(l => l.id)])] : selected.value.filter(id => !leads.value.some(l => l.id === id)) }
+/** The bar did its work: show the new state; the bar keeps its result (and what was skipped) until the selection is cleared. */
+async function onBulkDone() { await load(pagination.current_page); myDay.value?.load?.() }
+/** Two leads became one: the drawer shows the merged lead and the list loses the other. */
+async function onMerged() { mergeOpen.value = false; await onActionsChanged() }
+const exporting = ref(false)
+
+/** Same rule as the menu: company admins can do everything, others need the key. */
+function can(key) {
+  let u = null
+  try { u = JSON.parse(localStorage.getItem('user') || 'null') } catch { /* no user */ }
+  if (!u) return false
+  if (u.is_admin || u.is_company_admin || u.is_super_admin) return true
+  const p = u.permissions || []
+  return p.includes('*') || p.includes(key)
+}
+
+/** What is on screen (the status tab and the search box) as a spreadsheet. */
+async function exportCsv() {
+  exporting.value = true
+  try {
+    await leadService.exportList(currentFilters())
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Could not export the leads.') }
+  finally { exporting.value = false }
+}
+
 async function load(page = 1) {
   const seq = ++reqSeq
   loading.value = true
   try {
     const params = { page, per_page: 50 }
-    if (statusFilter.value) params.status = statusFilter.value
-    if (search.value) params.search = search.value
+    Object.assign(params, currentFilters())
     const res  = await leadService.list(params)
     if (seq !== reqSeq) return
     const body = res?.data ?? {}
@@ -311,6 +630,7 @@ async function loadUsers() {
 function openCreate() {
   Object.assign(form, { id: null, contact_name: '', company_name: '', phone: '', email: '', city: '', source: 'Other', application: '', assigned_to_user_id: null, est_qty_sqm: null, est_value: null, next_follow_up_date: '', requirement: '', notes: '' })
   formError.value = null
+  dupes.value = []
   showForm.value = true
   if (!users.value.length) loadUsers()
 }
@@ -323,26 +643,53 @@ function openEdit(l) {
     next_follow_up_date: l.next_follow_up_date ? String(l.next_follow_up_date).slice(0, 10) : '', requirement: l.requirement || '', notes: l.notes || '',
   })
   formError.value = null
+  dupes.value = []
   detail.value = null
   showForm.value = true
   if (!users.value.length) loadUsers()
+}
+
+// Same phone or e-mail as a lead that already exists: shown in the form until the buyer chooses to open it or save anyway.
+const dupes = ref([])
+watch(() => [form.phone, form.email], () => { dupes.value = [] })
+
+function openDuplicate(d) {
+  showForm.value = false
+  dupes.value = []
+  openDetail({ id: d.id })
 }
 
 async function save() {
   saving.value = true; formError.value = null
   try {
     const payload = { ...form }; delete payload.id
+    if (dupes.value.length) payload.allow_duplicate = true      // they have seen the matches and chose to go on
     if (form.id) await leadService.update(form.id, payload)
     else await leadService.create(payload)
     toastSuccess(form.id ? 'Lead updated.' : 'Lead created.')
     showForm.value = false
     await load()
   } catch (e) {
-    formError.value = e?.response?.data?.message ?? Object.values(e?.response?.data?.errors ?? {}).flat().join(' ') ?? 'Failed to save lead.'
+    const body = e?.response?.data
+    if (e?.response?.status === 409 && body?.error_code === 'DUPLICATE_LEAD') { dupes.value = body.errors?.duplicates ?? []; return }
+    formError.value = body?.message ?? Object.values(body?.errors ?? {}).flat().join(' ') ?? 'Failed to save lead.'
   } finally { saving.value = false }
 }
 
+// Campaign / UTM line and the raw message of an imported lead (kept out of the normal view; support reads it here)
+const utmText = computed(() => ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].map(k => detail.value?.[k]).filter(Boolean).join(' / '))
+const rawMsg = reactive({ open: false, loading: false, items: [] })
+async function togglePayload() {
+  rawMsg.open = !rawMsg.open
+  if (!rawMsg.open || rawMsg.items.length) return
+  rawMsg.loading = true
+  try { const r = await leadService.payloads(detail.value.id); rawMsg.items = r?.data ?? [] }
+  catch { rawMsg.items = [] }
+  finally { rawMsg.loading = false }
+}
+
 async function openDetail(l) {
+  Object.assign(rawMsg, { open: false, loading: false, items: [] })
   Object.assign(actForm, { type: 'note', description: '' })
   try { const res = await leadService.get(l.id); detail.value = res?.data ?? res }
   catch { detail.value = l }
@@ -359,45 +706,126 @@ async function addActivity() {
   finally { actBusy.value = false }
 }
 
-async function setStatus(l, status) {
+const sd = reactive({ open: false, lead: null, to: '', title: '', needsDate: false, isLost: false, lostReasonId: '', reasonLabel: '', reasonRequired: false, hold_until: '', reason: '', error: '' })
+const lostReasons = ref([])   // the company's list (Master Data -> Lead lists), from the options call
+
+async function sendStatus(l, payload, done) {
   busy.value = true
   try {
-    await leadService.changeStatus(l.id, { status })
-    toastSuccess(`Moved to ${status}.`)
-    const res = await leadService.get(l.id); detail.value = res?.data ?? res
+    await leadService.changeStatus(l.id, payload)
+    toastSuccess(done)
+    if (detail.value) { const res = await leadService.get(l.id); detail.value = res?.data ?? res }       // the drawer only if it was open (not when a card was moved on the board)
     await load()
-  } catch (e) { toastError(e?.response?.data?.message ?? 'Failed.') }
-  finally { busy.value = false }
+    board.value?.load?.()
+    return true
+  } catch (e) {
+    const msg = e?.response?.data?.message ?? 'Failed.'
+    if (sd.open) sd.error = msg; else toastError(msg)
+    return false
+  } finally { busy.value = false }
 }
 
-async function markLost(l) {
-  const reason = window.prompt('Reason for marking lost? (optional)')
-  if (reason === null) return
-  busy.value = true
-  try {
-    await leadService.changeStatus(l.id, { status: 'lost', lost_reason: reason || null })
-    toastSuccess('Marked lost.')
-    const res = await leadService.get(l.id); detail.value = res?.data ?? res
-    await load()
-  } catch (e) { toastError('Failed.') }
-  finally { busy.value = false }
-}
-
-async function convertLead(l) {
-  const ok = await confirmDialog({
-    title: 'Convert to Quotation?',
-    message: 'A customer will be created/linked from this lead and a new quotation opened. The lead will move to "quoted" on save.',
-    confirmLabel: 'Convert', cancelLabel: 'Cancel',
+function setStatus(l, to) {
+  if (to === 'lost') return markLost(l)
+  const reopen = isClosed(l.status)
+  if (!reopen && to !== 'on_hold' && to !== 'invalid') return sendStatus(l, { status: to }, `Moved to ${statusLabel(to)}.`)
+  Object.assign(sd, {
+    open: true, lead: l, to, error: '', reason: '', hold_until: '', isLost: false, lostReasonId: '',
+    needsDate: !reopen && to === 'on_hold',
+    reasonRequired: reopen,
+    title: reopen ? `Reopen as ${statusLabel(to)}` : to === 'on_hold' ? 'Put on hold' : 'Mark as invalid',
+    reasonLabel: reopen ? 'Why are you reopening this lead? *' : to === 'on_hold' ? 'Note (optional)' : 'Why is it invalid? (spam, wrong number...)',
   })
-  if (!ok) return
+}
+
+async function submitStatusDialog() {
+  sd.error = ''
+  if (sd.needsDate && !sd.hold_until) { sd.error = 'Choose the date this lead comes back.'; return }
+  if (sd.reasonRequired && !sd.reason.trim()) { sd.error = 'Say why you are reopening this lead.'; return }
+  if (sd.isLost && lostReasons.value.length && !sd.lostReasonId) { sd.error = 'Choose why this lead was lost.'; return }
+  const payload = { status: sd.to, reason: sd.reason.trim() || null }
+  if (sd.isLost) {
+    delete payload.reason
+    if (lostReasons.value.length) { payload.lost_reason_id = Number(sd.lostReasonId); payload.lost_note = sd.reason.trim() || null }
+    else payload.lost_reason = sd.reason.trim() || null          // the options call failed: free text still works
+  }
+  if (sd.needsDate) payload.hold_until = sd.hold_until
+  if (await sendStatus(sd.lead, payload, `Moved to ${statusLabel(sd.to)}.`)) sd.open = false
+}
+
+function markLost(l) {
+  Object.assign(sd, {
+    open: true, lead: l, to: 'lost', error: '', reason: '', hold_until: '', isLost: true, lostReasonId: '',
+    needsDate: false, reasonRequired: false, title: 'Mark as lost',
+    reasonLabel: lostReasons.value.length ? 'Note (optional)' : 'Why was it lost? (optional)',
+  })
+}
+
+const states = ref({})   // GST state code -> name, for the convert dialog
+const cv = reactive({ open: false, lead: null, state_code: '', gstin: '', address_line1: '', create_new: false, matches: [], error: '', busy: false })
+// A GSTIN starts with the state's code: fill the state from it.
+watch(() => cv.gstin, (g) => { const code = String(g || '').slice(0, 2); if (/^\d{2}$/.test(code) && states.value[code]) cv.state_code = code })
+
+async function convertLead(l, quote = null) {
+  quoteOpts.value = quote                                     // set only by "Quote this lead"; the ordinary Convert button leaves it empty
+  if (l.customer_id) {                                        // already linked: nothing to ask
+    busy.value = true
+    try { const d = await leadService.convert(l.id); finishConvert(d?.data ?? d) }
+    catch (e) { toastError(e?.response?.data?.message ?? 'Convert failed.') }
+    finally { busy.value = false }
+    return
+  }
+  Object.assign(cv, { open: true, lead: l, state_code: '', gstin: '', address_line1: '', create_new: false, matches: [], error: '', busy: false })
+  if (!Object.keys(states.value).length) {
+    try { const r = await leadService.states(); states.value = r?.data ?? {} } catch { /* the dialog still shows; the server refuses a missing state */ }
+  }
+}
+
+function finishConvert(d) {
+  const q = quoteOpts.value
+  quoteOpts.value = null
+  cv.open = false
+  if (q) return doQuote(d.lead_id, q)                          // the customer is ready: make the quotation from the requirement
+  detail.value = null
+  emit('convert', { customer_id: d.customer_id, lead_id: d.lead_id })
+}
+
+// "Quote this lead" (LEADS_PLAN 5.4): the quotation or BOQ is made on the server from the requirement lines, then opened.
+const quoteOpts = ref(null)
+async function startQuote(opts) {
+  const l = detail.value
+  if (!l) return
+  if (l.customer_id) await doQuote(l.id, opts)
+  else await convertLead(l, opts)                              // asks for the customer's state first, the same dialog as Convert
+}
+async function doQuote(leadId, opts = {}) {
   busy.value = true
   try {
-    const res = await leadService.convert(l.id)
-    const d = res?.data ?? res
+    const d = (await leadService.quoteLead(leadId, { as_boq: !!opts.asBoq }))?.data ?? {}
+    toastSuccess(`${d.as_boq ? 'BOQ' : 'Quotation draft'} ${d.quotation_no} made. Check the sizes and enter the rates.`)
     detail.value = null
-    emit('convert', { customer_id: d.customer_id, lead_id: d.lead_id })
-  } catch (e) { toastError(e?.response?.data?.message ?? 'Convert failed.') }
+    emit(d.as_boq ? 'open-boq' : 'open-quotation', d.quotation_id)
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Could not make the quotation.') }
   finally { busy.value = false }
+}
+
+async function submitConvert(extra = {}) {
+  const body = { ...extra }
+  if (!extra.customer_id) {
+    if (cv.state_code) body.state_code = cv.state_code
+    if (cv.gstin.trim()) body.gstin = cv.gstin.trim().toUpperCase()
+    if (cv.address_line1.trim()) body.address_line1 = cv.address_line1.trim()
+    if (cv.create_new) body.create_new = true
+  }
+  cv.busy = true; cv.error = ''
+  try {
+    const res = await leadService.convert(cv.lead.id, body)
+    finishConvert(res?.data ?? res)
+  } catch (e) {
+    const data = e?.response?.data
+    if (e?.response?.status === 409 && data?.error_code === 'CUSTOMER_EXISTS') { cv.matches = data.errors?.customers ?? []; return }
+    cv.error = data?.message ?? 'Convert failed.'
+  } finally { cv.busy = false }
 }
 
 async function removeLead(l) {
@@ -407,7 +835,45 @@ async function removeLead(l) {
   catch (e) { toastError('Failed to delete.') }
 }
 
-onMounted(load)
+async function loadOptions() {
+  try {
+    const res = await leadService.options()
+    const o = res?.data ?? res
+    if (Array.isArray(o?.sources) && o.sources.length) sources.value = o.sources
+    if (Array.isArray(o?.stages) && o.stages.length) stages.value = o.stages
+    if (o?.transitions && typeof o.transitions === 'object') transitions.value = o.transitions
+    if (Array.isArray(o?.lost_reasons)) lostReasons.value = o.lost_reasons
+    ownOnly.value = !!o?.own_only
+    if (o?.quiet_days) quietDays.value = o.quiet_days
+  } catch { /* keep the fallback list */ }
+}
+
+// A lead's own address (/leads/12) and a search result open the lead; one that is not there, or not yours, says so instead of opening an empty drawer.
+/** An action was planned, changed, done or removed: the lead's follow-up date and timeline moved with it. */
+async function onActionsChanged() {
+  if (detail.value) { try { const res = await leadService.get(detail.value.id); detail.value = res?.data ?? res } catch { /* the drawer keeps what it had */ } }
+  load()
+  board.value?.load?.()
+  myDay.value?.load?.()
+}
+function openFromDay(id) { view.value = 'list'; openById(id) }
+
+async function openById(id) {
+  try { const res = await leadService.get(id); detail.value = res?.data ?? res }
+  catch { toastError('That lead was not found.'); emit('detail', null) }
+}
+watch(() => detail.value?.id ?? null, (id) => emit('detail', id))
+watch(() => props.openId, (id) => { if (id) openById(id); else detail.value = null })
+
+onMounted(async () => {
+  await loadOptions()
+  restore()
+  load()
+  loadViews()
+  loadUsers()                       // for the "assigned to" filter
+  leadService.myDay({ assigned_to: 'me' }).then(r => { const d = r?.data; if (d) dayCount.value = d.overdue.length + d.today.length }).catch(() => {})
+  if (props.openId) openById(props.openId)
+})
 </script>
 
 <style scoped>
@@ -431,7 +897,7 @@ onMounted(load)
 .ins-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .ins-card h4 { margin: 0 0 12px; font-size: 13px; color: var(--primary); }
 .funnel-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
-.funnel-label { width: 78px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.funnel-label { width: 110px; font-size: 11px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .funnel-bar-track { flex: 1; height: 14px; background: var(--surface-2); border-radius: 7px; overflow: hidden; }
 .funnel-bar { height: 100%; background: var(--primary); border-radius: 7px; }
 .funnel-bar.won { background: #2e7d32; } .funnel-bar.lost { background: #c62828; }
@@ -444,6 +910,43 @@ onMounted(load)
 .fu-row.red b { color: #c62828; } .fu-row.amber b { color: #b5740a; }
 @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } .ins-grid { grid-template-columns: 1fr; } }
 
+.temp { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; border-radius: 9px; padding: 1px 7px; text-transform: capitalize; }
+.temp.hot { background: #fdecea; color: #b3261e; } .temp.warm { background: #fff4e0; color: #8a5300; } .temp.cold { background: #e8f1fb; color: #1e5a9c; }
+.temp.big { margin: 0 8px 0 0; font-size: 12px; padding: 3px 11px; }
+.score-box { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; }
+.score-head { display: flex; align-items: baseline; margin-bottom: 6px; }
+.score-head b { font-size: 22px; margin-right: 4px; } .score-head small { color: var(--text-3); }
+.score-box ul { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+.score-box li { display: grid; grid-template-columns: 110px 1fr auto; gap: 8px; padding: 3px 0; border-top: 1px solid var(--border); }
+.score-box li:first-child { border-top: 0; }
+.sc-l { font-weight: 600; } .sc-why { color: var(--text-2, #666); } .score-box li small { color: var(--text-3); font-weight: 400; }
+.temp-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.temp-tile { border: 0; border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; text-transform: capitalize; }
+.temp-tile span { font-size: 18px; font-weight: 800; margin-right: 4px; }
+.temp-tile.hot { background: #fdecea; color: #b3261e; } .temp-tile.warm { background: #fff4e0; color: #8a5300; } .temp-tile.cold { background: #e8f1fb; color: #1e5a9c; }
+.eng-chip { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; border-radius: 9px; padding: 1px 7px; white-space: nowrap; }
+.eng-chip.quiet { background: #fdecea; color: #b3261e; }
+.eng-chip.wait { background: #fff4e0; color: #8a5300; }
+.eng-line { font-size: 12.5px; margin: 8px 0 0; }
+.eng-line.ok { color: #2e7d32; } .eng-line.warn { color: #8a5300; } .eng-line.bad { color: #b3261e; font-weight: 600; }
+.ins-link { background: none; border: 0; font: inherit; font-weight: 700; color: inherit; cursor: pointer; text-decoration: underline; padding: 0; }
+.ins-link:disabled { cursor: default; text-decoration: none; }
+.vbadge { margin-left: 6px; background: #c62828; color: #fff; border-radius: 9px; font-size: 10.5px; padding: 0 6px; font-weight: 700; }
+.lm-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.lm-views { display: flex; gap: 6px; flex-wrap: wrap; }
+.vchip { display: inline-flex; align-items: center; border: 1px solid #d5d9e0; background: var(--surface); color: #555; border-radius: 16px; font-size: 12.5px; font-weight: 600; padding: 0; overflow: hidden; }
+.vchip > button { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 5px 12px; }
+button.vchip { cursor: pointer; font-family: inherit; padding: 5px 12px; }     /* the ready-made views are buttons themselves; a saved view is a chip holding two */
+.vchip.saved .vname { padding-right: 6px; }
+.vchip .vx { padding: 5px 9px 5px 2px; color: #aaa; font-weight: 400; }
+.vchip .vx:hover { color: #c62828; }
+.vchip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.vchip.on .vx { color: #ffd0d0; }
+.lm-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.lm-controls select, .lm-saveas input { padding: 6px 9px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; background: var(--surface); }
+.lm-saveas { display: inline-flex; gap: 8px; align-items: center; }
+.lm-controls .link { background: none; border: 0; color: var(--primary); font-size: 12.5px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.empty .link { background: none; border: 0; color: var(--primary); font-style: normal; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .status-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 2px solid #e0e0e0; flex-wrap: wrap; }
 .stab { padding: 8px 16px; border: none; background: none; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
 .stab.active { color: var(--primary); border-bottom-color: var(--primary); }
@@ -467,7 +970,7 @@ onMounted(load)
 .src-badge { font-size: 11px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 2px 8px; }
 .follow-over { color: #c62828; font-weight: 700; } .follow-today { color: #b5740a; font-weight: 700; }
 
-.status-badge { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.3px; }
+.status-badge { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.3px; background: var(--primary-tint); color: var(--primary); }   /* a stage the company added gets this; the built-in ones below override it */
 .status-badge.big { font-size: 12px; padding: 4px 12px; display: inline-block; margin-bottom: 14px; }
 .status-badge.new { background: #e3f2fd; color: #1565c0; }
 .status-badge.contacted { background: var(--primary-tint); color: var(--primary); }
@@ -475,6 +978,21 @@ onMounted(load)
 .status-badge.quoted { background: #ede7f6; color: #5e35b1; }
 .status-badge.won { background: #e8f5e9; color: #2e7d32; }
 .status-badge.lost { background: #ffebee; color: #c62828; }
+.status-badge.on_hold { background: #fff3e0; color: #e65100; }
+.status-badge.invalid { background: #eceff1; color: #546e7a; }
+.modal-overlay.sd-overlay { z-index: 1100; }   /* above the lead drawer (1000) it is opened from */
+.sd-input { width: 100%; padding: 8px 10px; border: 1px solid #cfd8dc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+.dup-box { margin-top: 12px; padding: 10px 14px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; font-size: 13px; color: #6d4c00; }
+.dup-box ul { margin: 6px 0; padding-left: 18px; }
+.dup-box a { color: var(--primary); font-weight: 700; }
+.dup-hint { font-size: 12px; color: #8d6e00; }
+.cv-note { font-size: 13px; color: #455a64; margin: 0 0 10px; }
+.cv-matches { list-style: none; margin: 0 0 8px; padding: 0; }
+.cv-matches li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #eceff1; font-size: 13px; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--primary); font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.raw-msg { margin: 6px 0 0; padding: 8px 10px; background: #f5f7f9; border-radius: 6px; font-size: 11px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.sd-error { color: #c62828; font-size: 13px; margin: 8px 0 0; }
+.form-grid.one { grid-template-columns: 1fr; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
 .modal-box { background: white; border-radius: 12px; padding: 22px 26px; width: 100%; max-width: 720px; box-shadow: 0 12px 48px rgba(0,0,0,0.22); max-height: 90vh; overflow-y: auto; }
@@ -524,6 +1042,9 @@ onMounted(load)
 .btn-status { background: var(--primary-tint); color: var(--primary); text-transform: capitalize; }
 .btn-danger { background: #c62828; color: #fff; }
 .btn-danger-ghost { background: transparent; border: 1px solid #ef9a9a; color: #c62828; }
+.sel-col { width: 34px; text-align: center; }
+.lead-row.picked { background: #f3f7ff; }
+.merge-btn { width: 100%; margin-top: 10px; }
 .btn-convert { width: 100%; margin-top: 10px; background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; font-weight: 700; }
 .conv-note { font-size: 12px; color: #2e7d32; margin: 8px 0 0; font-weight: 600; }
 .error-msg { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
