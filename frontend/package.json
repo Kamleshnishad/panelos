@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test src/composables/sessionPolicy.test.mjs src/services/errorText.test.mjs src/services/transfers.test.mjs src/services/routes.test.mjs"
+    "test": "node --test src/composables/sessionPolicy.test.mjs src/services/errorText.test.mjs src/services/transfers.test.mjs src/services/routes.test.mjs src/services/dates.test.mjs"
   },
   "dependencies": {
     "axios": "^1.7.7",

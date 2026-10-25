@@ -1230,21 +1230,21 @@ PO status is then recomputed: all lines full → `received`, some → `partial`,
 
 All under `reports.view`.
 
-**Known report defects still open (Reports audit, 25 Oct 2026): PB-074 to PB-082 in BUGS.md** (MIS last-day cut-off and planned-sqm, default period in IST, revenue-leak headline, accessory lines under 'Unknown', Receivables as-of and bucket filter, inconsistent definitions, CSV export dates, input validation). Read them before changing a report; the High ones (PB-071 to PB-073) are fixed.
+**Known report defects still open (Reports audit, 25 Oct 2026): PB-081 (CSV export dates and Excel BOM), PB-082 (input validation), PB-083 (UTC 'today' in other screens) and the enhancements FR-010 in BUGS.md.** PB-071 to PB-080 are fixed. Report dates in the SPA come from `frontend/src/services/dates.js`.
 
 | Endpoint | Content |
 |---|---|
-| `/api/reports/profit-loss` | Revenue, COGS proxy, expenses, net |
-| `/api/reports/balance-sheet` | As-of snapshot |
+| `/api/reports/profit-loss` | **Revenue only**: net sales, GST collected, gross revenue and invoice count for the period. There are no costs or expenses in it (a real P&L is FR-010 (4)) |
+| `/api/reports/balance-sheet` | Simplified, balances by construction: assets = receivable + cash received; liabilities = GST billed + customer advances (received beyond billed); equity = net sales less write-offs. Payments by `transaction_date` up to the end of the as-of day; write-offs are never cash |
 | `/api/reports/cash-flow` | Period cash movement: cash received (payments by `transaction_date`, first and last day included, write-offs excluded) and write-offs shown separately; `net_operating_cash_flow` = cash received |
-| `/api/reports/accounts-receivable` | **AR ageing** buckets |
-| `/api/reports/sales` | Sales by period |
+| `/api/reports/accounts-receivable` | **AR ageing** buckets. `as_of` means what was true that day: payments received up to its end only, days overdue counted to it. `bucket=current\|30\|60\|90\|90plus` narrows the list (not the summary) on the server before paging; `filtered_total` is the balance of the list |
+| `/api/reports/sales` | Sales by period; `by_panel_type` is keyed by panel type name, with accessory and other lines as 'Accessories & other' (value only, no quantity) |
 | `/api/reports/tax` | GST for the invoices dated in the period that are not draft or cancelled (`TaxService::getTaxReport`), with one row per invoice: number, date, customer, GSTIN, rate, taxable, CGST / SGST / IGST |
-| `/api/reports/accounting-dashboard` | Combined finance view |
-| `/api/reports/reconcile` · `/reconciliation` | Invoice reconciliation; per-order **ordered vs invoiced vs paid** (revenue-leakage flags) |
+| `/api/reports/accounting-dashboard` | Combined finance view: year to date from 1 April, `cash_collected_mtd` = cash received this month, `invoiced_mtd` = billed this month, `total_overdue` = every overdue bucket |
+| `/api/reports/reconcile` · `/reconciliation` | Invoice reconciliation; per-order **ordered vs invoiced vs paid**. Revenue leakage counts only orders fully delivered (completed, or every batch dispatched) and not (fully) invoiced; other orders are `not_delivered`, `part_delivered` or `awaiting_invoice` and are listed but not counted |
 | `/api/reports/revenue-trend` | Invoiced vs collected, last N months |
-| `/api/reports/top-customers` · `/panel-type-mix` | Customer and product mix |
-| `/api/reports/mis` | Owner-level monthly MIS: revenue, collection, production sqm + runs, GST liability, outstanding |
+| `/api/reports/top-customers` · `/panel-type-mix` | Customer and product mix. Panel mix: panel area only in `total_sqm`; accessories are their own value-only row |
+| `/api/reports/mis` | MIS for the invoices RAISED in the period: invoiced, collected (received against them so far, write-offs excluded), written off, outstanding (= the sum of the ageing, as of today, with a `not_due` bucket); GST; orders by order date; completed runs with PLANNED sqm (`basis: planned`: no actual output is stored). Not the cash received in the period (that is cash-flow) |
 | `/api/reports/tally/xml` · `/tally/csv` | Tally-compatible export. XML: every value escaped, dates `YYYYMMDD`, amounts two decimals. CSV: UTF-8 with a byte-order mark, text columns formula-guarded. The ledger names are fixed (`Sales @ <rate>%`, `CGST`, `SGST`, `IGST`) and must exist in the client's Tally |
 | `/api/export/customers|quotations|orders|invoices` | Bulk CSV |
 

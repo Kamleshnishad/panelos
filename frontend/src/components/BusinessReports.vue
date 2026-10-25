@@ -89,7 +89,7 @@
             <div v-for="r in mix.rows" :key="r.panel_type" class="mix-row">
               <div class="mix-info">
                 <span class="mix-name">{{ r.panel_type }}</span>
-                <span class="mix-val">₹ {{ fmtShort(r.value) }} · {{ fmtNum(r.sqm) }} SQM</span>
+                <span class="mix-val">₹ {{ fmtShort(r.value) }}<template v-if="r.sqm !== null"> · {{ fmtNum(r.sqm) }} SQM</template></span>
               </div>
               <div class="mix-bar-track">
                 <div class="mix-bar-fill" :style="{ width: r.value_pct + '%' }"></div>
@@ -106,6 +106,7 @@
     <template v-else-if="tab === 'mis'">
       <div v-if="misLoading" class="loading-hint">Computing MIS…</div>
       <template v-else-if="mis">
+        <p class="mis-note">The invoices raised in this period: what they come to, what has been paid against them so far, and what is still unpaid. For the money <em>received</em> in the period, see Cash Collected on the Dashboard tab.</p>
 
         <!-- Revenue summary cards -->
         <div class="headline-grid">
@@ -115,11 +116,11 @@
           </div>
           <div class="hl-card green">
             <div class="hl-val">₹ {{ fmtShort(mis.revenue.collected) }}</div>
-            <div class="hl-lbl">Cash Collected</div>
+            <div class="hl-lbl">Paid so far</div>
           </div>
           <div class="hl-card" :class="mis.revenue.outstanding > 0 ? 'amber' : ''">
             <div class="hl-val" :class="mis.revenue.outstanding > 0 ? 'red' : ''">₹ {{ fmtShort(mis.revenue.outstanding) }}</div>
-            <div class="hl-lbl">Outstanding</div>
+            <div class="hl-lbl">Still unpaid</div>
           </div>
           <div class="hl-card">
             <div class="hl-val">{{ mis.revenue.collection_pct }}%</div>
@@ -137,7 +138,8 @@
             <h3>🏭 Production Summary</h3>
             <div class="kv-list">
               <div class="kv"><span class="kv-l">Completed Runs</span><span class="kv-v">{{ mis.production.runs }}</span></div>
-              <div class="kv"><span class="kv-l">SQM Produced</span><span class="kv-v bold blue">{{ fmtNum(mis.production.sqm_produced) }} SQM</span></div>
+              <div class="kv"><span class="kv-l">SQM planned (completed runs)</span><span class="kv-v bold blue">{{ fmtNum(mis.production.sqm_produced) }} SQM</span></div>
+              <p class="mis-note small">The planned area of the runs completed in the period. Actual output is not recorded yet.</p>
             </div>
           </div>
           <div class="card">
@@ -153,23 +155,27 @@
 
         <!-- Aging -->
         <div class="card">
-          <h3>📅 Outstanding Aging (Overdue invoices)</h3>
+          <h3>📅 Still unpaid, by age (these invoices, as of today)</h3>
           <div class="aging-grid">
+            <div class="aging-cell ok">
+              <div class="aging-val">₹ {{ fmtShort(mis.aging.not_due) }}</div>
+              <div class="aging-lbl">Not yet due</div>
+            </div>
             <div class="aging-cell" :class="mis.aging['0_30'] > 0 ? 'warn' : 'ok'">
               <div class="aging-val">₹ {{ fmtShort(mis.aging['0_30']) }}</div>
-              <div class="aging-lbl">0–30 Days</div>
+              <div class="aging-lbl">1–30 days overdue</div>
             </div>
             <div class="aging-cell" :class="mis.aging['31_60'] > 0 ? 'warn' : 'ok'">
               <div class="aging-val">₹ {{ fmtShort(mis.aging['31_60']) }}</div>
-              <div class="aging-lbl">31–60 Days</div>
+              <div class="aging-lbl">31–60 days</div>
             </div>
             <div class="aging-cell" :class="mis.aging['61_90'] > 0 ? 'danger' : 'ok'">
               <div class="aging-val">₹ {{ fmtShort(mis.aging['61_90']) }}</div>
-              <div class="aging-lbl">61–90 Days</div>
+              <div class="aging-lbl">61–90 days</div>
             </div>
             <div class="aging-cell" :class="mis.aging['over_90'] > 0 ? 'danger' : 'ok'">
               <div class="aging-val">₹ {{ fmtShort(mis.aging['over_90']) }}</div>
-              <div class="aging-lbl">Over 90 Days</div>
+              <div class="aging-lbl">Over 90 days</div>
             </div>
           </div>
         </div>
@@ -178,7 +184,7 @@
         <div class="card">
           <h3>📈 Month-wise Invoiced vs Collected</h3>
           <table class="rep-table">
-            <thead><tr><th>Month</th><th class="text-right">Invoiced</th><th class="text-right">Collected</th><th class="text-right">Pending</th><th class="text-right">Invoices</th></tr></thead>
+            <thead><tr><th>Month</th><th class="text-right">Invoiced</th><th class="text-right">Paid so far</th><th class="text-right">Still unpaid</th><th class="text-right">Invoices</th></tr></thead>
             <tbody>
               <tr v-for="m in mis.monthly" :key="m.month">
                 <td class="bold">{{ m.month }}</td>
@@ -209,8 +215,9 @@
         </div>
         <div class="card">
           <div class="card-head"><h3>Order → Invoice Reconciliation</h3>
-            <span class="hint-sm">Orders delivered but not / under-invoiced = money left on the table.</span>
+            <span class="hint-sm">Revenue Leak counts only orders that are fully delivered but not (fully) invoiced: money left on the table.</span>
           </div>
+          <p class="mis-note small recon-note">{{ recon.summary.not_delivered }} order(s) not yet delivered (work in progress, not counted) · {{ recon.summary.awaiting_invoice }} delivered in part with nothing invoiced yet.</p>
           <table class="rep-table">
             <thead><tr><th>Order</th><th>Customer</th><th class="text-right">Ordered</th><th class="text-right">Invoiced</th><th class="text-right">Gap</th><th>Flag</th></tr></thead>
             <tbody>
@@ -219,7 +226,7 @@
                 <td>{{ r.customer }}</td>
                 <td class="text-right">₹ {{ fmtNum(r.ordered) }}</td>
                 <td class="text-right">₹ {{ fmtNum(r.invoiced) }}</td>
-                <td class="text-right" :class="{ red: r.invoice_gap > 0 }">₹ {{ fmtNum(r.invoice_gap) }}</td>
+                <td class="text-right" :class="{ red: r.flag === 'not_invoiced' || r.flag === 'under_invoiced' }">₹ {{ fmtNum(r.invoice_gap) }}</td>
                 <td><span class="flag-chip" :class="r.flag">{{ flagLabel(r.flag) }}</span></td>
               </tr>
             </tbody>
@@ -292,9 +299,10 @@
 import { ref, computed, onMounted } from 'vue'
 import reportService from '../services/reportService.js'
 import { downloadFile } from '../services/transfers.js'
+import { todayLocal, monthStartLocal } from '../services/dates.js'
 
-const from = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10))
-const to   = ref(new Date().toISOString().slice(0, 10))
+const from = ref(monthStartLocal())     // local dates: the UTC date is yesterday until 05:30 IST and the 1st of the month came out as the 31st (PB-075)
+const to   = ref(todayLocal())
 
 const tab   = ref('dashboard')
 const error = ref(null)
@@ -392,7 +400,7 @@ function onPeriodChange() {
 }
 
 function flagLabel(f) {
-  return { ok: 'OK', not_invoiced: 'Not Invoiced', under_invoiced: 'Under-invoiced', over_invoiced: 'Over-invoiced' }[f] || f
+  return { ok: 'OK', not_invoiced: 'Not Invoiced', under_invoiced: 'Under-invoiced', over_invoiced: 'Over-invoiced', not_delivered: 'Not delivered yet', part_delivered: 'Part delivered', awaiting_invoice: 'Awaiting invoice' }[f] || f
 }
 
 async function doExport(type) {
@@ -481,6 +489,9 @@ onMounted(loadDashboard)
 .flag-chip.not_invoiced { background: #ffebee; color: #c62828; }
 .flag-chip.under_invoiced { background: #fff8e1; color: #b5740a; }
 .flag-chip.over_invoiced { background: #eef1fe; color: #2B50E0; }
+.flag-chip.not_delivered { background: #f0f2f5; color: #667085; }
+.flag-chip.part_delivered { background: #eef1fe; color: #2B50E0; }
+.flag-chip.awaiting_invoice { background: #fff8e1; color: #b5740a; }
 .export-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .exp-btn { padding: 18px 12px; border: 1px solid var(--primary-bd); background: var(--primary-tint); color: var(--primary); border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
 .exp-btn:hover { background: var(--primary); color: #fff; }
@@ -499,7 +510,9 @@ onMounted(loadDashboard)
 .kv-l { color: #667085; }
 .kv-v { font-weight: 600; }
 
-.aging-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.aging-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.mis-note { font-size: 12.5px; color: #667085; margin: 0 0 14px; line-height: 1.5; }
+.mis-note.small { font-size: 11.5px; margin: 8px 0 0; }
 .aging-cell { border-radius: 10px; padding: 14px; text-align: center; }
 .aging-cell.ok     { background: #e8f5e9; border: 1px solid #a5d6a7; }
 .aging-cell.warn   { background: #fff8e1; border: 1px solid #ffe082; }

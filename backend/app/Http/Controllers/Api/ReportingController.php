@@ -98,6 +98,8 @@ class ReportingController extends Controller
                 $asOf,
                 (int) $request->query('page', 1),
                 (int) $request->query('per_page', 100),
+                // current | 30 | 60 | 90 | 90plus: narrows the list (not the summary) to one ageing bucket
+                array_key_exists((string) $request->query('bucket'), ReportingService::AR_BUCKETS) ? (string) $request->query('bucket') : null,
             );
 
             return response()->json([

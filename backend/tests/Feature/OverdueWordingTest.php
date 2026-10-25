@@ -58,7 +58,7 @@ class OverdueWordingTest extends TestCase
 
         $aging = app(ReportingService::class)->getMisReport($admin->company_id, now()->subYear()->toDateString(), now()->toDateString())['aging'];
 
-        $this->assertEquals(['0_30' => 1000, '31_60' => 1000, '61_90' => 1000, 'over_90' => 1000], $aging,
+        $this->assertEquals(['not_due' => 0, '0_30' => 1000, '31_60' => 1000, '61_90' => 1000, 'over_90' => 1000], $aging,
             'Every overdue invoice used to land in the first bucket.');
     }
 

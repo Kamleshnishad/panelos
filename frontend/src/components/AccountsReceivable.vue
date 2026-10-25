@@ -8,7 +8,7 @@
       <div class="toolbar-right">
         <div class="date-group">
           <label>As of</label>
-          <input v-model="asOf" type="date" @change="load" />
+          <input v-model="asOf" type="date" @change="page = 1; load()" />
         </div>
         <button class="btn btn-ghost btn-sm" @click="load">↻ Refresh</button>
       </div>
@@ -115,6 +115,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import invoiceService from '../services/invoiceService.js'
+import { todayLocal } from '../services/dates.js'
 
 defineEmits(['view-invoice'])
 
@@ -123,27 +124,14 @@ const summary    = ref(null)
 const loading    = ref(false)
 const error      = ref(null)
 const actionMsg  = ref(null)
-const asOf       = ref(new Date().toISOString().slice(0, 10))
+const asOf       = ref(todayLocal())      // local date, not the UTC one (PB-075)
 const bucket     = ref(null)
 const remindingId = ref(null)
 
-// Only show invoices with an outstanding balance
-const outstandingRows = computed(() => rows.value.filter(r => Number(r.remaining_due) > 0))
-
-const filteredRows = computed(() => {
-  if (!bucket.value) return outstandingRows.value
-  return outstandingRows.value.filter(r => {
-    const d = r.days_overdue
-    if (bucket.value === 'current') return d === 0
-    if (bucket.value === '30')      return d > 0 && d <= 30
-    if (bucket.value === '60')      return d > 30 && d <= 60
-    if (bucket.value === '90')      return d > 60 && d <= 90
-    if (bucket.value === '90plus')  return d > 90
-    return true
-  })
-})
-
-const shownTotal = computed(() => filteredRows.value.reduce((s, r) => s + Number(r.remaining_due || 0), 0))
+// The server returns only invoices with a balance, already narrowed to the chosen ageing bucket and paged, so the list and the page count agree (PB-079).
+const filteredRows = computed(() => rows.value)
+const filteredTotal = ref(0)       // the balance of every invoice in the list across all pages, from the server
+const shownTotal = computed(() => filteredTotal.value)
 
 const bucketLabel = computed(() => ({
   current: 'Current (not due)', '30': '1–30 days', '60': '31–60 days', '90': '61–90 days', '90plus': '90+ days',
@@ -164,11 +152,12 @@ async function load() {
   error.value   = null
   try {
     const res = await invoiceService.accountsReceivable({
-      as_of: asOf.value, page: page.value, per_page: 50,
+      as_of: asOf.value, page: page.value, per_page: 50, bucket: bucket.value || undefined,
     })
     const data = res?.data ?? {}
     summary.value = data.summary ?? null
     rows.value    = data.details ?? []
+    filteredTotal.value = Number(data.filtered_total ?? 0)
     const pg = data.pagination ?? {}
     lastPage.value = pg.last_page ?? 1
     total.value    = pg.total ?? rows.value.length
@@ -179,7 +168,7 @@ async function load() {
   }
 }
 
-function setBucket(b) { bucket.value = bucket.value === b ? null : b }
+function setBucket(b) { bucket.value = bucket.value === b ? null : b; page.value = 1; load() }
 
 async function sendReminder(row) {
   remindingId.value = row.invoice_id
