@@ -95,8 +95,12 @@ class QuotationService
     public function update(Quotation $quotation, array $data): Quotation
     {
         return DB::transaction(function () use ($quotation, $data) {
-            if (!in_array($quotation->status, ['boq', 'draft', 'sent'])) {
-                throw new \Exception('Only BOQs, draft or sent quotations can be edited.');
+            // A sent quotation is what the customer holds: changing it in place leaves their copy and ours
+            // disagreeing with no trail. A sent one is changed through Revise, which keeps both versions (PB-085).
+            if (!in_array($quotation->status, ['boq', 'draft'])) {
+                throw new \Exception($quotation->status === 'sent'
+                    ? 'This quotation has been sent to the customer, so it cannot be edited. Use Revise to make a new version.'
+                    : 'Only BOQs and draft quotations can be edited.');
             }
 
             $company  = $quotation->company;

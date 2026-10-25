@@ -718,7 +718,7 @@ A quotation exposes a computed `rates_pending` boolean (true when any item still
 | Action | Endpoint | Precondition | Result |
 |---|---|---|---|
 | Create | `POST /api/quotations` | — | `draft` (or `boq` with `as_boq`) |
-| Update | `PUT /api/quotations/{id}` | status ∈ `boq, draft, sent` | rows replaced, totals recomputed |
+| Update | `PUT /api/quotations/{id}` | status ∈ `boq, draft` (a sent one is changed by Revise, PB-085) | rows replaced, totals recomputed |
 | Convert BOQ | `POST /…/convert` | status `boq`, ≥1 row | `draft` |
 | Save rates | `POST /…/rates` | status ∈ `boq, draft, sent` | totals recomputed |
 | **Send** | `POST /…/send` | status `draft`, ≥1 row, **every item rate > 0** | `sent`, `sent_at` |
@@ -1575,7 +1575,8 @@ Hit one of these and the message tells you exactly which invariant you tripped.
 | `Rates are pending. Enter rates for all panel rows before sending.` | quotation send | An item still has `rate_per_sqm <= 0` |
 | `Only draft quotations can be sent.` | quotation send | Wrong status |
 | `Only a BOQ can be converted to a quotation.` | convert | Status ≠ `boq` |
-| `Only BOQs, draft or sent quotations can be edited.` | quotation update | Locked after accept |
+| `This quotation has been sent to the customer, so it cannot be edited. Use Revise to make a new version.` | quotation update | Locked once sent (PB-085) |
+| `Only BOQs and draft quotations can be edited.` | quotation update | Locked after accept / reject / expire |
 | `Quotation must be accepted to create an order.` | order create | Status ≠ `accepted` |
 | `This quotation already has an order and can no longer be revised.` | quotation revise | Revising it would allow a second order for one job |
 | `An order already exists for this quotation.` | order create | One order per quotation (row-locked) |
