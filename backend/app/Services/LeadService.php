@@ -76,6 +76,32 @@ class LeadService
         return $q->orderByDesc('id');
     }
 
+    public const BOARD_COLUMNS = ['new', 'contacted', 'qualified', 'quoted', 'on_hold'];
+    public const BOARD_PER_COLUMN = 25;
+
+    /**
+     * The board (LEADS_PLAN 5.8): one column per open stage and one for leads on hold, each with how many leads, their estimated area and value, and the first
+     * BOARD_PER_COLUMN of them (those with the nearest follow-up first). Takes the list's own filters (source, assigned_to, follow_up, search, quiet, unanswered; a
+     * `status` is ignored: the columns are the statuses) and respects the viewer's visibility. Closed leads are not on the board: the list has them.
+     * @return list<array{status:string,count:int,est_qty_sqm:float,est_value:float,more:int,leads:\Illuminate\Support\Collection}>
+     */
+    public function board(int $companyId, array $filters = [], ?User $viewer = null): array
+    {
+        $filters = array_diff_key($filters, ['status' => 1, 'sort' => 1, 'dir' => 1]) + ['sort' => 'follow_up'];
+        $out = [];
+        foreach (self::BOARD_COLUMNS as $status) {
+            $q = $this->list($companyId, $filters + ['status' => $status], $viewer);
+            $sums = (clone $q)->reorder()->toBase()->select(DB::raw('count(*) as n, coalesce(sum(est_qty_sqm),0) as sqm, coalesce(sum(est_value),0) as val'))->first();      // select() replaces the list's columns
+            $n = (int) ($sums->n ?? 0);
+            $out[] = [
+                'status' => $status, 'count' => $n, 'est_qty_sqm' => (float) ($sums->sqm ?? 0), 'est_value' => (float) ($sums->val ?? 0),
+                'more' => max(0, $n - self::BOARD_PER_COLUMN), 'leads' => (clone $q)->limit(self::BOARD_PER_COLUMN)->get(),
+            ];
+        }
+
+        return $out;
+    }
+
     public function getDetails(Lead $lead): Lead
     {
         LeadEngagement::attach($lead);

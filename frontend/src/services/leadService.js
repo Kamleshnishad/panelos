@@ -14,6 +14,7 @@ export const LEAD_APPLICATIONS = ['Wall', 'Roof', 'Cold Room', 'Partition', 'Cle
 
 export default {
   list(params = {})        { return api('get',  '/api/leads', null, params) },
+  board(params = {})       { return api('get',  '/api/leads/board', null, params) },
   dashboard()              { return api('get',  '/api/leads/dashboard') },
   options()                { return api('get',  '/api/leads/options') },
   get(id)                  { return api('get',  `/api/leads/${id}`) },

@@ -177,6 +177,7 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::post('/leads/import/preview', [\App\Http\Controllers\Api\LeadSheetController::class, 'preview'])->middleware('throttle:lead-import')->name('leads.import.preview');
     Route::post('/leads/import/{id}/commit', [\App\Http\Controllers\Api\LeadSheetController::class, 'commit'])->middleware('throttle:lead-import')->name('leads.import.commit');
     Route::post('/leads/import/{id}/undo', [\App\Http\Controllers\Api\LeadSheetController::class, 'undo'])->name('leads.import.undo');
+    Route::get('/leads/board', [\App\Http\Controllers\Api\LeadController::class, 'board'])->name('leads.board');
     Route::get('/leads/dashboard', [\App\Http\Controllers\Api\LeadController::class, 'dashboard'])->name('leads.dashboard');
     Route::get('/leads/options', [\App\Http\Controllers\Api\LeadController::class, 'options'])->name('leads.options');
     Route::post('/leads', [\App\Http\Controllers\Api\LeadController::class, 'store'])->name('leads.store');

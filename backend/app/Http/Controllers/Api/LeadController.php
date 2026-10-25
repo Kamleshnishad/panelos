@@ -74,6 +74,14 @@ class LeadController extends Controller
         return $this->leads->visible($this->cid($r), $r->user())->findOrFail($id);
     }
 
+    /** The board: a column per stage with its count, totals and first leads. Same filters as the list (its status tabs do not apply). */
+    public function board(Request $r)
+    {
+        $cols = $this->leads->board($this->cid($r), $r->only(['source', 'assigned_to', 'follow_up', 'search', 'quiet', 'unanswered']), $r->user());
+
+        return $this->successResponse(['columns' => array_map(fn ($c) => $c + ['leads' => $c['leads']->values()], $cols), 'per_column' => LeadService::BOARD_PER_COLUMN], 'Lead board');
+    }
+
     public function dashboard(Request $r)
     {
         return $this->successResponse($this->leads->dashboard($this->cid($r), $r->user()), 'Lead dashboard');

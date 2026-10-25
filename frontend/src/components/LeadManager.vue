@@ -8,10 +8,11 @@
       <div class="lm-head-actions">
         <div class="view-toggle">
           <button :class="{ on: view === 'list' }" @click="view = 'list'">List</button>
+          <button :class="{ on: view === 'board' }" @click="view = 'board'">Board</button>
           <button :class="{ on: view === 'myday' }" @click="view = 'myday'">My day<span v-if="dayCount" class="vbadge">{{ dayCount }}</span></button>
           <button :class="{ on: view === 'insights' }" @click="showInsights">📊 Insights</button>
         </div>
-        <input v-if="view === 'list'" v-model="search" class="lm-search" placeholder="Search name / company / phone / e-mail…" @keyup.enter="filterChanged" />
+        <input v-if="view === 'list' || view === 'board'" v-model="search" class="lm-search" placeholder="Search name / company / phone / e-mail…" @keyup.enter="filterChanged" />
         <button class="btn btn-primary" @click="openCreate">+ New Lead</button>
         <button v-if="can('leads.manage')" class="btn btn-ghost" @click="importOpen = true">Import</button>
         <button v-if="can('reports.view')" class="btn btn-ghost" :disabled="exporting" @click="exportCsv">{{ exporting ? 'Exporting…' : 'Export' }}</button>
@@ -83,7 +84,7 @@
     </div>
 
     <!-- Views and filters (LEADS_PLAN 5.1) -->
-    <div v-if="view === 'list'" class="lm-filters" aria-label="Views and filters">
+    <div v-if="view === 'list' || view === 'board'" class="lm-filters" aria-label="Views and filters">
       <div class="lm-views" role="group" aria-label="Views">
         <button v-for="v in readyViews" :key="v.key" type="button" :class="['vchip', { on: activeView === 'r:' + v.key }]" @click="applyView(v.filters, 'r:' + v.key)">{{ v.label }}</button>
         <span v-for="v in savedViews" :key="v.id" :class="['vchip saved', { on: activeView === 's:' + v.id }]">
@@ -113,6 +114,9 @@
         </form>
       </div>
     </div>
+
+    <!-- The board: one column per stage (LEADS_PLAN 5.8). The same filters as the list; its status tabs do not apply. -->
+    <lead-board v-if="view === 'board'" ref="board" :filters="boardFilters" :quiet-days="quietDays" @open="openDetail" @move="onBoardMove" @open-list="showStage" />
 
     <!-- Status filter tabs -->
     <div v-if="view === 'list'" class="status-tabs">
@@ -350,6 +354,7 @@ import LeadContactBar from './LeadContactBar.vue'
 import LeadRequirement from './LeadRequirement.vue'
 import LeadAttachments from './LeadAttachments.vue'
 import LeadBulkBar from './LeadBulkBar.vue'
+import LeadBoard from './LeadBoard.vue'
 import LeadMergeDialog from './LeadMergeDialog.vue'
 import LeadMyDay from './LeadMyDay.vue'
 
@@ -533,6 +538,18 @@ const today = new Date().toISOString().slice(0, 10)
 let reqSeq = 0
 const importOpen = ref(false)
 const mergeOpen = ref(false)
+const board = ref(null)
+/** The list's filters for the board: its status tabs and sort do not apply (the columns are the statuses). */
+const boardFilters = computed(() => { const { status, sort, dir, ...rest } = currentFilters(); return rest })
+const DIRECT = ['new', 'contacted', 'qualified', 'quoted']      // moves that need nothing more; hold, lost and junk ask their question first
+async function onBoardMove({ lead, to }) {
+  if (!DIRECT.includes(to)) return setStatus(lead, to)
+  try { await leadService.changeStatus(lead.id, { status: to }); toastSuccess(`${lead.lead_no} moved to ${statusLabel(to)}.`) }
+  catch (e) { toastError(e?.response?.data?.message ?? 'That move did not work.') }
+  board.value?.load()
+}
+/** "+ N more" on a column: the list, on that stage. */
+function showStage(status) { statusFilter.value = status; view.value = 'list'; filterChanged() }
 const selected = ref([])                                  // ids ticked on the list, for the bulk bar (LEADS_PLAN 5.8)
 const canManage = can('leads.manage')
 const allSelected = computed(() => leads.value.length > 0 && leads.value.every(l => selected.value.includes(l.id)))
@@ -682,8 +699,9 @@ async function sendStatus(l, payload, done) {
   try {
     await leadService.changeStatus(l.id, payload)
     toastSuccess(done)
-    const res = await leadService.get(l.id); detail.value = res?.data ?? res
+    if (detail.value) { const res = await leadService.get(l.id); detail.value = res?.data ?? res }       // the drawer only if it was open (not when a card was moved on the board)
     await load()
+    board.value?.load?.()
     return true
   } catch (e) {
     const msg = e?.response?.data?.message ?? 'Failed.'
@@ -819,6 +837,7 @@ async function loadOptions() {
 async function onActionsChanged() {
   if (detail.value) { try { const res = await leadService.get(detail.value.id); detail.value = res?.data ?? res } catch { /* the drawer keeps what it had */ } }
   load()
+  board.value?.load?.()
   myDay.value?.load?.()
 }
 function openFromDay(id) { view.value = 'list'; openById(id) }
@@ -887,6 +906,7 @@ onMounted(async () => {
 .lm-views { display: flex; gap: 6px; flex-wrap: wrap; }
 .vchip { display: inline-flex; align-items: center; border: 1px solid #d5d9e0; background: var(--surface); color: #555; border-radius: 16px; font-size: 12.5px; font-weight: 600; padding: 0; overflow: hidden; }
 .vchip > button { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 5px 12px; }
+button.vchip { cursor: pointer; font-family: inherit; padding: 5px 12px; }     /* the ready-made views are buttons themselves; a saved view is a chip holding two */
 .vchip.saved .vname { padding-right: 6px; }
 .vchip .vx { padding: 5px 9px 5px 2px; color: #aaa; font-weight: 400; }
 .vchip .vx:hover { color: #c62828; }
