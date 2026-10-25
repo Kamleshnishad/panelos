@@ -551,6 +551,24 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "lead_tasks": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "lead_id": "bigint unsigned",
+        "assigned_to_user_id": "bigint unsigned",
+        "created_by_user_id": "bigint unsigned",
+        "type": "varchar(12)",
+        "title": "varchar(150)",
+        "due_date": "date",
+        "due_time": "time",
+        "status": "varchar(10)",
+        "done_at": "timestamp",
+        "done_by_user_id": "bigint unsigned",
+        "done_note": "varchar(500)",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
     "lead_views": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

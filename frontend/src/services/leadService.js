@@ -25,6 +25,14 @@ export default {
   convert(id, data = {})   { return api('post', `/api/leads/${id}/convert`, data) },
   states()                 { return api('get',  '/api/gst/states') },
 
+  // Next actions (LEADS_PLAN 5.2)
+  myDay(params = {})         { return api('get',  '/api/leads/tasks', null, params) },
+  tasks(leadId)              { return api('get',  `/api/leads/${leadId}/tasks`) },
+  addTask(leadId, data)      { return api('post', `/api/leads/${leadId}/tasks`, data) },
+  updateTask(id, data)       { return api('put',  `/api/leads/tasks/${id}`, data) },
+  completeTask(id, data = {}) { return api('post', `/api/leads/tasks/${id}/complete`, data) },
+  deleteTask(id)             { return api('delete', `/api/leads/tasks/${id}`) },
+
   // A person's own saved views of the list (LEADS_PLAN 5.1)
   views()                  { return api('get',  '/api/leads/views') },
   saveView(name, filters)  { return api('post', '/api/leads/views', { name, filters }) },

@@ -185,6 +185,9 @@ class LeadService
 
         DB::transaction(function () use ($lead, $payload, $from, $to, $suffix, $userId) {
             $lead->update($payload);
+            if (in_array($to, Lead::CLOSED, true)) {
+                app(LeadTaskService::class)->cancelOpen($lead);        // a won, lost or invalid lead has nothing left to do (5.2)
+            }
             LeadActivity::create([
                 'company_id'    => $lead->company_id,
                 'lead_id'       => $lead->id,

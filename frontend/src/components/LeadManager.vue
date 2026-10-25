@@ -8,6 +8,7 @@
       <div class="lm-head-actions">
         <div class="view-toggle">
           <button :class="{ on: view === 'list' }" @click="view = 'list'">List</button>
+          <button :class="{ on: view === 'myday' }" @click="view = 'myday'">My day<span v-if="dayCount" class="vbadge">{{ dayCount }}</span></button>
           <button :class="{ on: view === 'insights' }" @click="showInsights">📊 Insights</button>
         </div>
         <input v-if="view === 'list'" v-model="search" class="lm-search" placeholder="Search name / company / phone / e-mail…" @keyup.enter="filterChanged" />
@@ -17,6 +18,9 @@
         <button class="btn btn-ghost" :disabled="loading" @click="load">↻</button>
       </div>
     </div>
+
+    <!-- My day: the next actions due, in three buckets (LEADS_PLAN 5.2) -->
+    <lead-my-day v-if="view === 'myday'" ref="myDay" :users="users" :own-only="ownOnly" @open-lead="openFromDay" @changed="load()" @counted="n => dayCount = n" />
 
     <!-- Insights dashboard -->
     <div v-if="view === 'insights'" class="insights">
@@ -258,6 +262,7 @@
           <div :class="followClass(detail)"><label>Follow-up</label><span>{{ detail.next_follow_up_date ? fmtDate(detail.next_follow_up_date) : '—' }}</span></div>
         </div>
         <div class="d-req" v-if="detail.requirement"><label>Requirement</label><p>{{ detail.requirement }}</p></div>
+        <lead-next-actions :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :users="users" @changed="onActionsChanged" />
         <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.landing_page || detail.first_seen_at">
           <label>Where it came from</label>
           <p>{{ detail.source }}<template v-if="detail.external_id"> · ref {{ detail.external_id }}</template><template v-if="detail.campaign"> · {{ detail.campaign }}</template><template v-if="utmText"> · {{ utmText }}</template><template v-if="detail.landing_page"> · page {{ detail.landing_page }}</template><template v-if="detail.first_seen_at"> · first seen {{ fmtDateTime(detail.first_seen_at) }}</template></p>
@@ -318,6 +323,8 @@ import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 import FormInput from './Form/FormInput.vue'
 import FormSelect from './Form/FormSelect.vue'
 import LeadImportDialog from './LeadImportDialog.vue'
+import LeadNextActions from './LeadNextActions.vue'
+import LeadMyDay from './LeadMyDay.vue'
 
 const props = defineProps({ openId: { type: Number, default: null } })
 const emit = defineEmits(['convert', 'detail'])
@@ -435,6 +442,8 @@ const actForm = reactive({ type: 'note', description: '' })
 const actBusy = ref(false)
 
 const view = ref('list')
+const dayCount = ref(0)
+const myDay = ref(null)
 const dash = ref(null)
 const dashLoading = ref(false)
 
@@ -721,6 +730,14 @@ async function loadOptions() {
 }
 
 // A lead's own address (/leads/12) and a search result open the lead; one that is not there, or not yours, says so instead of opening an empty drawer.
+/** An action was planned, changed, done or removed: the lead's follow-up date and timeline moved with it. */
+async function onActionsChanged() {
+  if (detail.value) { try { const res = await leadService.get(detail.value.id); detail.value = res?.data ?? res } catch { /* the drawer keeps what it had */ } }
+  load()
+  myDay.value?.load?.()
+}
+function openFromDay(id) { view.value = 'list'; openById(id) }
+
 async function openById(id) {
   try { const res = await leadService.get(id); detail.value = res?.data ?? res }
   catch { toastError('That lead was not found.'); emit('detail', null) }
@@ -734,6 +751,7 @@ onMounted(async () => {
   load()
   loadViews()
   loadUsers()                       // for the "assigned to" filter
+  leadService.myDay({ assigned_to: 'me' }).then(r => { const d = r?.data; if (d) dayCount.value = d.overdue.length + d.today.length }).catch(() => {})
   if (props.openId) openById(props.openId)
 })
 </script>
@@ -772,6 +790,7 @@ onMounted(async () => {
 .fu-row.red b { color: #c62828; } .fu-row.amber b { color: #b5740a; }
 @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } .ins-grid { grid-template-columns: 1fr; } }
 
+.vbadge { margin-left: 6px; background: #c62828; color: #fff; border-radius: 9px; font-size: 10.5px; padding: 0 6px; font-weight: 700; }
 .lm-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 .lm-views { display: flex; gap: 6px; flex-wrap: wrap; }
 .vchip { display: inline-flex; align-items: center; border: 1px solid #d5d9e0; background: var(--surface); color: #555; border-radius: 16px; font-size: 12.5px; font-weight: 600; padding: 0; overflow: hidden; }

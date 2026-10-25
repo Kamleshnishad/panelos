@@ -245,6 +245,18 @@ class LeadImportTest extends TestCase
         $this->assertSame([], $imp->created_lead_ids);
     }
 
+    public function test_importing_puts_no_time_limit_on_a_process_that_has_none(): void
+    {
+        // The import raises PHP's limit for a big file on the web server. In a command-line or test process (no limit) it used to set one,
+        // and the rest of that process was killed 180 seconds later: the full suite died in an unrelated PDF test (PB-069).
+        $before = ini_get('max_execution_time');
+
+        $this->imported(self::HEAD . "A,,9809090900,,,,,,,,,
+");
+
+        $this->assertSame($before, ini_get('max_execution_time'));
+    }
+
     public function test_a_file_can_be_imported_only_once(): void
     {
         $imp = $this->imported(self::HEAD . "A,,9809090909,,,,,,,,,\n");

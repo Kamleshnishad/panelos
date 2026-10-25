@@ -61,6 +61,7 @@ class LeadController extends Controller
             'sources'      => $this->lists->activeNames('source', $cid),
             'lost_reasons' => $reasons,
             'statuses'     => Lead::STATUSES,
+            'task_types'   => \App\Models\LeadTask::TYPES,
             'own_only'     => $r->user()->ownLeadsOnly(),      // the screen hides the filters that cannot apply to a restricted person
             'transitions'  => Lead::transitions(),     // what each status may move to: the screen offers exactly these
         ], 'Lead options');

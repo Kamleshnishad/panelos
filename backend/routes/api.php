@@ -134,6 +134,13 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     // Spreadsheet in and out (LEADS_PLAN 4.2). Before /leads/{id} so "export" is not read as an id.
+    // Next actions (LEADS_PLAN 5.2). Before /leads/{id}: "tasks" must not be read as an id.
+    Route::get('/leads/tasks', [\App\Http\Controllers\Api\LeadTaskController::class, 'index'])->name('leads.tasks.index');
+    Route::put('/leads/tasks/{id}', [\App\Http\Controllers\Api\LeadTaskController::class, 'update'])->name('leads.tasks.update');
+    Route::post('/leads/tasks/{id}/complete', [\App\Http\Controllers\Api\LeadTaskController::class, 'complete'])->name('leads.tasks.complete');
+    Route::delete('/leads/tasks/{id}', [\App\Http\Controllers\Api\LeadTaskController::class, 'destroy'])->name('leads.tasks.destroy');
+    Route::get('/leads/{id}/tasks', [\App\Http\Controllers\Api\LeadTaskController::class, 'forLead'])->name('leads.tasks.for_lead');
+    Route::post('/leads/{id}/tasks', [\App\Http\Controllers\Api\LeadTaskController::class, 'store'])->name('leads.tasks.store');
     // A person's own saved views of the list (LEADS_PLAN 5.1).
     Route::get('/leads/views', [\App\Http\Controllers\Api\LeadViewController::class, 'index'])->name('leads.views.index');
     Route::post('/leads/views', [\App\Http\Controllers\Api\LeadViewController::class, 'store'])->name('leads.views.store');

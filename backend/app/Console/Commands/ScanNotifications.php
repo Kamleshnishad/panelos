@@ -83,6 +83,13 @@ class ScanNotifications extends Command
             report($e);
         }
 
+        // Next actions due or overdue (LEADS_PLAN 5.2).
+        try {
+            app(\App\Services\LeadTaskReminderService::class)->sync($companyId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         // IndiaMART link health (LEADS_PLAN 3.3): key refused, nothing pulled for an hour, key about to go idle.
         try {
             app(\App\Services\LeadConnectorHealth::class)->sync($companyId);

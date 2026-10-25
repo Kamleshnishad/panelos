@@ -39,8 +39,11 @@ class LeadReminderService
             ->whereNotNull('next_follow_up_date')->whereDate('next_follow_up_date', '<=', $today)
             ->orderBy('next_follow_up_date')->get() : collect();
 
+        // A lead with open next actions is reminded action by action (LeadTaskReminderService), not twice.
+        $withActions = \App\Models\LeadTask::withoutGlobalScope('tenant')->where('company_id', $companyId)->where('status', 'open')->pluck('lead_id')->flip();
+
         $mine = [];
-        foreach ($leads->whereNotNull('assigned_to_user_id') as $l) {
+        foreach ($leads->whereNotNull('assigned_to_user_id')->reject(fn ($l) => $withActions->has($l->id)) as $l) {
             $due = $l->next_follow_up_date->copy()->startOfDay();
             $name = $l->contact_name . ($l->company_name ? ", {$l->company_name}" : '');
             $mine["lead:{$l->id}:{$l->assigned_to_user_id}"] = [

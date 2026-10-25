@@ -93,7 +93,11 @@ class LeadSheetController extends Controller
     public function commit(Request $r, int $id)
     {
         try {
-            @set_time_limit(180);
+            // A big file takes a while. Only where PHP has a limit (the web server), and never to shorten an unlimited process: a command-line or test run
+            // that called this used to be cut off 180 seconds later, wherever it was.
+            if ((int) ini_get('max_execution_time') !== 0 && (int) ini_get('max_execution_time') < 180) {
+                @set_time_limit(180);
+            }
             $imp = $this->imports->commit($this->mine($r, $id));
 
             return $this->successResponse($imp->summary(), 'Import finished');
