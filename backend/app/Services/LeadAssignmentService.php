@@ -19,8 +19,24 @@ use App\Models\User;
  */
 class LeadAssignmentService
 {
+    /** While an import runs the bell is held: the people who were given leads are counted here, and the import sends each of them one line. */
+    private static ?array $held = null;
+
     public function __construct(private AppNotificationService $notify)
     {
+    }
+
+    /** Run $f with the per-lead bell held back. @return array<int,int> user id => how many leads they were given meanwhile */
+    public static function holdAlerts(callable $f): array
+    {
+        self::$held = [];
+        try {
+            $f();
+
+            return self::$held;
+        } finally {
+            self::$held = null;
+        }
     }
 
     /** @return ?int the user the lead was given to */
@@ -90,6 +106,11 @@ class LeadAssignmentService
     /** One bell entry for one person: who, where from, what they want, how to reach them. */
     public function alert(Lead $lead, int $userId, string $headline): void
     {
+        if (self::$held !== null) {
+            self::$held[$userId] = (self::$held[$userId] ?? 0) + 1;
+
+            return;
+        }
         $bits = array_filter([$lead->source, $lead->city, $lead->application]);
         $body = implode(' · ', $bits)
             . ($lead->requirement ? '. ' . mb_substr($lead->requirement, 0, 120) : '')

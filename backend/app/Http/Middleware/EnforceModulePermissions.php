@@ -32,6 +32,8 @@ class EnforceModulePermissions
         'batches.create'      => 'production.manage',
         'dispatches.create'   => 'dispatch.manage',
         'dispatches.by_batch' => 'dispatch.view',
+        // A whole contact list in one file is a bulk export like the ones under /export, not a read of one lead.
+        'leads.export'        => 'reports.view',
         // Stage sign-off is a separate duty from running the line, so it
         // gets its own key rather than riding on production.manage.
         'batches.stages.approve' => 'production.approve',

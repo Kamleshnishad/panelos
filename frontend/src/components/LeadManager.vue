@@ -12,6 +12,8 @@
         </div>
         <input v-if="view === 'list'" v-model="search" class="lm-search" placeholder="Search name / company / phone…" @keyup.enter="load" />
         <button class="btn btn-primary" @click="openCreate">+ New Lead</button>
+        <button v-if="can('leads.manage')" class="btn btn-ghost" @click="importOpen = true">Import</button>
+        <button v-if="can('reports.view')" class="btn btn-ghost" :disabled="exporting" @click="exportCsv">{{ exporting ? 'Exporting…' : 'Export' }}</button>
         <button class="btn btn-ghost" :disabled="loading" @click="load">↻</button>
       </div>
     </div>
@@ -100,6 +102,8 @@
       <button class="pg-btn" :disabled="pagination.current_page >= pagination.last_page" @click="goPage(pagination.current_page + 1)">Next →</button>
     </div>
     </template>
+
+    <lead-import-dialog v-if="importOpen" @close="importOpen = false" @changed="load()" />
 
     <!-- Hold / junk / lost / reopen: the moves that need a date or a reason -->
     <div v-if="sd.open" class="modal-overlay sd-overlay" @click.self="sd.open = false">
@@ -280,6 +284,7 @@ import leadService, { LEAD_APPLICATIONS } from '../services/leadService.js'
 import { toastSuccess, toastError, confirmDialog } from '../services/ui.js'
 import FormInput from './Form/FormInput.vue'
 import FormSelect from './Form/FormSelect.vue'
+import LeadImportDialog from './LeadImportDialog.vue'
 
 const emit = defineEmits(['convert'])
 
@@ -357,6 +362,31 @@ const today = new Date().toISOString().slice(0, 10)
 // quickly can let an earlier request resolve after a later one and overwrite
 // the table with stale data (MD8).
 let reqSeq = 0
+const importOpen = ref(false)
+const exporting = ref(false)
+
+/** Same rule as the menu: company admins can do everything, others need the key. */
+function can(key) {
+  let u = null
+  try { u = JSON.parse(localStorage.getItem('user') || 'null') } catch { /* no user */ }
+  if (!u) return false
+  if (u.is_admin || u.is_company_admin || u.is_super_admin) return true
+  const p = u.permissions || []
+  return p.includes('*') || p.includes(key)
+}
+
+/** What is on screen (the status tab and the search box) as a spreadsheet. */
+async function exportCsv() {
+  exporting.value = true
+  try {
+    const params = {}
+    if (statusFilter.value) params.status = statusFilter.value
+    if (search.value) params.search = search.value
+    await leadService.exportList(params)
+  } catch (e) { toastError(e?.response?.data?.message ?? 'Could not export the leads.') }
+  finally { exporting.value = false }
+}
+
 async function load(page = 1) {
   const seq = ++reqSeq
   loading.value = true

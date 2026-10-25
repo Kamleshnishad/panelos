@@ -36,7 +36,7 @@ class ExportController extends Controller
     }
 
     /** Neutralise CSV/Excel formula injection (=,+,-,@,tab,CR lead) by prefixing a quote. */
-    private static function csvSafe($v): string
+    public static function csvSafe($v): string
     {
         $s = (string) ($v ?? '');
         if ($s !== '' && in_array($s[0], ['=', '+', '-', '@', "\t", "\r"], true)) {

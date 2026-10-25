@@ -64,6 +64,9 @@ RateLimiter::for('lead-pull', fn (Request $request) => Limit::perMinute(6)->by('
 // Inbound lead address (LEADS_PLAN 2.3): 60 messages a minute per token. There is deliberately no per-address limit here: behind the proxies the
 // address may be the proxy's, shared by everyone, so a limit on it would let one noisy sender block all real ones. Wrong-token guesses are
 // counted per address inside LeadInboundService instead (valid tokens never count against it).
+// Checking and running a spreadsheet are heavy: a few a minute per person is plenty.
+RateLimiter::for('lead-import', fn (Request $request) => Limit::perMinute(10)->by('lead-import:' . ($request->user()?->id ?? $request->ip())));
+
 RateLimiter::for('inbound-leads', function (Request $request) {
     return Limit::perMinute(60)->by('token:' . sha1((string) $request->route('token')))->response(
         fn (Request $r, array $headers) => response()->json(
@@ -130,6 +133,13 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
 
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
+    // Spreadsheet in and out (LEADS_PLAN 4.2). Before /leads/{id} so "export" is not read as an id.
+    Route::get('/leads/export', [\App\Http\Controllers\Api\LeadSheetController::class, 'export'])->name('leads.export');
+    Route::get('/leads/import/template', [\App\Http\Controllers\Api\LeadSheetController::class, 'template'])->name('leads.import.template');
+    Route::get('/leads/import/last', [\App\Http\Controllers\Api\LeadSheetController::class, 'last'])->name('leads.import.last');
+    Route::post('/leads/import/preview', [\App\Http\Controllers\Api\LeadSheetController::class, 'preview'])->middleware('throttle:lead-import')->name('leads.import.preview');
+    Route::post('/leads/import/{id}/commit', [\App\Http\Controllers\Api\LeadSheetController::class, 'commit'])->middleware('throttle:lead-import')->name('leads.import.commit');
+    Route::post('/leads/import/{id}/undo', [\App\Http\Controllers\Api\LeadSheetController::class, 'undo'])->name('leads.import.undo');
     Route::get('/leads/dashboard', [\App\Http\Controllers\Api\LeadController::class, 'dashboard'])->name('leads.dashboard');
     Route::get('/leads/options', [\App\Http\Controllers\Api\LeadController::class, 'options'])->name('leads.options');
     Route::post('/leads', [\App\Http\Controllers\Api\LeadController::class, 'store'])->name('leads.store');

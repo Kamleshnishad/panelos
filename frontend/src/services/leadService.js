@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { downloadFile } from './transfers.js'
 
 function authHeaders() {
   const token = localStorage.getItem('token')
@@ -23,6 +24,19 @@ export default {
   addActivity(id, data)    { return api('post', `/api/leads/${id}/activities`, data) },
   convert(id, data = {})   { return api('post', `/api/leads/${id}/convert`, data) },
   states()                 { return api('get',  '/api/gst/states') },
+
+  // Spreadsheet in and out (LEADS_PLAN 4.2)
+  importCheck(file, source) {
+    const form = new FormData()
+    form.append('file', file)
+    if (source) form.append('source', source)
+    return axios({ method: 'post', url: '/api/leads/import/preview', data: form, headers: authHeaders() }).then(r => r.data)
+  },
+  importCommit(id)         { return api('post', `/api/leads/import/${id}/commit`) },
+  importUndo(id)           { return api('post', `/api/leads/import/${id}/undo`) },
+  importLast()             { return api('get',  '/api/leads/import/last') },
+  /** The list as the screen shows it (same status and search), as a CSV file. */
+  exportList(params = {})  { return downloadFile('/api/leads/export', `leads_${new Date().toISOString().slice(0, 10)}.csv`, { label: 'Exporting leads', kind: 'leads-export', params, type: 'text/csv' }) },
   remove(id)               { return api('delete', `/api/leads/${id}`) },
 
   users()                  { return api('get',  '/api/users') },

@@ -62,7 +62,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 3.3 | Connector health and alerts | done, local (against a fake; no real key yet) |
 | 3.4 | IndiaMART go-live | not started |
 | 4.1 | Website enquiry form | done, local |
-| 4.2 | Spreadsheet import and export | not started |
+| 4.2 | Spreadsheet import and export | done, local |
 | 4.3 | WhatsApp enquiries | not started |
 | 4.4 | Meta lead ads, Google Ads | not started |
 | 4.5 | Justdial, TradeIndia, ExportersIndia | not started |
@@ -233,6 +233,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **4.1 Website enquiry form (LC-03):** embed snippet with spam protection, page and campaign captured, posts to the inbound API. **S to M.**
   **Result (local):** `frontend/public/lead-form.js`, `leads.landing_page`, per-address allowed websites, a "sent too fast" check, the *Website form* card (snippet + websites) in Master Data -> Lead intake, `LeadWebsiteFormTest` (22) and browser runs. Decisions: no captcha (honeypot + timer + allowed websites are enough to start; add one if spam appears); the API was already open to browsers, so no CORS change; the snippet needs the token, which is shown only once, so the card fills it in right after an address is made.
 - **4.2 Spreadsheet import and export (LC-09):** template, dry run listing rejects and duplicates, undo of the last import, export of the filtered list. **M.**
+  **Result (local):** `LeadSheetController`, `LeadImportService`, `LeadIntakeService::preview`, table `lead_imports`, `LeadImportDialog.vue` and Import / Export buttons on the Leads screen, `LeadImportTest` (33) and a browser run. Decisions: CSV only (no spreadsheet library, Excel saves CSV); check then import then undo-the-last, the same door as every channel; undo keeps leads someone has worked on; the bell is one line per person during an import; export needs `reports.view` (a bulk contact list), import needs `leads.manage`; 1,000 rows per file. Found on the way: PB-067.
 - **4.3 WhatsApp enquiries (LC-07):** Twilio inbound webhook creates a lead or adds to an existing one, optional auto-reply. **M.** Needs the client's WhatsApp number setup.
 - **4.4 Meta lead ads and Google Ads (LC-04, LC-05):** Meta webhook plus Graph read (needs a Meta app review and the page admin), Google form webhook to the inbound API. **M each.** Only if they advertise.
 - **4.5 Justdial, TradeIndia, ExportersIndia (LC-06):** first ask each for a partner API; otherwise an inbound e-mail address with a parser per portal, with a visible "could not read this e-mail" list. **M.**

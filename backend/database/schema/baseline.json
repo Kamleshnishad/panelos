@@ -551,6 +551,24 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "lead_imports": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "user_id": "bigint unsigned",
+        "file_name": "varchar(150)",
+        "source": "varchar(60)",
+        "status": "varchar(12)",
+        "total_rows": "int unsigned",
+        "counts": "json",
+        "rows": "longtext",
+        "created_lead_ids": "json",
+        "undo_result": "json",
+        "imported_at": "timestamp",
+        "undone_at": "timestamp",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
     "lead_sources": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

@@ -66,6 +66,31 @@ class LeadIntakeService
         }
     }
 
+    /**
+     * What ingest() would do with this message, without doing it (the spreadsheet check, LEADS_PLAN 4.2). Writes nothing at all.
+     * @return array{outcome:string, reason:?string, phone_key:?string, email_key:?string, external_id:?string}
+     */
+    public function preview(int $companyId, string $source, array $data): array
+    {
+        $source = $this->source($companyId, $source);
+        $lead = $this->clean($data);
+        $keys = ['phone_key' => LeadMatcher::phoneKey($lead['phone']), 'email_key' => LeadMatcher::emailKey($lead['email']), 'external_id' => $lead['external_id']];
+
+        if ($lead['external_id'] !== null && $this->alreadyReceived($companyId, $source, $lead['external_id'])) {
+            return ['outcome' => LeadIntakeResult::ALREADY_RECEIVED, 'reason' => 'This reference was received before.'] + $keys;
+        }
+        if ($problem = $this->problem($lead)) {
+            return ['outcome' => LeadIntakeResult::REJECTED, 'reason' => $problem] + $keys;
+        }
+        $matches = $this->matcher->matches($companyId, $lead['phone'], $lead['email']);
+        $open = collect($matches)->first(fn ($m) => !in_array($m['status'], Lead::CLOSED, true));
+        if ($open) {
+            return ['outcome' => LeadIntakeResult::MERGED, 'reason' => "Same buyer as open lead {$open['lead_no']}; it is added to that lead."] + $keys;
+        }
+
+        return ['outcome' => LeadIntakeResult::CREATED, 'reason' => $matches ? 'Same buyer as ' . implode(', ', array_column($matches, 'lead_no')) . ' (closed); a new lead is made.' : null] + $keys;
+    }
+
     private function create(int $companyId, string $source, array $d, array $payload, array $similarNos, array $matches): LeadIntakeResult
     {
         return DB::transaction(function () use ($companyId, $source, $d, $payload, $similarNos, $matches) {
@@ -183,7 +208,7 @@ class LeadIntakeService
         $when = null;
         if (is_scalar($in['first_seen_at'] ?? null) && trim((string) $in['first_seen_at']) !== '') {
             try {
-                $when = Carbon::parse((string) $in['first_seen_at']);
+                $when = Carbon::parse((string) $in['first_seen_at'])->setTimezone(config('app.timezone'));     // stored as app time: a +05:30 stamp must not be saved as if it were UTC
                 if ($when->isFuture()) $when = now();
             } catch (\Throwable) {
                 $when = null;
