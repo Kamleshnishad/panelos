@@ -25,6 +25,11 @@ export default {
   convert(id, data = {})   { return api('post', `/api/leads/${id}/convert`, data) },
   states()                 { return api('get',  '/api/gst/states') },
 
+  // Many leads at once, and merging two (LEADS_PLAN 5.8)
+  bulk(ids, data)               { return api('post', '/api/leads/bulk', { ids, ...data }) },
+  mergeCandidates(id, q = '')   { return api('get',  `/api/leads/${id}/merge-candidates`, null, q ? { q } : null) },
+  mergeLead(keepId, fromId)     { return api('post', `/api/leads/${keepId}/merge`, { from_lead_id: fromId }) },
+
   // Files on a lead (LEADS_PLAN 5.7). Downloads go through transfers.js (they need the sign-in header).
   attachments(id)               { return api('get', `/api/leads/${id}/attachments`) },
   addAttachment(id, file, kind) {

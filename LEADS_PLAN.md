@@ -74,7 +74,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 | 5.5 | Quotation chasing | done, local |
 | 5.6 | Stale leads and response time | done, local |
 | 5.7 | Attachments | done, local |
-| 5.8 | Merge, bulk actions, board, stages, scoring | not started |
+| 5.8 | Merge, bulk actions, board, stages, scoring | **part done, local**: merge and bulk actions. Board, editable stages and scoring still to do |
 | 6.1 | Lead-to-cash tracing | not started |
 | 6.2 | Pipeline forecast | not started |
 | 6.3 | Funnel and lost analysis | not started |
@@ -256,6 +256,7 @@ Phases 1 to 3 are the core. 4 to 7 can be reordered by what the client says matt
 - **5.7 Attachments (LP-12):** drawings, photos, BOQ files on a lead, carried to the quotation. **M.**
   **Result (local):** private files on a lead (`lead_attachments`, `LeadAttachmentService`, `LeadAttachments.vue`), only real files of eleven known kinds, 15 MB and 30 files each, `LeadAttachmentTest` (18) and a browser run. Decision: **"carried to the quotation" is left out on purpose**: the quotation module has no place for files and adding one would change it, which this work avoids; the files stay on the lead. If wanted, a small *Files* box on the quotation that reads the lead's files can be added later as its own step. Also: files are in the `storage` volume, which the nightly database backup does not include.
 - **5.8 Merge, bulk actions, board, stages, scoring (LP-08, LP-09, LP-11, LP-06):** merge two leads, select-many actions, board view, editable stages with probabilities, hot/warm/cold and a score. **L, split in sub-PRs when we get there.**
+  **First part (local):** merge two leads and select-many actions: `LeadMergeService`, `LeadBulkService`, `LeadBulkBar.vue`, `LeadMergeDialog.vue`, `LeadMergeBulkTest` (22) and a browser run. Decisions: the lead you look at is kept and the other is folded in and soft-deleted (it keeps its number and channel reference so the same enquiry cannot come back); a merge is refused when either lead is closed, both are quoted, or the customers differ; bulk never reopens, wins or deletes, skips what cannot take the change and says why, and rings each person once. **Still to do in 5.8:** board view, editable stages with probabilities, hot/warm/cold and a score (each its own step).
 
 ## Phase 6: insight
 

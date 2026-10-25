@@ -470,6 +470,7 @@
         "lost_note": "text",
         "customer_id": "bigint unsigned",
         "quotation_id": "bigint unsigned",
+        "merged_into_lead_id": "bigint unsigned",
         "notes": "text",
         "created_at": "timestamp",
         "updated_at": "timestamp",

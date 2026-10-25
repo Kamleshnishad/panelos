@@ -122,16 +122,21 @@
     </div>
 
     <template v-if="view === 'list'">
+    <lead-bulk-bar v-if="view === 'list' && canManage && selected.length" :ids="selected" :users="users" @clear="selected = []" @done="onBulkDone" />
     <div v-if="loading" class="lm-loading">Loading…</div>
     <p v-else-if="!leads.length && (filtersActive || search)" class="empty">No leads match these filters. <button class="link" type="button" @click="clearFilters">Show everything</button></p>
     <p v-else-if="!leads.length" class="empty">No leads here. Click <strong>+ New Lead</strong> to add an inquiry.</p>
 
     <table v-else class="lead-table">
       <thead>
-        <tr><th>Lead</th><th>Contact</th><th>Source</th><th>Requirement</th><th>Follow-up</th><th>Status</th></tr>
+        <tr>
+          <th v-if="canManage" class="sel-col"><input type="checkbox" :checked="allSelected" :indeterminate.prop="someSelected && !allSelected" aria-label="Select every lead on this page" @change="toggleAll($event.target.checked)" /></th>
+          <th>Lead</th><th>Contact</th><th>Source</th><th>Requirement</th><th>Follow-up</th><th>Status</th>
+        </tr>
       </thead>
       <tbody>
-        <tr v-for="l in leads" :key="l.id" class="lead-row" tabindex="0" role="button" @click="openDetail(l)" @keyup.enter="openDetail(l)">
+        <tr v-for="l in leads" :key="l.id" class="lead-row" :class="{ picked: selected.includes(l.id) }" tabindex="0" role="button" @click="openDetail(l)" @keyup.enter="openDetail(l)">
+          <td v-if="canManage" class="sel-col" @click.stop><input type="checkbox" :checked="selected.includes(l.id)" :aria-label="'Select ' + l.lead_no" @change="toggle(l.id, $event.target.checked)" /></td>
           <td class="mono">{{ l.lead_no }}</td>
           <td><div class="bold">{{ l.contact_name }}</div><div class="muted">{{ l.company_name || l.phone || '—' }}</div></td>
           <td><span class="src-badge">{{ l.source }}</span></td>
@@ -151,6 +156,7 @@
     </div>
     </template>
 
+    <lead-merge-dialog v-if="mergeOpen && detail" :lead="detail" @close="mergeOpen = false" @merged="onMerged" />
     <lead-import-dialog v-if="importOpen" @close="importOpen = false" @changed="load()" />
 
     <!-- Hold / junk / lost / reopen: the moves that need a date or a reason -->
@@ -293,6 +299,7 @@
             <button v-for="s in moveTo(detail.status)" :key="s" :class="['btn', 'sm', s === 'lost' ? 'btn-danger' : 'btn-status']" :disabled="busy" @click="setStatus(detail, s)">{{ isClosed(detail.status) ? 'Reopen as ' + statusLabel(s) : statusLabel(s) }}</button>
           </div>
           <p v-if="detail.status === 'on_hold'" class="conv-note">On hold until {{ fmtDate(detail.next_follow_up_date) }}.</p>
+          <button v-if="!isClosed(detail.status) && canManage" class="btn btn-ghost sm merge-btn" type="button" @click="mergeOpen = true">Merge another lead into this one…</button>
           <button v-if="!isClosed(detail.status)" class="btn btn-convert" :disabled="busy" @click="convertLead(detail)">
             → Convert to Quotation
           </button>
@@ -342,6 +349,8 @@ import LeadNextActions from './LeadNextActions.vue'
 import LeadContactBar from './LeadContactBar.vue'
 import LeadRequirement from './LeadRequirement.vue'
 import LeadAttachments from './LeadAttachments.vue'
+import LeadBulkBar from './LeadBulkBar.vue'
+import LeadMergeDialog from './LeadMergeDialog.vue'
 import LeadMyDay from './LeadMyDay.vue'
 
 const props = defineProps({ openId: { type: Number, default: null } })
@@ -523,6 +532,17 @@ const today = new Date().toISOString().slice(0, 10)
 // the table with stale data (MD8).
 let reqSeq = 0
 const importOpen = ref(false)
+const mergeOpen = ref(false)
+const selected = ref([])                                  // ids ticked on the list, for the bulk bar (LEADS_PLAN 5.8)
+const canManage = can('leads.manage')
+const allSelected = computed(() => leads.value.length > 0 && leads.value.every(l => selected.value.includes(l.id)))
+const someSelected = computed(() => selected.value.length > 0)
+const toggle = (id, on) => { selected.value = on ? [...new Set([...selected.value, id])] : selected.value.filter(x => x !== id) }
+const toggleAll = (on) => { selected.value = on ? [...new Set([...selected.value, ...leads.value.map(l => l.id)])] : selected.value.filter(id => !leads.value.some(l => l.id === id)) }
+/** The bar did its work: show the new state; the bar keeps its result (and what was skipped) until the selection is cleared. */
+async function onBulkDone() { await load(pagination.current_page); myDay.value?.load?.() }
+/** Two leads became one: the drawer shows the merged lead and the list loses the other. */
+async function onMerged() { mergeOpen.value = false; await onActionsChanged() }
 const exporting = ref(false)
 
 /** Same rule as the menu: company admins can do everything, others need the key. */
@@ -972,6 +992,9 @@ onMounted(async () => {
 .btn-status { background: var(--primary-tint); color: var(--primary); text-transform: capitalize; }
 .btn-danger { background: #c62828; color: #fff; }
 .btn-danger-ghost { background: transparent; border: 1px solid #ef9a9a; color: #c62828; }
+.sel-col { width: 34px; text-align: center; }
+.lead-row.picked { background: #f3f7ff; }
+.merge-btn { width: 100%; margin-top: 10px; }
 .btn-convert { width: 100%; margin-top: 10px; background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; font-weight: 700; }
 .conv-note { font-size: 12px; color: #2e7d32; margin: 8px 0 0; font-weight: 600; }
 .error-msg { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 9px 14px; border-radius: 6px; font-size: 13px; margin-top: 12px; }

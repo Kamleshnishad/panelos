@@ -66,6 +66,9 @@ RateLimiter::for('lead-pull', fn (Request $request) => Limit::perMinute(6)->by('
 // counted per address inside LeadInboundService instead (valid tokens never count against it).
 // Checking and running a spreadsheet are heavy: a few a minute per person is plenty.
 // E-mails and WhatsApp links written from a lead: a person sends a few a minute, not hundreds.
+// Select-many actions: a few a minute per person (each can touch up to 200 leads).
+RateLimiter::for('lead-bulk', fn (Request $request) => Limit::perMinute(10)->by('lead-bulk:' . ($request->user()?->id ?? $request->ip())));
+
 // Files put on leads: a few a minute per person is plenty.
 RateLimiter::for('lead-upload', fn (Request $request) => Limit::perMinute(20)->by('lead-upload:' . ($request->user()?->id ?? $request->ip())));
 
@@ -140,6 +143,10 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     // Spreadsheet in and out (LEADS_PLAN 4.2). Before /leads/{id} so "export" is not read as an id.
+    // Many leads at once, and merging two (LEADS_PLAN 5.8).
+    Route::post('/leads/bulk', [\App\Http\Controllers\Api\LeadBulkController::class, 'run'])->middleware('throttle:lead-bulk')->name('leads.bulk');
+    Route::get('/leads/{id}/merge-candidates', [\App\Http\Controllers\Api\LeadMergeController::class, 'candidates'])->name('leads.merge.candidates');
+    Route::post('/leads/{id}/merge', [\App\Http\Controllers\Api\LeadMergeController::class, 'merge'])->name('leads.merge');
     // Files on a lead (LEADS_PLAN 5.7). Before /leads/{id}: "attachments" must not be read as an id.
     Route::get('/leads/attachments/{id}', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'download'])->name('leads.attachments.download');
     Route::delete('/leads/attachments/{id}', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'destroy'])->name('leads.attachments.destroy');

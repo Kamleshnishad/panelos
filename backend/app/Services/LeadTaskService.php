@@ -177,6 +177,12 @@ class LeadTaskService
         });
     }
 
+    /** Make the lead's follow-up date follow its open actions again (after actions were moved onto it, as a merge does). */
+    public function refreshDate(Lead $lead): void
+    {
+        $this->syncLeadDate($lead, true);
+    }
+
     /** The quotation is no longer out with the buyer: the open chase actions made for it are cancelled and each lead's date follows what is left. @return int how many */
     public function cancelForQuotation(int $companyId, int $quotationId, string $why): int
     {
