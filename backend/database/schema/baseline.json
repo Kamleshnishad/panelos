@@ -551,6 +551,20 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "lead_attachments": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "lead_id": "bigint unsigned",
+        "uploaded_by_user_id": "bigint unsigned",
+        "kind": "varchar(12)",
+        "original_name": "varchar(200)",
+        "path": "varchar(255)",
+        "extension": "varchar(8)",
+        "size_bytes": "int unsigned",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "deleted_at": "timestamp"
+    },
     "lead_requirement_lines": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",

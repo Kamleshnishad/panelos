@@ -232,6 +232,7 @@ class LeadService
 
     public function delete(Lead $lead): void
     {
+        app(LeadAttachmentService::class)->purge($lead);          // its files go with it (5.7)
         $lead->delete();
     }
 

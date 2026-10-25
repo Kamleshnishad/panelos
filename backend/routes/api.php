@@ -66,6 +66,9 @@ RateLimiter::for('lead-pull', fn (Request $request) => Limit::perMinute(6)->by('
 // counted per address inside LeadInboundService instead (valid tokens never count against it).
 // Checking and running a spreadsheet are heavy: a few a minute per person is plenty.
 // E-mails and WhatsApp links written from a lead: a person sends a few a minute, not hundreds.
+// Files put on leads: a few a minute per person is plenty.
+RateLimiter::for('lead-upload', fn (Request $request) => Limit::perMinute(20)->by('lead-upload:' . ($request->user()?->id ?? $request->ip())));
+
 RateLimiter::for('lead-contact', fn (Request $request) => Limit::perMinute(30)->by('lead-contact:' . ($request->user()?->id ?? $request->ip())));
 
 RateLimiter::for('lead-import', fn (Request $request) => Limit::perMinute(10)->by('lead-import:' . ($request->user()?->id ?? $request->ip())));
@@ -137,6 +140,11 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     // Lead / Inquiry Management
     Route::get('/leads', [\App\Http\Controllers\Api\LeadController::class, 'index'])->name('leads.index');
     // Spreadsheet in and out (LEADS_PLAN 4.2). Before /leads/{id} so "export" is not read as an id.
+    // Files on a lead (LEADS_PLAN 5.7). Before /leads/{id}: "attachments" must not be read as an id.
+    Route::get('/leads/attachments/{id}', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'download'])->name('leads.attachments.download');
+    Route::delete('/leads/attachments/{id}', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'destroy'])->name('leads.attachments.destroy');
+    Route::get('/leads/{id}/attachments', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'index'])->name('leads.attachments.index');
+    Route::post('/leads/{id}/attachments', [\App\Http\Controllers\Api\LeadAttachmentController::class, 'store'])->middleware('throttle:lead-upload')->name('leads.attachments.store');
     // What a lead wants, and "Quote this lead" (LEADS_PLAN 5.4). Calls the quotation module, never changes it.
     Route::get('/leads/{id}/requirement', [\App\Http\Controllers\Api\LeadRequirementController::class, 'show'])->name('leads.requirement.show');
     Route::put('/leads/{id}/requirement', [\App\Http\Controllers\Api\LeadRequirementController::class, 'save'])->name('leads.requirement.save');

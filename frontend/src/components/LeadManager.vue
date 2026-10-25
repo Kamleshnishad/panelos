@@ -276,6 +276,7 @@
         <p v-if="engagementLine" class="eng-line" :class="engagementLine.tone" data-testid="engagement">{{ engagementLine.text }}</p>
         <lead-contact-bar :lead="detail" @changed="onActionsChanged" />
         <lead-requirement :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :busy="busy" @changed="onActionsChanged" @quote="startQuote" />
+        <lead-attachments :lead-id="detail.id" @changed="onActionsChanged" />
         <lead-next-actions :lead-id="detail.id" :closed="CLOSED.includes(detail.status)" :users="users" @changed="onActionsChanged" />
         <div class="d-req" v-if="detail.external_id || detail.campaign || utmText || detail.landing_page || detail.first_seen_at">
           <label>Where it came from</label>
@@ -340,6 +341,7 @@ import LeadImportDialog from './LeadImportDialog.vue'
 import LeadNextActions from './LeadNextActions.vue'
 import LeadContactBar from './LeadContactBar.vue'
 import LeadRequirement from './LeadRequirement.vue'
+import LeadAttachments from './LeadAttachments.vue'
 import LeadMyDay from './LeadMyDay.vue'
 
 const props = defineProps({ openId: { type: Number, default: null } })

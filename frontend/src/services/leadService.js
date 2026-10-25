@@ -25,6 +25,16 @@ export default {
   convert(id, data = {})   { return api('post', `/api/leads/${id}/convert`, data) },
   states()                 { return api('get',  '/api/gst/states') },
 
+  // Files on a lead (LEADS_PLAN 5.7). Downloads go through transfers.js (they need the sign-in header).
+  attachments(id)               { return api('get', `/api/leads/${id}/attachments`) },
+  addAttachment(id, file, kind) {
+    const form = new FormData()
+    form.append('file', file)
+    if (kind) form.append('kind', kind)
+    return axios({ method: 'post', url: `/api/leads/${id}/attachments`, data: form, headers: authHeaders() }).then(r => r.data)
+  },
+  removeAttachment(id)          { return api('delete', `/api/leads/attachments/${id}`) },
+
   // What they want, and "Quote this lead" (LEADS_PLAN 5.4)
   requirement(id)               { return api('get', `/api/leads/${id}/requirement`) },
   saveRequirement(id, lines)    { return api('put', `/api/leads/${id}/requirement`, { lines }) },
