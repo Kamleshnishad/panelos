@@ -1228,9 +1228,9 @@ PO status is then recomputed: all lines full → `received`, some → `partial`,
 
 ### 19.3 Reports & analytics
 
-All under `reports.view`.
+All under `reports.view`. Every report endpoint validates its input first (`ReportingController::period` and the rules on each method): dates `YYYY-MM-DD`, the end not before the start, `months` 1 to 60, `limit` 1 to 100, `page` / `per_page` / `bucket` checked; a bad value is a 422 naming the problem, and the controller no longer catches exceptions (the app's handler logs them and answers with a reference).
 
-**Known report defects still open (Reports audit, 25 Oct 2026): PB-081 (CSV export dates and Excel BOM), PB-082 (input validation), PB-083 (UTC 'today' in other screens) and the enhancements FR-010 in BUGS.md.** PB-071 to PB-080 are fixed. Report dates in the SPA come from `frontend/src/services/dates.js`.
+**Known report items still open (Reports audit, 25 Oct 2026): PB-083 (UTC 'today' in other screens) and the enhancements FR-010 in BUGS.md.** PB-071 to PB-082 are fixed. Report dates in the SPA come from `frontend/src/services/dates.js`.
 
 | Endpoint | Content |
 |---|---|
@@ -1246,7 +1246,7 @@ All under `reports.view`.
 | `/api/reports/top-customers` · `/panel-type-mix` | Customer and product mix. Panel mix: panel area only in `total_sqm`; accessories are their own value-only row |
 | `/api/reports/mis` | MIS for the invoices RAISED in the period: invoiced, collected (received against them so far, write-offs excluded), written off, outstanding (= the sum of the ageing, as of today, with a `not_due` bucket); GST; orders by order date; completed runs with PLANNED sqm (`basis: planned`: no actual output is stored). Not the cash received in the period (that is cash-flow) |
 | `/api/reports/tally/xml` · `/tally/csv` | Tally-compatible export. XML: every value escaped, dates `YYYYMMDD`, amounts two decimals. CSV: UTF-8 with a byte-order mark, text columns formula-guarded. The ledger names are fixed (`Sales @ <rate>%`, `CGST`, `SGST`, `IGST`) and must exist in the client's Tally |
-| `/api/export/customers|quotations|orders|invoices` | Bulk CSV |
+| `/api/export/customers|quotations|orders|invoices` | Bulk CSV, UTF-8 with a byte-order mark. `from` / `to` (YYYY-MM-DD, both included) filter on the document's own date: quotation `quoted_on`, order `order_date`, invoice `invoice_date` (customers have no range). `ExportController::csvSafe` defuses anything that could run as a formula but leaves plain numbers and phone numbers alone |
 
 Forecasting (`reports.manage` to generate): `/api/forecasts/inventory`, `/demand`, `/reorders`, plus an ML
 set `/forecasts/ml`, `/ml/compare-models`, `/ml/anomalies`, `/ml/record-actual`, `/ml/performance`.

@@ -281,7 +281,7 @@ class ReportsMediumFixesTest extends TestCase
         $this->assertSame([2, 2, 2], [$p1['pagination']['total'], $p1['pagination']['last_page'], $p2['pagination']['current_page']]);
         $this->assertNotSame($nos($p1), $nos($p2));
 
-        $this->assertSame(6, $this->ar('bucket=nonsense')['pagination']['total'], 'an unknown bucket is ignored');
+        $this->getJson('/api/reports/accounts-receivable?bucket=nonsense')->assertStatus(422);       // PB-082: an unknown bucket is refused, not ignored
     }
 
     // ── PB-080 c/d/e: one set of definitions ────────────────────────────────
