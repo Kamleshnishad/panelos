@@ -239,6 +239,13 @@
               <input v-model.number="form.lead_overdue_alert_days" type="number" min="1" max="60" class="days-input" aria-label="Days overdue before the owner is told" /> days
             </div>
           </label>
+          <label class="trigger-row">
+            <input type="checkbox" v-model="form.chase_quotations" />
+            <div>
+              <div class="trigger-label">Chase sent quotations</div>
+              <div class="trigger-sub">When a quotation is sent, plan follow-up actions for its lead 3 and 7 days later and two days before it expires. They stop when the quotation is accepted, rejected, expired or revised</div>
+            </div>
+          </label>
         </div>
       </section>
 

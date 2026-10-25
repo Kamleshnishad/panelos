@@ -83,6 +83,13 @@ class ScanNotifications extends Command
             report($e);
         }
 
+        // Sent quotations are chased with next actions (LEADS_PLAN 5.5), before the reminders so a step due today rings in this run.
+        try {
+            app(\App\Services\QuotationChaseService::class)->sync($companyId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         // Next actions due or overdue (LEADS_PLAN 5.2).
         try {
             app(\App\Services\LeadTaskReminderService::class)->sync($companyId);

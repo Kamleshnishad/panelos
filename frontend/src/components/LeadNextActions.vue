@@ -8,7 +8,7 @@
 
     <ul v-if="open.length" class="na-list">
       <li v-for="t in open" :key="t.id" :class="{ late: isLate(t) }">
-        <span class="na-type">{{ t.type_label }}</span>
+        <span class="na-type">{{ t.type_label }}<span v-if="t.auto" class="na-auto" title="Planned automatically for a sent quotation">auto</span></span>
         <span class="na-when" :class="{ late: isLate(t) }">{{ whenText(t) }}</span>
         <span class="na-what">{{ t.title || '' }}<small v-if="t.assignee"> · {{ t.assignee }}</small></span>
         <span class="na-btns">
@@ -106,6 +106,7 @@ onMounted(load)
 .na-list { list-style: none; margin: 6px 0 0; padding: 0; }
 .na-list li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
 .na-type { font-weight: 700; color: var(--primary); min-width: 88px; }
+.na-auto { margin-left: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; background: #e8eefc; color: #3b5bdb; border-radius: 8px; padding: 1px 6px; }
 .na-when { color: #555; min-width: 120px; }
 .na-when.late { color: #c62828; font-weight: 600; }
 .na-what { flex: 1; color: #333; }

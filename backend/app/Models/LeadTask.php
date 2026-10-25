@@ -13,7 +13,7 @@ class LeadTask extends BaseModel
     public const TYPES = ['call' => 'Call', 'whatsapp' => 'WhatsApp', 'email' => 'E-mail', 'visit' => 'Site visit', 'quote' => 'Send quotation', 'other' => 'Other'];
 
     protected $fillable = [
-        'company_id', 'lead_id', 'assigned_to_user_id', 'created_by_user_id', 'type', 'title', 'due_date', 'due_time', 'status', 'done_at', 'done_by_user_id', 'done_note',
+        'company_id', 'lead_id', 'quotation_id', 'chase_step', 'assigned_to_user_id', 'created_by_user_id', 'type', 'title', 'due_date', 'due_time', 'status', 'done_at', 'done_by_user_id', 'done_note',
     ];
 
     protected $casts = ['due_date' => 'date', 'done_at' => 'datetime'];

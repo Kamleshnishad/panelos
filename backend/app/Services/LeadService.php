@@ -424,7 +424,7 @@ class LeadService
     }
 
     /** @return \Illuminate\Support\Collection<int,Lead> leads whose quotation is this one or any earlier version of it */
-    private function leadsForQuotation(int $companyId, int $quotationId)
+    public function leadsForQuotation(int $companyId, int $quotationId)
     {
         $ids = [];
         for ($id = $quotationId, $guard = 0; $id && !in_array($id, $ids, true) && $guard < 25; $guard++) {

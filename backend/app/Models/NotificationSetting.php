@@ -15,7 +15,7 @@ class NotificationSetting extends Model
         'notify_payment_due', 'payment_due_days_before',
         'notify_payment_overdue', 'notify_low_stock',
         'notify_order_confirmed', 'notify_dispatch_done',
-        'notify_lead_followups', 'lead_overdue_alert_days',
+        'notify_lead_followups', 'lead_overdue_alert_days', 'chase_quotations',
         'admin_phone',
         'email_payment_reminders',
         'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password', 'smtp_from_address', 'smtp_from_name',
@@ -32,6 +32,7 @@ class NotificationSetting extends Model
         'notify_order_confirmed' => 'boolean',
         'notify_dispatch_done'   => 'boolean',
         'notify_lead_followups'  => 'boolean',
+        'chase_quotations'       => 'boolean',
         'lead_overdue_alert_days'=> 'integer',
         'payment_due_days_before'=> 'integer',
         'email_payment_reminders'=> 'boolean',
@@ -51,7 +52,7 @@ class NotificationSetting extends Model
     {
         return static::firstOrCreate(
             ['company_id' => $companyId],
-            ['sms_enabled' => false, 'whatsapp_enabled' => false, 'email_payment_reminders' => false, 'notify_lead_followups' => true, 'lead_overdue_alert_days' => 3]
+            ['sms_enabled' => false, 'whatsapp_enabled' => false, 'email_payment_reminders' => false, 'notify_lead_followups' => true, 'lead_overdue_alert_days' => 3, 'chase_quotations' => true]
         );
     }
 

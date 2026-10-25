@@ -74,9 +74,10 @@ class LeadTaskService
 
     // ── changes ──────────────────────────────────────────────────────────────
 
-    public function create(Lead $lead, array $d, ?User $actor = null): LeadTask
+    /** $meta (the system only): quotation_id and chase_step for an action planned by quotation chasing; quiet = do not ring the person it is for. */
+    public function create(Lead $lead, array $d, ?User $actor = null, array $meta = []): LeadTask
     {
-        return DB::transaction(function () use ($lead, $d, $actor) {
+        return DB::transaction(function () use ($lead, $d, $actor, $meta) {
             $lead = Lead::withoutGlobalScope('tenant')->where('company_id', $lead->company_id)->lockForUpdate()->findOrFail($lead->id);
             if ($lead->isClosed()) {
                 $this->refuse('lead', 'This lead is closed. Reopen it to plan an action.');
@@ -87,10 +88,13 @@ class LeadTaskService
             $task = LeadTask::create([
                 'company_id' => $lead->company_id, 'lead_id' => $lead->id, 'assigned_to_user_id' => $assignee, 'created_by_user_id' => $actor?->id,
                 'type' => $this->type($d['type'] ?? null), 'title' => $this->title($d['title'] ?? null), 'due_date' => $date, 'due_time' => $time, 'status' => LeadTask::OPEN,
+                'quotation_id' => $meta['quotation_id'] ?? null, 'chase_step' => $meta['chase_step'] ?? null,
             ]);
             $this->log($lead, $actor, 'note', "Next action planned: {$task->label()} on {$task->when()}" . $this->forWhom($task) . ($task->title ? ": {$task->title}" : ''));
             $this->syncLeadDate($lead, true);
-            $this->tell($task, $lead, $actor, 'New action for you');
+            if (empty($meta['quiet'])) {
+                $this->tell($task, $lead, $actor, 'New action for you');
+            }
 
             return $task->fresh('assignee');
         });
@@ -171,6 +175,23 @@ class LeadTaskService
                 $this->syncLeadDate($lead, false);
             }
         });
+    }
+
+    /** The quotation is no longer out with the buyer: the open chase actions made for it are cancelled and each lead's date follows what is left. @return int how many */
+    public function cancelForQuotation(int $companyId, int $quotationId, string $why): int
+    {
+        $tasks = LeadTask::withoutGlobalScope('tenant')->where('company_id', $companyId)->where('quotation_id', $quotationId)->where('status', LeadTask::OPEN)->get();
+        foreach ($tasks->groupBy('lead_id') as $leadId => $group) {
+            DB::transaction(function () use ($group, $companyId, $leadId, $why) {
+                LeadTask::withoutGlobalScope('tenant')->whereIn('id', $group->pluck('id'))->update(['status' => LeadTask::CANCELLED, 'updated_at' => now()]);
+                if ($lead = Lead::withoutGlobalScope('tenant')->where('company_id', $companyId)->find($leadId)) {
+                    $this->log($lead, null, 'note', "Quotation follow-ups cancelled: {$why}");
+                    $this->syncLeadDate($lead, false);
+                }
+            });
+        }
+
+        return $tasks->count();
     }
 
     /** The lead was closed: its open actions no longer apply. Called from LeadService::transition. @return int how many */

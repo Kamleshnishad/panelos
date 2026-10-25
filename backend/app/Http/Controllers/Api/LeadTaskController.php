@@ -46,7 +46,7 @@ class LeadTaskController extends Controller
         return [
             'id' => $t->id, 'lead_id' => $t->lead_id, 'type' => $t->type, 'type_label' => $t->label(), 'title' => $t->title,
             'due_date' => $t->due_date->toDateString(), 'due_time' => $t->due_time ? substr($t->due_time, 0, 5) : null, 'status' => $t->status,
-            'assigned_to_user_id' => $t->assigned_to_user_id, 'assignee' => $t->assignee?->name, 'done_at' => $t->done_at, 'done_note' => $t->done_note,
+            'assigned_to_user_id' => $t->assigned_to_user_id, 'assignee' => $t->assignee?->name, 'auto' => $t->chase_step !== null, 'done_at' => $t->done_at, 'done_note' => $t->done_note,
             'lead' => $t->relationLoaded('lead') && $t->lead ? $t->lead->only(['id', 'lead_no', 'contact_name', 'company_name', 'phone', 'status', 'source', 'city']) : null,
         ];
     }
