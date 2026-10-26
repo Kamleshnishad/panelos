@@ -229,7 +229,7 @@ class StockService
     private function checkAndCreateConsumableAlert($stock)
     {
         if ($stock->isLowStock()) {
-            LowStockAlert::createIfNeeded('consumable', $stock->id, $stock->quantity_in_stock, $stock->reorder_level);
+            LowStockAlert::createIfNeeded('consumable', $stock->id, $stock->quantity_in_stock, $stock->reorder_level, $stock->company_id);
         }
     }
 
@@ -270,7 +270,7 @@ class StockService
             ->get();
 
         foreach ($lowCoils as $coil) {
-            LowStockAlert::createIfNeeded('coil', $coil->id, $coil->quantity_in_stock, $coil->reorder_level);
+            LowStockAlert::createIfNeeded('coil', $coil->id, $coil->quantity_in_stock, $coil->reorder_level, $coil->company_id);
         }
 
         // Check chemicals
@@ -279,7 +279,7 @@ class StockService
             ->get();
 
         foreach ($lowChemicals as $chemical) {
-            LowStockAlert::createIfNeeded('chemical', $chemical->id, $chemical->quantity_in_stock, $chemical->reorder_level);
+            LowStockAlert::createIfNeeded('chemical', $chemical->id, $chemical->quantity_in_stock, $chemical->reorder_level, $chemical->company_id);
         }
 
         // Check expiring chemicals
@@ -351,7 +351,8 @@ class StockService
                 $stock instanceof CoilStock ? 'coil' : 'chemical',
                 $stock->id,
                 $stock->quantity_in_stock,
-                $stock->reorder_level
+                $stock->reorder_level,
+                $stock->company_id
             );
         }
 
