@@ -107,6 +107,12 @@ export default {
     return user
   },
 
+  // Keeps this session; the API signs out every other device on the account
+  async changePassword(data) {
+    const res = await axios.post('/api/auth/change-password', data, { headers: authHeaders() })
+    return res.data
+  },
+
   async logout() {
     try {
       await axios.post('/api/auth/logout', {}, { headers: authHeaders() })
