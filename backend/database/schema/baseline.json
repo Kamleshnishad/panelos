@@ -958,6 +958,26 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp"
     },
+    "production_cut_lines": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "batch_id": "bigint unsigned",
+        "order_item_id": "bigint unsigned",
+        "order_item_size_id": "bigint unsigned",
+        "spec_label": "varchar(255)",
+        "sequence": "smallint unsigned",
+        "method": "varchar(10)",
+        "panel_length_mm": "int unsigned",
+        "production_length_mm": "int unsigned",
+        "width_mm": "int unsigned",
+        "per_strip": "tinyint unsigned",
+        "planned_nos": "int unsigned",
+        "cut_nos": "int unsigned",
+        "rejected_nos": "int unsigned",
+        "is_remake": "tinyint",
+        "created_at": "timestamp",
+        "updated_at": "timestamp"
+    },
     "production_material_usages": {
         "id": "bigint unsigned",
         "company_id": "bigint unsigned",
@@ -1331,5 +1351,17 @@
         "updated_at": "timestamp",
         "deleted_at": "timestamp",
         "two_factor_attempts": "tinyint unsigned"
+    },
+    "waste_reason_codes": {
+        "id": "bigint unsigned",
+        "company_id": "bigint unsigned",
+        "code": "varchar(40)",
+        "label": "varchar(120)",
+        "category": "varchar(20)",
+        "root_cause_hint": "varchar(255)",
+        "is_active": "tinyint",
+        "sort_order": "smallint unsigned",
+        "created_at": "timestamp",
+        "updated_at": "timestamp"
     }
 }

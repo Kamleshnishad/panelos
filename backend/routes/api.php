@@ -321,6 +321,11 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     // Batch actions
     Route::post('/batches/{id}/start', [ProductionBatchController::class, 'startProduction'])->name('batches.start');
     Route::post('/batches/{id}/complete', [ProductionBatchController::class, 'completeBatch'])->name('batches.complete');
+    Route::get('/batches/{id}/cut-lines', [ProductionBatchController::class, 'cutLines'])->name('batches.cut_lines');
+    Route::post('/batches/{id}/cut-lines/{lineId}', [ProductionBatchController::class, 'recordCut'])->name('batches.cut_lines.record');
+    Route::get('/waste/reason-codes', [\App\Http\Controllers\Api\WasteReasonCodeController::class, 'index'])->name('waste.reason_codes.index');
+    Route::post('/waste/reason-codes', [\App\Http\Controllers\Api\WasteReasonCodeController::class, 'store'])->name('waste.reason_codes.store');
+    Route::put('/waste/reason-codes/{id}', [\App\Http\Controllers\Api\WasteReasonCodeController::class, 'update'])->name('waste.reason_codes.update');
 
     // Production Stages
     Route::get('/production-stages', [ProductionStageController::class, 'index'])->name('stages.index');

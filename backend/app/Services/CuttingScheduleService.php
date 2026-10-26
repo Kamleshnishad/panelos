@@ -51,6 +51,7 @@ class CuttingScheduleService
                         $schedule[] = [
                             'method'          => 'double',
                             'item_id'         => $item->id,
+                            'size_id'         => $size->id,
                             'panel_type'      => $panelName,
                             'panel_length'    => $length,
                             'quantity'        => $pairs * 2,
@@ -68,6 +69,7 @@ class CuttingScheduleService
                         $schedule[] = [
                             'method'          => 'single',
                             'item_id'         => $item->id,
+                            'size_id'         => $size->id,
                             'panel_type'      => $panelName,
                             'panel_length'    => $length,
                             'quantity'        => $remainder,
@@ -85,6 +87,7 @@ class CuttingScheduleService
                     $schedule[] = [
                         'method'          => 'single',
                         'item_id'         => $item->id,
+                        'size_id'         => $size->id,
                         'panel_type'      => $panelName,
                         'panel_length'    => $length,
                         'quantity'        => $nos,
@@ -110,6 +113,57 @@ class CuttingScheduleService
             'optimization'          => $this->getOptimizationSummary($schedule),
             'created_at'            => now(),
         ];
+    }
+
+    /**
+     * Persist the schedule as the batch's cut list (WR-1). Idempotent: a batch
+     * that already has cut lines keeps them, so recorded counts are never lost.
+     * Lines run grouped by spec (thickness → colour) and longest first, which
+     * keeps changeovers together on a continuous line.
+     */
+    public function generateCutLines(ProductionBatch $batch): \Illuminate\Support\Collection
+    {
+        if ($batch->cutLines()->exists()) {
+            return $batch->cutLines()->get();
+        }
+
+        $schedule = $this->calculateSchedule($batch); // loads order.items.sizes
+        $items = $batch->order?->items->keyBy('id') ?? collect();
+        $rows  = collect($schedule['schedule_items'])
+            ->sortBy(fn ($r) => [
+                (float) ($items[$r['item_id']]->thickness ?? 0),
+                (string) ($items[$r['item_id']]->top_color ?? ''),
+                -$r['panel_length'],
+            ])->values();
+
+        foreach ($rows as $i => $r) {
+            $item = $items[$r['item_id']];
+            $batch->cutLines()->create([
+                'company_id'           => $batch->company_id,
+                'order_item_id'        => $item->id,
+                'order_item_size_id'   => $r['size_id'],
+                'spec_label'           => $this->specLabel($item),
+                'sequence'             => $i + 1,
+                'method'               => $r['method'],
+                'panel_length_mm'      => $r['panel_length'],
+                'production_length_mm' => $r['material_length'],
+                'width_mm'             => $r['material_width'],
+                'per_strip'            => $r['per_strip'],
+                'planned_nos'          => $r['quantity'],
+            ]);
+        }
+
+        return $batch->cutLines()->get();
+    }
+
+    private function specLabel($item): string
+    {
+        $skin = trim(($item->top_skin_thickness ? rtrim(rtrim((string) $item->top_skin_thickness, '0'), '.') . 'mm ' : '')
+            . ($item->top_skin_material ?? '') . ' ' . ($item->top_color ?? ''));
+        return trim(($item->panelType->name ?? 'Panel')
+            . ($item->thickness ? ' ' . (int) $item->thickness . 'mm' : '')
+            . ($item->density_type ? ' ' . $item->density_type : '')
+            . ($skin !== '' ? ' · ' . $skin : ''));
     }
 
     private function getOptimizationSummary(array $schedule): array

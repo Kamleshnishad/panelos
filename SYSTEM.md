@@ -224,6 +224,7 @@ Admins (`is_company_admin`, `is_super_admin`) and roles holding `*` bypass all c
 | `quotations` | `quotations.view` | `quotations.manage` |
 | `orders` | `orders.view` | `orders.manage` |
 | `batches`, `production`, `production-stages`, `quality-control` | `production.view` | `production.manage` |
+| `waste` (rejection & waste reason codes) | `production.view` | `settings.manage` |
 | `dispatches` | `dispatch.view` | `dispatch.manage` |
 | `invoices` | `invoices.view` | `invoices.manage` |
 | `payments` | `payments.view` | `payments.manage` |
@@ -907,8 +908,8 @@ Inside one transaction:
 * `recordActuals()` reconciles stock by the **difference** vs what was issued
   (`actual > issued` → deduct more, capped at on-hand; `actual < issued` → add the remainder back),
   and stores real `wastage_pct = (actual − standard) / standard × 100`.
-* Every `in_progress` child batch → `qc_pending`, with `completed_quantity` defaulting to
-  `planned_quantity`.
+* Every `in_progress` child batch → `qc_pending`. Its `completed_quantity` is the **good SQM on its cut
+  list** once the floor has recorded any cuts (§14.4), otherwise it defaults to `planned_quantity`.
 * Run → `completed`, `completed_at = now`.
 
 `actuals` is optional — omit it and only the status changes.
@@ -939,7 +940,10 @@ A batch can exist without a run: `POST /api/orders/{orderId}/batches` `{ planned
 order's BOM (`issueForBatch`), mirroring the run path. For a child of a run, material was already issued at
 run start and nothing is deducted again.
 
-`POST /api/batches/{id}/complete` `{ completed_quantity? }` → `qc_pending`.
+Starting a batch (directly or through its run) also writes its **cut list** (§14.4).
+
+`POST /api/batches/{id}/complete` `{ completed_quantity? }` → `qc_pending`. Once any cut is recorded on the
+cut list, `completed_quantity` is derived from the good panels and the typed value is ignored.
 `DELETE /api/batches/{id}` works only on `draft`.
 
 ### 14.2 Stage tracking
@@ -974,6 +978,27 @@ set is emitted as its own `single` row with a note. `optimization_efficiency` is
 slot (100% = every strip carried two panels). This matches the DL rule on the BOQ sheet (§9.3), so the
 office and the floor describe the same job.
 
+### 14.4 Cut list — NOS on the floor (WR-1)
+
+**Table:** `production_cut_lines` · **Service:** `CuttingScheduleService::generateCutLines`,
+`ProductionBatchService::recordCut` · **UI:** Batch screen → *Cut List*
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/batches/{id}/cut-lines` | The batch's cut list. A batch already running without one gets it generated here; a `draft` batch returns `[]` |
+| `POST /api/batches/{id}/cut-lines/{lineId}` `{ cut_nos, rejected_nos }` | Record **running totals** for one line (not increments, so a retry cannot double-count) |
+
+* Written once, when the batch starts, from the §14.3 schedule: one row per spec × panel length, carrying
+  `method` (`single`/`double`), `production_length_mm` (doubled for DL), `per_strip`, `planned_nos`.
+  Idempotent — a batch that has lines keeps them and their counts.
+* Order: thickness → top colour → **longest first**; the UI marks a *changeover* row where the spec changes.
+* Derived, not stored: `good_nos = cut_nos − rejected_nos`, `good_sqm`, `planned_sqm`, and `status`
+  (`pending` → `in_progress` → `done` when good ≥ planned).
+* Rules: batch must be `in_progress`; `rejected_nos ≤ cut_nos`; `good_nos ≤ planned_nos` (cut may exceed the
+  plan to replace rejects).
+* Rejection reasons, dispositions (scrap / remake / recut / downgrade), process scrap and costing come next:
+  WR-2 … WR-8 in `PLAN/WR_WASTE_REJECTION_PLAN.md`. Reason codes already exist (§15).
+
 ---
 
 ## 15. Flow — Quality Control
@@ -1000,11 +1025,20 @@ Create payload:
 
 Rules:
 
-* The batch **must be `qc_pending`** to enter QC.
-* `pass` → batch `qc_passed`; `fail` → batch `qc_failed`.
+* The batch **must be `qc_pending` or `qc_failed`** to enter QC. A batch keeps a **history** of inspections;
+  the **latest** one decides (`GET …/qc` returns it with `history`, newest first; dispatch and
+  `ProductionBatch::qualityControl()` read the latest). (PB-095)
+* `pass` → batch `qc_passed`; `fail` → batch `qc_failed` (can be re-inspected); `rework_required` → batch back
+  to `in_progress`, and completing it again returns it to `qc_pending`.
 * **Approve only works on a `pass`.** `"Can only approve QC entries with pass status. Failed QC requires
   rework."` Approval stamps `approved_by_user_id` + `approved_at`, which is exactly what dispatch checks.
 * Checklist is capped at 50 items; each needs `key`, `label`, `passed`.
+
+**Rejection & waste reason codes (WR-0)** — `waste_reason_codes`, per tenant, edited in Master Data →
+*Rejection & Waste Reasons*. Categories: `defect`, `process_scrap`, `handling`, `transit`, `supplier`,
+`stock_adjust`. Fourteen defaults are seeded on first `GET /api/waste/reason-codes`; `POST` creates,
+`PUT /{id}` edits or deactivates (never delete — old records keep their meaning). Codes are upper-cased
+and unique per tenant.
 
 ---
 
@@ -1421,7 +1455,8 @@ draft ──start (issues material)──► in_progress ──complete (+actual
 ### Production batch
 ```
 draft ──start──► in_progress ──complete──► qc_pending ──QC pass──► qc_passed ──dispatch complete──► dispatched
-                                                   └──QC fail──► qc_failed (rework)
+                      ▲                           │  └──QC fail──► qc_failed ──re-inspect pass──► qc_passed
+                      └──── QC rework_required ───┘                    └──re-inspect fail/rework──► (same rules)
 ```
 
 ### Dispatch
@@ -1587,7 +1622,10 @@ Hit one of these and the message tells you exactly which invariant you tripped.
 | `Cannot start production for batch not in draft status` | batch start | Wrong status |
 | `Cannot start stage 'X' until 'Y' is completed` | stage start | Sequence enforcement |
 | `Stage 'X' has already been started for this batch` | stage start | Duplicate stage log |
-| `Batch must be in qc_pending status to enter QC` | QC create | Complete the batch first |
+| `Batch must be in qc_pending or qc_failed status to enter QC` | QC create | Complete the batch first |
+| `Cuts can only be recorded while the batch is in production.` | cut record | Batch not `in_progress` |
+| `Rejected panels cannot exceed panels cut.` | cut record | Fix the counts |
+| `Good panels (c − r) cannot exceed the planned n.` | cut record | Over-production on a cut line |
 | `Can only approve QC entries with pass status. Failed QC requires rework.` | QC approve | Failed QC cannot be approved |
 | `Batch must have an approved-pass QC record before dispatch.` | dispatch create | QC missing, failed, or unapproved |
 | `Batch has already been dispatched` | dispatch create | One dispatch per batch |

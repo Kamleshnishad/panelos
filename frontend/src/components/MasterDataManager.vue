@@ -5,6 +5,7 @@
       <button :class="['md-tab', { active: tab === 'panels' }]"      @click="tab = 'panels'">Panel Types</button>
       <button :class="['md-tab', { active: tab === 'accessories' }]" @click="tab = 'accessories'">Accessories</button>
       <button :class="['md-tab', { active: tab === 'stages' }]"      @click="tab = 'stages'">Production Stages</button>
+      <button :class="['md-tab', { active: tab === 'waste' }]"       @click="tab = 'waste'">Rejection &amp; Waste Reasons</button>
       <button :class="['md-tab', { active: tab === 'tax' }]"         @click="tab = 'tax'">Tax / GST</button>
       <button :class="['md-tab', { active: tab === 'gst' }]"         @click="tab = 'gst'">GST Compliance</button>
       <button :class="['md-tab', { active: tab === 'leadlists' }]"   @click="tab = 'leadlists'">Lead lists</button>
@@ -16,6 +17,7 @@
     <panel-type-master       v-if="tab === 'panels'" />
     <accessory-master        v-else-if="tab === 'accessories'" />
     <production-stage-master  v-else-if="tab === 'stages'" />
+    <waste-reason-settings   v-else-if="tab === 'waste'" />
     <tax-configuration       v-else-if="tab === 'tax'" />
     <gst-config-manager      v-else-if="tab === 'gst'" />
     <lead-lists-settings     v-else-if="tab === 'leadlists'" />
@@ -30,6 +32,7 @@ import { ref } from 'vue'
 import PanelTypeMaster       from './PanelTypeMaster.vue'
 import AccessoryMaster       from './AccessoryMaster.vue'
 import ProductionStageMaster from './ProductionStageMaster.vue'
+import WasteReasonSettings   from './WasteReasonSettings.vue'
 import TaxConfiguration      from './TaxConfiguration.vue'
 import GstConfigManager      from './GstConfigManager.vue'
 import LeadListsSettings     from './LeadListsSettings.vue'

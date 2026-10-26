@@ -200,6 +200,62 @@
       </div>
     </div>
 
+    <!-- Cut list (length × NOS) — what the floor actually produces -->
+    <div class="card" v-if="cutLines.length">
+      <div class="cut-head">
+        <h3>Cut List</h3>
+        <div class="cut-progress">
+          <b>{{ cutTotals.good }} / {{ cutTotals.planned }}</b> good panels
+          · {{ fmtQty(cutTotals.goodSqm) }} / {{ fmtQty(cutTotals.plannedSqm) }} SQM
+          <span v-if="cutTotals.rejected" class="cut-rej">· {{ cutTotals.rejected }} rejected</span>
+        </div>
+      </div>
+      <div class="cut-bar"><div :style="{ width: cutTotals.pct + '%' }"></div></div>
+      <p v-if="canRecordCuts" class="cut-hint">Enter running totals per length: panels cut so far and how many of them were rejected. Good = cut − rejected.</p>
+      <div class="cut-scroll">
+        <table class="size-table cut-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Spec</th><th>Length (mm)</th>
+              <th class="text-center">Planned</th><th class="text-center">Cut</th><th class="text-center">Rejected</th>
+              <th class="text-center">Good</th><th class="text-center">Good SQM</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="(l, i) in cutLines" :key="l.id">
+              <tr v-if="i && l.spec_label !== cutLines[i - 1].spec_label" class="changeover">
+                <td colspan="9">↻ Changeover → {{ l.spec_label }}</td>
+              </tr>
+              <tr :class="'cut-' + l.status">
+                <td>{{ l.sequence }}</td>
+                <td class="cut-spec">{{ l.spec_label }}</td>
+                <td class="bold">
+                  {{ l.panel_length_mm }}
+                  <span v-if="l.method === 'double'" class="warn-tag" :title="`Produce at ${l.production_length_mm} mm, cut each into 2`">DL {{ l.production_length_mm }}</span>
+                </td>
+                <td class="text-center bold">{{ l.planned_nos }}</td>
+                <template v-if="canRecordCuts">
+                  <td class="text-center"><input class="cut-input" type="number" min="0" inputmode="numeric" v-model.number="cutEdit[l.id].cut_nos" :aria-label="`Cut for ${l.panel_length_mm} mm`" /></td>
+                  <td class="text-center"><input class="cut-input" type="number" min="0" inputmode="numeric" v-model.number="cutEdit[l.id].rejected_nos" :aria-label="`Rejected for ${l.panel_length_mm} mm`" /></td>
+                </template>
+                <template v-else>
+                  <td class="text-center">{{ l.cut_nos }}</td>
+                  <td class="text-center" :class="{ 'cut-rej': l.rejected_nos }">{{ l.rejected_nos }}</td>
+                </template>
+                <td class="text-center bold">{{ l.good_nos }}</td>
+                <td class="text-center">{{ fmtQty(l.good_sqm) }}</td>
+                <td>
+                  <button v-if="canRecordCuts && cutDirty(l)" class="btn btn-save btn-xs" :disabled="cutSaving[l.id]" @click="saveCut(l)">{{ cutSaving[l.id] ? '…' : 'Save' }}</button>
+                  <span v-else :class="['cut-status', l.status]">{{ { pending: 'Pending', in_progress: 'Running', done: 'Done' }[l.status] }}</span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="cutError" class="error-msg">{{ cutError }}</div>
+    </div>
+
     <!-- Panel BOQ (from linked order) -->
     <div class="card" v-if="batch.order?.items?.length">
       <h3>Panel Specification</h3>
@@ -220,7 +276,7 @@
             <div class="item-sqm">{{ fmtQty(item.total_sqm) }} SQM</div>
           </div>
         </div>
-        <table class="size-table" v-if="item.sizes?.length">
+        <table class="size-table" v-if="item.sizes?.length && !cutLines.length">
           <thead>
             <tr>
               <th>Length (mm)</th>
@@ -251,8 +307,9 @@
       <!-- ── Already inspected: show result ── -->
       <template v-if="qc">
         <div class="qc-result-bar" :class="qc.status">
-          <span class="qc-result-icon">{{ qc.status === 'pass' ? '✅' : '❌' }}</span>
-          <span class="qc-result-label">{{ qc.status === 'pass' ? 'PASSED' : 'FAILED' }}</span>
+          <span class="qc-result-icon">{{ { pass: '✅', fail: '❌', rework_required: '🔧' }[qc.status] }}</span>
+          <span class="qc-result-label">{{ { pass: 'PASSED', fail: 'FAILED', rework_required: 'REWORK REQUIRED' }[qc.status] }}</span>
+          <button v-if="batch.status === 'qc_failed'" class="btn btn-ghost btn-xs qc-reinspect" @click="reinspect = true">Re-inspect</button>
         </div>
 
         <div class="qc-detail-grid">
@@ -289,19 +346,31 @@
         </div>
 
         <!-- Approve button — only if not yet approved -->
-        <div class="qc-approve-row" v-if="!qc.approved_at && ['pass','fail'].includes(qc.status)">
+        <div class="qc-approve-row" v-if="!qc.approved_at && qc.status === 'pass'">
           <input v-model="approveNote" class="qc-note-input" placeholder="Approval note (optional)…" />
           <button class="btn btn-approve" :disabled="actionLoading" @click="doApprove">
             {{ actionLoading ? 'Approving…' : 'Approve QC' }}
           </button>
         </div>
+
+        <!-- Earlier inspections (re-inspections after fail / rework) -->
+        <div class="qc-history" v-if="qc.history?.length > 1">
+          <div class="qc-detail-label">Inspection history</div>
+          <div v-for="h in qc.history" :key="h.id" class="qc-history-row">
+            <span :class="['qc-history-status', h.status]">{{ { pass: 'Pass', fail: 'Fail', rework_required: 'Rework' }[h.status] }}</span>
+            <span>{{ h.inspected_at ? fmtDateTime(h.inspected_at) : '—' }}</span>
+            <span>{{ h.inspected_by_user?.name ?? '' }}</span>
+            <span class="qc-history-notes">{{ h.notes }}</span>
+          </div>
+        </div>
       </template>
 
       <!-- ── Pending inspection: entry form ── -->
-      <template v-else>
+      <template v-if="!qc || reinspect">
         <div class="qc-pending-hint">
-          This batch has completed production and is awaiting QC inspection.
-          Fill in the checklist below and submit the result.
+          <template v-if="reinspect">Re-inspecting a failed batch. The earlier result stays in the history.</template>
+          <template v-else>This batch has completed production and is awaiting QC inspection.
+          Fill in the checklist below and submit the result.</template>
         </div>
 
         <!-- Checklist -->
@@ -327,6 +396,10 @@
               <input type="radio" v-model="qcForm.status" value="pass" />
               <span class="verdict-icon">✅</span> Pass
             </label>
+            <label class="verdict-opt" :class="{ selected: qcForm.status === 'rework_required' }">
+              <input type="radio" v-model="qcForm.status" value="rework_required" />
+              <span class="verdict-icon">🔧</span> Rework
+            </label>
             <label class="verdict-opt" :class="{ selected: qcForm.status === 'fail' }">
               <input type="radio" v-model="qcForm.status" value="fail" />
               <span class="verdict-icon">❌</span> Fail
@@ -344,15 +417,19 @@
 
         <div class="qc-submit-row">
           <span class="qc-submit-hint" v-if="qcForm.status === 'fail'">
-            Failing will mark batch as QC Failed — it can be re-inspected after rework.
+            Failing marks the batch QC Failed and blocks dispatch. It can be re-inspected later.
           </span>
+          <span class="qc-submit-hint" v-if="qcForm.status === 'rework_required'">
+            Rework sends the batch back to production. Complete it again to return it to QC.
+          </span>
+          <button v-if="reinspect" class="btn btn-ghost" @click="reinspect = false">Cancel</button>
           <button
             class="btn btn-qc-submit"
-            :class="{ 'btn-pass': qcForm.status === 'pass', 'btn-fail': qcForm.status === 'fail' }"
+            :class="{ 'btn-pass': qcForm.status === 'pass', 'btn-fail': qcForm.status === 'fail' || qcForm.status === 'rework_required' }"
             :disabled="actionLoading || !qcForm.status"
             @click="submitQc"
           >
-            {{ actionLoading ? 'Submitting…' : (qcForm.status === 'pass' ? 'Submit — Pass' : qcForm.status === 'fail' ? 'Submit — Fail' : 'Submit QC') }}
+            {{ actionLoading ? 'Submitting…' : ({ pass: 'Submit — Pass', fail: 'Submit — Fail', rework_required: 'Submit — Rework' }[qcForm.status] ?? 'Submit QC') }}
           </button>
         </div>
       </template>
@@ -362,8 +439,14 @@
     <div v-if="showCompleteModal" class="modal-overlay" @click.self="showCompleteModal = false">
       <div class="modal-box">
         <h3>Complete Batch Production</h3>
-        <p>Enter the actual quantity produced for <strong>{{ batch.batch_no }}</strong>.</p>
-        <div class="form-group">
+        <template v-if="cutRecorded">
+          <p>Output for <strong>{{ batch.batch_no }}</strong> comes from the cut list:
+            <strong>{{ cutTotals.good }} good panels = {{ fmtQty(cutTotals.goodSqm) }} SQM</strong>
+            <span v-if="cutTotals.rejected"> ({{ cutTotals.rejected }} rejected)</span>.</p>
+          <p v-if="cutTotals.good < cutTotals.planned" class="hint">{{ cutTotals.planned - cutTotals.good }} planned panels are not produced yet.</p>
+        </template>
+        <p v-else>Enter the actual quantity produced for <strong>{{ batch.batch_no }}</strong>.</p>
+        <div class="form-group" v-if="!cutRecorded">
           <label>Completed Quantity (SQM)</label>
           <input v-model.number="completeQty" type="number" min="0.1" step="0.01" :placeholder="batch.planned_quantity" />
           <span class="hint">Leave blank to use planned quantity ({{ fmtQty(batch.planned_quantity) }} SQM)</span>
@@ -420,6 +503,48 @@ const editNotes         = ref('')
 const showCompleteModal = ref(false)
 const showDeleteModal   = ref(false)
 const completeQty       = ref(null)
+const reinspect         = ref(false)
+
+// ── Cut list (WR-1) ─────────────────────────────────────────────
+const cutLines  = ref([])
+const cutEdit   = reactive({})
+const cutSaving = reactive({})
+const cutError  = ref(null)
+const canRecordCuts = computed(() => batch.value?.status === 'in_progress')
+const cutTotals = computed(() => {
+  const sum = k => cutLines.value.reduce((a, l) => a + Number(l[k] || 0), 0)
+  const planned = sum('planned_nos'), good = sum('good_nos')
+  return { planned, good, rejected: sum('rejected_nos'), plannedSqm: sum('planned_sqm'), goodSqm: sum('good_sqm'),
+           pct: planned ? Math.min(100, (good / planned) * 100) : 0 }
+})
+// Once anything is recorded, completed SQM comes from the cut list (backend does the same)
+const cutRecorded = computed(() => cutLines.value.some(l => l.cut_nos > 0))
+const cutDirty = l => cutEdit[l.id] && (cutEdit[l.id].cut_nos !== l.cut_nos || cutEdit[l.id].rejected_nos !== l.rejected_nos)
+
+async function loadCutLines() {
+  if (batch.value?.status === 'draft') { cutLines.value = []; return }
+  try {
+    const res = await batchService.cutLines(props.batchId)
+    cutLines.value = res?.data ?? res ?? []
+    cutLines.value.forEach(l => { cutEdit[l.id] = { cut_nos: l.cut_nos, rejected_nos: l.rejected_nos } })
+  } catch { cutLines.value = [] }
+}
+
+async function saveCut(l) {
+  cutSaving[l.id] = true
+  cutError.value  = null
+  try {
+    const res = await batchService.recordCut(props.batchId, l.id, {
+      cut_nos: Number(cutEdit[l.id].cut_nos) || 0,
+      rejected_nos: Number(cutEdit[l.id].rejected_nos) || 0,
+    })
+    const saved = res?.data ?? res
+    cutLines.value = cutLines.value.map(x => (x.id === l.id ? saved : x))
+    cutEdit[l.id] = { cut_nos: saved.cut_nos, rejected_nos: saved.rejected_nos }
+  } catch (e) {
+    cutError.value = e?.response?.data?.message ?? 'Failed to save.'
+  } finally { cutSaving[l.id] = false }
+}
 
 // Per-stage notes keyed by stage_id
 const stageNotes = reactive({})
@@ -482,7 +607,7 @@ async function load() {
     const res   = await batchService.get(props.batchId)
     batch.value = res?.data ?? res
     editNotes.value = batch.value.notes ?? ''
-    await loadProgress()
+    await Promise.all([loadProgress(), loadCutLines()])
     if (['qc_pending','qc_passed','qc_failed','completed'].includes(batch.value.status)) {
       await loadQc()
     }
@@ -511,6 +636,7 @@ async function loadQc() {
     qc.value = null
   }
   // Reset form whenever QC state is reloaded
+  reinspect.value = false
   qcForm.status = ''
   qcForm.notes  = ''
   qcSubmitError.value = null
@@ -522,18 +648,19 @@ async function submitQc() {
   actionLoading.value = true
   qcSubmitError.value = null
   try {
-    const res = await batchService.createQc(props.batchId, {
+    await batchService.createQc(props.batchId, {
       status:    qcForm.status,
       notes:     qcForm.notes || null,
       checklist: qcChecklist.map(c => ({ key: c.key, label: c.label, passed: !!c.passed })),
     })
-    qc.value = res?.data ?? res
-    // Reload full batch to update status badge
-    const bRes   = await batchService.get(props.batchId)
-    batch.value  = bRes?.data ?? bRes
-    actionSuccess.value = qcForm.status === 'pass'
-      ? 'QC passed — batch is ready for dispatch.'
-      : 'QC failed — batch marked for rework.'
+    const submitted = qcForm.status
+    actionSuccess.value = {
+      pass: 'QC passed — batch is ready for dispatch.',
+      fail: 'QC failed — dispatch is blocked until it is re-inspected.',
+      rework_required: 'Sent back to production for rework.',
+    }[submitted]
+    // Reload batch + QC (with history); rework moves the batch back to in_progress
+    await load()
   } catch (e) {
     qcSubmitError.value = e?.response?.data?.message ?? 'Failed to submit QC.'
   } finally {
@@ -959,4 +1086,29 @@ onUnmounted(clearTimers)
 .modal-box h3  { margin: 0 0 10px; color: var(--primary); font-size: 16px; }
 .modal-box p   { color: #555; font-size: 14px; margin-bottom: 16px; line-height: 1.6; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.qc-result-bar.rework_required { background: #fff8e1; color: #b26a00; border: 1px solid #ffe082; }
+.qc-reinspect { margin-left: auto; font-size: 12px; letter-spacing: 0; }
+.qc-history { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+.qc-history-row { display: grid; grid-template-columns: 70px 150px 120px 1fr; gap: 10px; font-size: 12px; padding: 4px 0; color: var(--text-2); }
+.qc-history-status { font-weight: 700; }
+.qc-history-status.pass { color: #2e7d32; } .qc-history-status.fail { color: #c62828; } .qc-history-status.rework_required { color: #b26a00; }
+.qc-history-notes { color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Cut list (WR-1) */
+.cut-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.cut-head h3 { margin: 0; }
+.cut-progress { font-size: 13px; color: var(--text-2); }
+.cut-rej { color: #c62828; font-weight: 700; }
+.cut-bar { height: 8px; background: #eef0f4; border-radius: 4px; overflow: hidden; margin: 10px 0 8px; }
+.cut-bar > div { height: 100%; background: var(--success, #2e7d32); border-radius: 4px; transition: width .3s; }
+.cut-hint { font-size: 12px; color: var(--text-3); margin: 0 0 6px; }
+.cut-scroll { overflow-x: auto; }
+.cut-table td { vertical-align: middle; }
+.cut-spec { font-size: 11px; color: var(--text-2); min-width: 160px; }
+.cut-input { width: 72px; padding: 6px; font-size: 14px; text-align: center; border: 1px solid var(--border); border-radius: 6px; }
+.cut-table tr.changeover td { background: #f6f7fb; color: var(--text-3); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.cut-table tr.cut-done td { background: #f3faf4; }
+.cut-status { font-size: 11px; font-weight: 700; }
+.cut-status.done { color: #2e7d32; } .cut-status.in_progress { color: #b26a00; } .cut-status.pending { color: var(--text-3); }
+.btn-xs { padding: 4px 10px; font-size: 12px; }
 </style>

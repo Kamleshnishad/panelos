@@ -64,7 +64,7 @@ class QualityControlController extends Controller
                 ->findOrFail($batchId);
 
             $validated = $request->validate([
-                'status' => 'required|in:pass,fail',
+                'status' => 'required|in:pass,fail,rework_required',
                 'notes' => 'nullable|string|max:1000',
                 'checklist' => 'nullable|array|max:50',
                 'checklist.*.key' => 'required_with:checklist|string|max:50',
@@ -123,10 +123,11 @@ class QualityControlController extends Controller
                 );
             }
 
-            return $this->successResponse(
-                $this->qcService->getDetails($qc),
-                'QC entry retrieved successfully'
-            );
+            // Latest inspection, plus every earlier one (re-inspections after fail/rework).
+            $details = $this->qcService->getDetails($qc);
+            $details->setAttribute('history', $this->qcService->historyForBatch($batch));
+
+            return $this->successResponse($details, 'QC entry retrieved successfully');
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return $this->errorResponse(
                 ['id' => ['Batch not found']],

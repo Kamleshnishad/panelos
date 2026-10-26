@@ -217,6 +217,45 @@ class ProductionBatchController extends Controller
     }
 
     /**
+     * GET /batches/{id}/cut-lines - The batch's cut list (length × NOS) with recorded counts.
+     * Batches started before the cut list existed get one generated on first view.
+     */
+    public function cutLines(Request $request, int $id, \App\Services\CuttingScheduleService $cutting)
+    {
+        try {
+            $batch = ProductionBatch::where('company_id', $request->user()->company_id)->findOrFail($id);
+            $lines = $batch->status === 'draft' ? collect() : $cutting->generateCutLines($batch);
+            return $this->successResponse($lines, 'Cut list retrieved');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return $this->errorResponse(['id' => ['Batch not found']], 'Batch not found', 'NOT_FOUND', 404);
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'CUT_LINES_ERROR', 400);
+        }
+    }
+
+    /**
+     * POST /batches/{id}/cut-lines/{lineId} - Record running totals: panels cut and rejected.
+     */
+    public function recordCut(Request $request, int $id, int $lineId)
+    {
+        try {
+            $batch = ProductionBatch::where('company_id', $request->user()->company_id)->findOrFail($id);
+            $validated = $request->validate([
+                'cut_nos'      => 'required|integer|min:0|max:100000',
+                'rejected_nos' => 'required|integer|min:0|max:100000',
+            ]);
+            $line = $this->batchService->recordCut($batch, $lineId, $validated['cut_nos'], $validated['rejected_nos']);
+            return $this->successResponse($line, 'Cut recorded');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return $this->errorResponse(['id' => ['Batch or cut line not found']], 'Not found', 'NOT_FOUND', 404);
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->errors(), 'Validation failed', 'VALIDATION_ERROR', 422);
+        } catch (\Exception $e) {
+            return $this->errorResponse(['error' => $e->getMessage()], $e->getMessage(), 'CUT_RECORD_ERROR', 400);
+        }
+    }
+
+    /**
      * POST /batches/{id}/complete - Complete production
      */
     public function completeBatch(Request $request, int $id)
