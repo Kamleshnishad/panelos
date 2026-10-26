@@ -30,7 +30,7 @@
     <aside class="sidebar" :class="{ open: mobileOpen }">
       <div class="side-brand" :class="{ 'wide-logo': companyLogo && logoWide }" @click="go('dashboard')">
         <div class="brand-mark" :class="{ 'has-logo': companyLogo }">
-          <img v-if="companyLogo" :src="companyLogo" class="brand-logo-img" alt="logo" @load="e => (logoWide = e.target.naturalWidth > e.target.naturalHeight * 1.6)" />
+          <img v-if="companyLogo" :src="companyLogo" class="brand-logo-img" alt="logo" @error="companyLogo = null" @load="e => (logoWide = e.target.naturalWidth > e.target.naturalHeight * 1.6)" />
           <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="#fff" stroke-width="2.2"/><path d="M8 8h5a3 3 0 0 1 0 6H8z" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/></svg>
         </div>
         <div class="brand-block">
@@ -56,16 +56,6 @@
         </template>
       </nav>
 
-      <div class="side-user">
-        <div class="su-avatar">{{ initials }}</div>
-        <div class="su-meta">
-          <div class="su-name">{{ user?.name ?? 'User' }}</div>
-          <div class="su-role">{{ roleLabel }}</div>
-        </div>
-        <button class="su-logout" title="Logout" aria-label="Log out" @click="$emit('logout')">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 12H3m0 0l4-4m-4 4l4 4M21 3v18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
     </aside>
 
     <!-- Main -->
@@ -84,13 +74,44 @@
           <template v-if="!isSuperAdmin">
             <global-search :sections="jumpItems" @section="go" @open="(section, id) => go(section, id)" />
             <notification-bell @navigate="go" />
-            <button class="btn-primary" @click="go('quotations')">
+            <button class="btn-primary" aria-label="New quote" @click="go('quotations')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-              New Quote
+              <span class="nq-label">New Quote</span>
             </button>
           </template>
+
+          <!-- Account menu: profile + log out -->
+          <div class="user-menu">
+            <button class="um-trigger" :aria-expanded="userMenuOpen" aria-haspopup="menu" @click="userMenuOpen = !userMenuOpen">
+              <span class="su-avatar">{{ initials }}</span>
+              <span class="um-meta">
+                <span class="su-name">{{ user?.name ?? 'User' }}</span>
+                <span class="su-role">{{ roleLabel }}</span>
+              </span>
+              <svg class="um-chev" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <template v-if="userMenuOpen">
+              <div class="um-scrim" @click="userMenuOpen = false"></div>
+              <div class="um-drop" role="menu" @keydown.esc="userMenuOpen = false">
+                <div class="um-head">
+                  <div class="su-name">{{ user?.name ?? 'User' }}</div>
+                  <div class="um-email">{{ user?.email }}</div>
+                </div>
+                <button role="menuitem" class="um-item" @click="userMenuOpen = false; profileOpen = true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  My Profile
+                </button>
+                <button role="menuitem" class="um-item um-logout" @click="userMenuOpen = false; $emit('logout')">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 12H3m0 0l4-4m-4 4l4 4M21 3v18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Log out
+                </button>
+              </div>
+            </template>
+          </div>
         </div>
       </header>
+
+      <profile-modal v-if="profileOpen" :user="user" :initials="initials" :role-label="roleLabel" :company-name="companyName" @close="profileOpen = false" />
 
       <main class="content">
         <home-dashboard        v-if="active === 'dashboard'"   @navigate="go" />
@@ -131,6 +152,7 @@ import { useSessionGuard } from '../composables/useSessionGuard.js'
 import SessionWarning from './SessionWarning.vue'
 import NotificationBell from './NotificationBell.vue'
 import GlobalSearch from './GlobalSearch.vue'
+import ProfileModal from './ProfileModal.vue'
 import dashboardService from '../services/dashboardService.js'
 import companyService from '../services/companyService.js'
 import productionService from '../services/productionService.js'
@@ -334,6 +356,8 @@ const initials = computed(() => {
   const n = user.value?.name ?? 'U'
   return n.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 })
+const userMenuOpen = ref(false)
+const profileOpen  = ref(false)
 const roleLabel = computed(() => user.value?.is_super_admin ? 'Super Admin' : (user.value?.is_company_admin ? 'Company Admin' : 'User'))
 const isAdmin = computed(() => !!(user.value?.is_admin || user.value?.is_company_admin || user.value?.is_super_admin))
 function can(key) {
@@ -517,13 +541,21 @@ onMounted(async () => {
 .nav-item.active .nav-badge { background: var(--brand-50); color: var(--brand-700); }
 .nav-badge.danger { background: var(--danger); color: #fff; }
 
-.side-user { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.07); }
-.su-avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-600)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
-.su-meta { flex: 1; line-height: 1.25; min-width: 0; }
-.su-name { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.su-role { font-size: 11px; color: #6b7299; }
-.su-logout { background: none; border: none; color: #6b7299; cursor: pointer; padding: 6px; border-radius: var(--r-sm); display: flex; transition: all var(--t-fast); }
-.su-logout:hover { color: #fff; background: rgba(255,255,255,0.07); }
+.su-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-600)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.su-name { display: block; font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.su-role { display: block; font-size: 11px; color: var(--text-3); }
+.user-menu { position: relative; }
+.um-trigger { display: flex; align-items: center; gap: 9px; background: none; border: 1px solid transparent; border-radius: 10px; padding: 4px 8px 4px 4px; cursor: pointer; text-align: left; }
+.um-trigger:hover, .um-trigger[aria-expanded="true"] { background: var(--surface-2); border-color: var(--border); }
+.um-meta { line-height: 1.25; min-width: 0; }
+.um-chev { color: var(--text-3); flex-shrink: 0; }
+.um-scrim { position: fixed; inset: 0; z-index: 40; }
+.um-drop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 41; min-width: 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-lg); padding: 6px; }
+.um-head { padding: 8px 10px 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.um-email { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; }
+.um-item { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none; padding: 9px 10px; border-radius: 7px; font-size: 13.5px; color: var(--text); cursor: pointer; text-align: left; }
+.um-item:hover { background: var(--surface-2); }
+.um-logout { color: #c62828; }
 
 /* ---- Topbar ---- */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -567,5 +599,8 @@ onMounted(async () => {
   .hamburger { display: flex; }
   .search { display: none; }
   .topbar { padding: 12px 16px; }
+  .um-meta, .um-chev, .nq-label { display: none; }
+  .tb-right { gap: 8px; }
+  .tb-left { min-width: 0; }
 }
 </style>
