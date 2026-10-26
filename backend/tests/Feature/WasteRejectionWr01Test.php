@@ -114,6 +114,21 @@ class WasteRejectionWr01Test extends TestCase
         $this->assertSame(['pass', 'fail'], array_column($qc->json('data.history'), 'status'));
     }
 
+    public function test_reinspected_and_approved_batch_can_be_dispatched(): void
+    {
+        $admin = $this->createAdminUser();
+        $batch = $this->makeBatch($admin->company_id, [30 => [[3000, 2]]], 'qc_pending');
+
+        $this->actingAs($admin, 'sanctum')->postJson("/api/batches/{$batch->id}/qc", ['status' => 'fail'])->assertStatus(201);
+        $passId = $this->postJson("/api/batches/{$batch->id}/qc", ['status' => 'pass'])->assertStatus(201)->json('data.id');
+        $this->postJson("/api/quality-control/{$passId}/approve")->assertStatus(200);
+
+        // The older failed inspection must not block dispatch — the latest one decides.
+        $this->assertSame($passId, $batch->fresh()->qualityControl->id);
+        $dispatch = app(\App\Services\DispatchService::class)->createDispatch($batch->id, ['customer_address' => 'Site'], $admin->company_id);
+        $this->assertSame('pending', $dispatch->status);
+    }
+
     public function test_rework_required_sends_batch_back_to_the_floor(): void
     {
         $admin = $this->createAdminUser();

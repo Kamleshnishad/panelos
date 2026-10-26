@@ -29,8 +29,10 @@ class DispatchService
 
             // Stricter precondition: an APPROVED 'pass' QC must exist for the batch.
             // The old check let 'completed' batches through, bypassing QC entirely.
+            // Latest inspection decides: a batch can be re-inspected after a fail (PB-095).
             $qc = QualityControl::where('batch_id', $batch->id)
                 ->where('company_id', $companyId)
+                ->latest('id')
                 ->first();
             if (!$qc || $qc->status !== 'pass' || !$qc->approved_at) {
                 throw new \Exception('Batch must have an approved-pass QC record before dispatch.');

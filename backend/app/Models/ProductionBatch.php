@@ -75,7 +75,8 @@ class ProductionBatch extends BaseModel
 
     public function qualityControl()
     {
-        return $this->hasOne(QualityControl::class, 'batch_id');
+        // Latest inspection — a batch keeps a QC history (PB-095)
+        return $this->hasOne(QualityControl::class, 'batch_id')->latestOfMany();
     }
 
     public function dispatches()
