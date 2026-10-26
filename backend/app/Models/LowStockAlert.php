@@ -44,13 +44,18 @@ class LowStockAlert extends BaseModel
         return $this;
     }
 
-    public static function createIfNeeded($itemType, $itemId, $currentQuantity, $reorderLevel)
+    /**
+     * The company comes from the stock row, not the signed-in user: stock also moves in
+     * scheduled jobs and console commands, where there is no user (PB-097).
+     */
+    public static function createIfNeeded($itemType, $itemId, $currentQuantity, $reorderLevel, int $companyId)
     {
         if ($currentQuantity > $reorderLevel) {
             return null;
         }
 
-        $existingAlert = static::where('item_type', $itemType)
+        $existingAlert = static::where('company_id', $companyId)
+            ->where('item_type', $itemType)
             ->where('item_id', $itemId)
             ->where('status', 'active')
             ->first();
@@ -60,7 +65,7 @@ class LowStockAlert extends BaseModel
         }
 
         return static::create([
-            'company_id' => auth()?->user()?->company_id,
+            'company_id' => $companyId,
             'item_type' => $itemType,
             'item_id' => $itemId,
             'current_quantity' => $currentQuantity,
