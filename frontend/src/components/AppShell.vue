@@ -28,9 +28,9 @@
 
     <!-- Sidebar -->
     <aside class="sidebar" :class="{ open: mobileOpen }">
-      <div class="side-brand" @click="go('dashboard')">
-        <div class="brand-mark">
-          <img v-if="companyLogo" :src="companyLogo" class="brand-logo-img" alt="logo" />
+      <div class="side-brand" :class="{ 'wide-logo': companyLogo && logoWide }" @click="go('dashboard')">
+        <div class="brand-mark" :class="{ 'has-logo': companyLogo }">
+          <img v-if="companyLogo" :src="companyLogo" class="brand-logo-img" alt="logo" @load="e => (logoWide = e.target.naturalWidth > e.target.naturalHeight * 1.6)" />
           <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="#fff" stroke-width="2.2"/><path d="M8 8h5a3 3 0 0 1 0 6H8z" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/></svg>
         </div>
         <div class="brand-block">
@@ -235,6 +235,7 @@ function exitImpersonation() {
   window.location.reload()
 }
 const companyLogo = ref(null)
+const logoWide    = ref(false) // wide logos get the full sidebar width
 const badges      = ref({})
 const quotationOpenId = ref(null)
 const quotationPrefill = ref(null)
@@ -492,7 +493,12 @@ onMounted(async () => {
 
 .side-brand { display: flex; align-items: center; gap: 11px; padding: 18px 18px 16px; cursor: pointer; }
 .brand-mark { width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; background: linear-gradient(135deg, var(--accent), var(--accent-600)); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(61,90,241,0.4); overflow: hidden; }
-.brand-logo-img { width: 100%; height: 100%; object-fit: cover; }
+/* A company logo is shown whole on a white tile (logos are often wide; cover cropped them) */
+.brand-mark.has-logo { width: auto; min-width: 38px; max-width: 84px; padding: 4px 6px; background: #fff; box-shadow: none; }
+.brand-logo-img { height: 100%; width: auto; max-width: 100%; object-fit: contain; display: block; }
+.side-brand.wide-logo { flex-direction: column; align-items: stretch; gap: 8px; }
+.side-brand.wide-logo .brand-mark { width: 100%; max-width: none; height: auto; padding: 6px 10px; box-sizing: border-box; }
+.side-brand.wide-logo .brand-logo-img { width: 100%; height: auto; max-height: 52px; }
 .brand-name { font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.01em; line-height: 1.15; }
 .brand-sub { font-size: 9.5px; color: #6b7299; letter-spacing: 2px; font-weight: 600; margin-top: 1px; }
 
