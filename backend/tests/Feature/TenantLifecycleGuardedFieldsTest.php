@@ -42,7 +42,7 @@ class TenantLifecycleGuardedFieldsTest extends TestCase
         $this->assertSame('expired', $company->fresh()->subscription_status);
     }
 
-    public function test_a_new_signup_lands_on_the_starter_plan_with_a_real_trial_end_date(): void
+    public function test_a_new_signup_lands_on_the_enterprise_plan_with_a_real_trial_end_date(): void
     {
         $result = app(TenantProvisioningService::class)->provision([
             'company_name' => 'New Tenant Co ' . uniqid(),
@@ -52,7 +52,7 @@ class TenantLifecycleGuardedFieldsTest extends TestCase
         ]);
 
         $company = $result['company']->fresh();
-        $this->assertSame('starter', $company->subscription_plan);
+        $this->assertSame('enterprise', $company->subscription_plan);
         $this->assertSame('trial', $company->subscription_status);
         $this->assertTrue($company->is_active);
         $this->assertNotNull($company->trial_ends_at);

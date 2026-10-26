@@ -11,7 +11,7 @@
           <a href="#why" @click.prevent="scrollTo('why')">Why PanelOS</a>
           <a href="#features" @click.prevent="scrollTo('features')">Features</a>
           <a href="#how" @click.prevent="scrollTo('how')">How it works</a>
-          <a href="#pricing" @click.prevent="scrollTo('pricing')">Pricing</a>
+          <a v-if="showPricing" href="#pricing" @click.prevent="scrollTo('pricing')">Pricing</a>
           <a href="#faq" @click.prevent="scrollTo('faq')">FAQ</a>
         </nav>
         <div class="nav-cta">
@@ -175,7 +175,7 @@
     </section>
 
     <!-- ══ PRICING ══ -->
-    <section class="sec" id="pricing">
+    <section v-if="showPricing" class="sec" id="pricing">
       <div class="lp-wrap center">
         <span class="eyebrow reveal">Simple pricing</span>
         <h2 class="reveal">Plans that grow with your factory</h2>
@@ -236,7 +236,7 @@
           <a class="brand" href="#top" @click.prevent="scrollTo('top')"><span class="mark">P</span><span class="bn" style="color:#fff">PanelOS<small>by Digital Web Weaver</small></span></a>
           <p class="fdesc">The all-in-one ERP for PUF &amp; PIR insulated panel manufacturers — from enquiry to dispatch to payment.</p>
         </div>
-        <div><h5>Product</h5><a href="#features" @click.prevent="scrollTo('features')">Features</a><a href="#how" @click.prevent="scrollTo('how')">How it works</a><a href="#pricing" @click.prevent="scrollTo('pricing')">Pricing</a><button class="link-btn fl" @click="$emit('sign-in')">Sign in</button></div>
+        <div><h5>Product</h5><a href="#features" @click.prevent="scrollTo('features')">Features</a><a href="#how" @click.prevent="scrollTo('how')">How it works</a><a v-if="showPricing" href="#pricing" @click.prevent="scrollTo('pricing')">Pricing</a><button class="link-btn fl" @click="$emit('sign-in')">Sign in</button></div>
         <div><h5>Company</h5><a href="https://digitalwebweaver.com" target="_blank" rel="noopener">Digital Web Weaver</a><a href="mailto:digitalwebweaver@gmail.com">Contact</a><a href="#faq" @click.prevent="scrollTo('faq')">FAQ</a></div>
         <div><h5>Get started</h5><button class="link-btn fl" @click="$emit('start-trial')">Start free trial</button><a href="mailto:digitalwebweaver@gmail.com">Book a demo</a></div>
       </div>
@@ -311,6 +311,9 @@ const featureTabs = [
 const flow = ['Lead', 'Quotation', 'Order', 'Production', 'Dispatch', 'GST Invoice', 'Payment']
 const industry = ['PUF / PIR / Rockwool / EPS', 'Density & thickness', 'PPGI / PPGL / SS / Aluminium skins', 'RAL colours', 'SQM pricing', 'Indian GST & e-Invoice']
 
+// Pricing is hidden: every signup gets the Enterprise plan. Flip to true to show the plan cards again.
+const showPricing = false
+
 const plans = [
   { name: 'Starter', price: '2,999', desc: 'For small units getting off spreadsheets.', feats: ['Up to 3 users', 'Leads, Quotations & Orders', 'GST invoicing & basic reports'], pop: false },
   { name: 'Growth', price: '5,999', desc: 'For factories running full production.', feats: ['Up to 10 users', 'Everything in Starter', 'Production + Inventory + BOM', 'Tally export + WhatsApp alerts'], pop: true },
@@ -323,7 +326,7 @@ const faqs = [
   { q: 'Is it GST compliant?', a: 'Absolutely. Invoices auto-calculate CGST/SGST/IGST with HSN codes, amount-in-words, and are e-Invoice (IRN) and e-Way bill ready. Tally export included.' },
   { q: 'Can my whole team use it together?', a: 'Yes — sales, production, stores and accounts all work on one live system with role-based permissions, so nothing conflicts.' },
   { q: 'I\'m not very technical. Is it hard?', a: 'PanelOS follows the natural flow of your business, and there is a built-in step-by-step guide with screenshots inside the app.' },
-  { q: 'What happens after the free trial?', a: '14 days free, no card. After that pick a plan that fits — your data stays exactly where it is. No lock-in.' },
+  { q: 'What happens after the free trial?', a: '14 days free, no card. Your data stays exactly where it is, and we will get in touch about continuing. No lock-in.' },
 ]
 
 // ── scroll-state nav ──
