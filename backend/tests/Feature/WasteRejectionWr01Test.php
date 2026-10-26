@@ -17,7 +17,7 @@ class WasteRejectionWr01Test extends TestCase
 {
     use \Tests\Traits\HasDatabaseTestHelpers;
 
-    private function makeBatch(int $companyId, array $sizesByThickness, string $status = 'draft'): ProductionBatch
+    public static function makeBatch(int $companyId, array $sizesByThickness, string $status = 'draft'): ProductionBatch
     {
         $customer  = Customer::factory()->create(['company_id' => $companyId]);
         $quotation = Quotation::create(['company_id' => $companyId, 'customer_id' => $customer->id, 'quotation_no' => uniqid('Q'), 'status' => 'accepted']);
@@ -70,21 +70,24 @@ class WasteRejectionWr01Test extends TestCase
         $this->actingAs($admin, 'sanctum')->postJson("/api/batches/{$batch->id}/start?force=1")->assertStatus(200);
         [$long, $short] = $batch->fresh()->cutLines;
 
-        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$long->id}", ['cut_nos' => 10, 'rejected_nos' => 2])
-            ->assertStatus(200)->assertJsonPath('data.good_nos', 8)->assertJsonPath('data.status', 'in_progress');
+        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$long->id}", ['cut_nos' => 10])
+            ->assertStatus(200)->assertJsonPath('data.good_nos', 10)->assertJsonPath('data.status', 'done');
+        // 2 rejected at the saw (a rejection record, WR-2) → 8 good
+        WasteRejectionWr2Test::reject($this, $batch, $long, 2);
+        $this->assertSame(8, $long->fresh()->good_nos);
         // remakes: cut 12 with 2 rejected → 10 good = done
-        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$long->id}", ['cut_nos' => 12, 'rejected_nos' => 2])
+        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$long->id}", ['cut_nos' => 12])
             ->assertJsonPath('data.status', 'done');
-        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$short->id}", ['cut_nos' => 4, 'rejected_nos' => 0])->assertStatus(200);
+        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$short->id}", ['cut_nos' => 4])->assertStatus(200);
 
-        // invalid: more rejected than cut; more good than planned
-        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$short->id}", ['cut_nos' => 1, 'rejected_nos' => 2])->assertStatus(400);
-        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$short->id}", ['cut_nos' => 6, 'rejected_nos' => 0])->assertStatus(400);
+        // invalid: cut below the panels already rejected; more good than planned
+        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$long->id}", ['cut_nos' => 1])->assertStatus(400);
+        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$short->id}", ['cut_nos' => 6])->assertStatus(400);
 
         $this->postJson("/api/batches/{$batch->id}/complete", ['completed_quantity' => 999])->assertStatus(200);
         // 10 × 3.0 + 4 × 2.0 = 38 SQM, typed-in 999 ignored
         $this->assertEquals(38, (float) $batch->fresh()->completed_quantity);
-        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$short->id}", ['cut_nos' => 5, 'rejected_nos' => 0])->assertStatus(400);
+        $this->postJson("/api/batches/{$batch->id}/cut-lines/{$short->id}", ['cut_nos' => 5])->assertStatus(400);
     }
 
     public function test_cut_lines_are_tenant_isolated(): void

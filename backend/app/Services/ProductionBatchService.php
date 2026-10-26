@@ -153,24 +153,26 @@ class ProductionBatchService
     }
 
     /**
-     * Record the running totals for one cut line: panels cut so far and how many
-     * of them were rejected. Totals (not increments) so a retry can't double-count.
+     * Record the running total of panels cut on one cut line. Rejected panels are
+     * not typed here — each one is a rejection record (RejectionService), which
+     * keeps the line's rejected_nos (WR-2). Totals, not increments, so a retry
+     * can't double-count.
      */
-    public function recordCut(ProductionBatch $batch, int $lineId, int $cutNos, int $rejectedNos): \App\Models\ProductionCutLine
+    public function recordCut(ProductionBatch $batch, int $lineId, int $cutNos): \App\Models\ProductionCutLine
     {
         if ($batch->status !== 'in_progress') {
             throw new \Exception('Cuts can only be recorded while the batch is in production.');
         }
-        if ($rejectedNos > $cutNos) {
-            throw new \Exception('Rejected panels cannot exceed panels cut.');
-        }
 
-        return DB::transaction(function () use ($batch, $lineId, $cutNos, $rejectedNos) {
+        return DB::transaction(function () use ($batch, $lineId, $cutNos) {
             $line = $batch->cutLines()->lockForUpdate()->findOrFail($lineId);
-            if ($cutNos - $rejectedNos > $line->planned_nos) {
-                throw new \Exception("Good panels ({$cutNos} − {$rejectedNos}) cannot exceed the planned {$line->planned_nos}.");
+            if ($cutNos < $line->rejected_nos) {
+                throw new \Exception("{$line->rejected_nos} panels are already rejected on this line; cut cannot be lower.");
             }
-            $line->update(['cut_nos' => $cutNos, 'rejected_nos' => $rejectedNos]);
+            if ($cutNos - $line->rejected_nos > $line->planned_nos) {
+                throw new \Exception("Good panels ({$cutNos} − {$line->rejected_nos}) cannot exceed the planned {$line->planned_nos}.");
+            }
+            $line->update(['cut_nos' => $cutNos]);
             return $line;
         });
     }

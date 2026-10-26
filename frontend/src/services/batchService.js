@@ -34,6 +34,11 @@ export default {
   cutLines(id)                       { return api('get',  `/api/batches/${id}/cut-lines`) },
   recordCut(id, lineId, data)        { return api('post', `/api/batches/${id}/cut-lines/${lineId}`, data) },
 
+  // Rejected panels — WR-2 (data may be FormData when a photo is attached)
+  rejections(id)                     { return api('get',  `/api/batches/${id}/rejections`) },
+  raiseRejection(id, data)           { return api('post', `/api/batches/${id}/rejections`, data) },
+  voidRejection(id, rejectionId, data) { return api('post', `/api/batches/${id}/rejections/${rejectionId}/void`, data) },
+
   // Waste & rejection reason codes — WR-0
   reasonCodes(params = {})           { return api('get',  '/api/waste/reason-codes', null, params) },
   createReasonCode(data)             { return api('post', '/api/waste/reason-codes', data) },

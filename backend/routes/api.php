@@ -323,6 +323,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'tenant.active', 'perm.modu
     Route::post('/batches/{id}/complete', [ProductionBatchController::class, 'completeBatch'])->name('batches.complete');
     Route::get('/batches/{id}/cut-lines', [ProductionBatchController::class, 'cutLines'])->name('batches.cut_lines');
     Route::post('/batches/{id}/cut-lines/{lineId}', [ProductionBatchController::class, 'recordCut'])->name('batches.cut_lines.record');
+    Route::get('/batches/{batchId}/rejections', [\App\Http\Controllers\Api\RejectionController::class, 'index'])->name('batches.rejections.index');
+    Route::post('/batches/{batchId}/rejections', [\App\Http\Controllers\Api\RejectionController::class, 'store'])->name('batches.rejections.store');
+    Route::post('/batches/{batchId}/rejections/{id}/void', [\App\Http\Controllers\Api\RejectionController::class, 'void'])->name('batches.rejections.void');
     Route::get('/waste/reason-codes', [\App\Http\Controllers\Api\WasteReasonCodeController::class, 'index'])->name('waste.reason_codes.index');
     Route::post('/waste/reason-codes', [\App\Http\Controllers\Api\WasteReasonCodeController::class, 'store'])->name('waste.reason_codes.store');
     Route::put('/waste/reason-codes/{id}', [\App\Http\Controllers\Api\WasteReasonCodeController::class, 'update'])->name('waste.reason_codes.update');

@@ -21,12 +21,14 @@ class QualityControl extends Model
         'approved_at',
         'notes',
         'checklist',
+        'measurements',
     ];
 
     protected $casts = [
         'inspected_at' => 'datetime',
         'approved_at' => 'datetime',
         'checklist' => 'array',
+        'measurements' => 'array',
     ];
 
     /**
