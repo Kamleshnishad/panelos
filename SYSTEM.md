@@ -986,7 +986,7 @@ office and the floor describe the same job.
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/batches/{id}/cut-lines` | The batch's cut list. A batch already running without one gets it generated here; a `draft` batch returns `[]` |
-| `POST /api/batches/{id}/cut-lines/{lineId}` `{ cut_nos, rejected_nos }` | Record **running totals** for one line (not increments, so a retry cannot double-count) |
+| `POST /api/batches/{id}/cut-lines/{lineId}` `{ cut_nos }` | Record the **running total** of panels cut on one line (not an increment, so a retry cannot double-count). Rejected panels are never typed here — see §14.5 |
 
 * Written once, when the batch starts, from the §14.3 schedule: one row per spec × panel length, carrying
   `method` (`single`/`double`), `production_length_mm` (doubled for DL), `per_strip`, `planned_nos`.
@@ -994,10 +994,30 @@ office and the floor describe the same job.
 * Order: thickness → top colour → **longest first**; the UI marks a *changeover* row where the spec changes.
 * Derived, not stored: `good_nos = cut_nos − rejected_nos`, `good_sqm`, `planned_sqm`, and `status`
   (`pending` → `in_progress` → `done` when good ≥ planned).
-* Rules: batch must be `in_progress`; `rejected_nos ≤ cut_nos`; `good_nos ≤ planned_nos` (cut may exceed the
+* Rules: batch must be `in_progress`; `cut_nos ≥ rejected_nos`; `good_nos ≤ planned_nos` (cut may exceed the
   plan to replace rejects).
-* Rejection reasons, dispositions (scrap / remake / recut / downgrade), process scrap and costing come next:
-  WR-2 … WR-8 in `PLAN/WR_WASTE_REJECTION_PLAN.md`. Reason codes already exist (§15).
+* `rejected_nos` is **owned by rejection records** (§14.5): it is the sum of the line's open rejections.
+
+### 14.5 Rejected panels (WR-2)
+
+**Table:** `production_rejections` · **Service:** `RejectionService` · **UI:** Batch screen → *Reject* on a cut
+line, *Rejected Panels* card, and the QC form
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/batches/{batchId}/rejections` | Every rejection on the batch (reason, who, photos), newest first |
+| `POST /api/batches/{batchId}/rejections` `{ cut_line_id, nos, reason_code_id, stage_found, notes?, photo? }` | Record rejected panels (multipart when a photo is attached → `attachments` type `rejection_photo`) |
+| `POST /api/batches/{batchId}/rejections/{id}/void` `{ reason }` | Correct a mistake: the panels count as good again |
+
+* One record = NOS of one length rejected for one reason, with `stage_found` ∈ `saw · qc · stacking · store`,
+  `sqm`, `raised_by_user_id`, `status` (`open` · `void`; WR-3 adds dispositions).
+* Raising adds `nos` to the cut line's `rejected_nos`; voiding subtracts it. `nos` cannot exceed the line's good panels.
+* Reason must be this tenant's, active, and of a panel category (`defect · handling · supplier · transit`) —
+  process scrap and stock adjustments are not panel rejections.
+* Allowed while the batch is `in_progress`, `qc_pending`, `qc_failed`, `qc_passed` or `completed` (from the saw
+  until the panels leave). After production, `completed_quantity` follows the good SQM.
+* Dispositions (scrap / remake / recut / downgrade), process scrap and costing: WR-3 … WR-8 in
+  `PLAN/WR_WASTE_REJECTION_PLAN.md`.
 
 ---
 
@@ -1033,6 +1053,9 @@ Rules:
 * **Approve only works on a `pass`.** `"Can only approve QC entries with pass status. Failed QC requires
   rework."` Approval stamps `approved_by_user_id` + `approved_at`, which is exactly what dispatch checks.
 * Checklist is capped at 50 items; each needs `key`, `label`, `passed`.
+* Optional (WR-2): `measurements` `{ thickness_mm?, density_kgm3? }` stored on the inspection, and `rejections`
+  `[{ cut_line_id, nos, reason_code_id, notes? }]` — each becomes a §14.5 record with `stage_found = qc` linked to
+  the inspection. They are raised in the same transaction: one invalid row rolls the whole inspection back.
 
 **Rejection & waste reason codes (WR-0)** — `waste_reason_codes`, per tenant, edited in Master Data →
 *Rejection & Waste Reasons*. Categories: `defect`, `process_scrap`, `handling`, `transit`, `supplier`,
@@ -1626,6 +1649,11 @@ Hit one of these and the message tells you exactly which invariant you tripped.
 | `Cuts can only be recorded while the batch is in production.` | cut record | Batch not `in_progress` |
 | `Rejected panels cannot exceed panels cut.` | cut record | Fix the counts |
 | `Good panels (c − r) cannot exceed the planned n.` | cut record | Over-production on a cut line |
+| `n panels are already rejected on this line; cut cannot be lower.` | cut record | Void a rejection to correct it |
+| `Only n good panels of L mm can be rejected.` | rejection | More rejected than good on the line |
+| `Choose an active panel-rejection reason.` | rejection | Reason inactive, another tenant's, or a scrap/stock reason |
+| `Rejections can only be recorded on a batch that is in production or awaiting dispatch.` | rejection | Draft or dispatched batch |
+| `Only an open rejection can be voided.` | rejection void | Already voided |
 | `Can only approve QC entries with pass status. Failed QC requires rework.` | QC approve | Failed QC cannot be approved |
 | `Batch must have an approved-pass QC record before dispatch.` | dispatch create | QC missing, failed, or unapproved |
 | `Batch has already been dispatched` | dispatch create | One dispatch per batch |

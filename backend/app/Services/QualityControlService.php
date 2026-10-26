@@ -28,7 +28,14 @@ class QualityControlService
                 'inspected_at' => now(),
                 'notes' => $data['notes'] ?? null,
                 'checklist' => $data['checklist'] ?? null,
+                'measurements' => $data['measurements'] ?? null,
             ]);
+
+            // Panels found bad at this inspection become rejection records (WR-2),
+            // raised before the batch moves on so the open-batch rule still holds.
+            foreach ($data['rejections'] ?? [] as $r) {
+                app(RejectionService::class)->raise($batch, $r + ['stage_found' => 'qc'], $userId, $qc->id);
+            }
 
             // Update batch status based on QC result
             // rework_required sends the batch back to the floor; completing it

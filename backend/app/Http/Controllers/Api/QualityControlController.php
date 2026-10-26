@@ -70,6 +70,15 @@ class QualityControlController extends Controller
                 'checklist.*.key' => 'required_with:checklist|string|max:50',
                 'checklist.*.label' => 'required_with:checklist|string|max:200',
                 'checklist.*.passed' => 'required_with:checklist|boolean',
+                // WR-2: measured values and panels rejected at this inspection
+                'measurements' => 'nullable|array',
+                'measurements.thickness_mm' => 'nullable|numeric|min:0|max:1000',
+                'measurements.density_kgm3' => 'nullable|numeric|min:0|max:500',
+                'rejections' => 'nullable|array|max:100',
+                'rejections.*.cut_line_id' => 'required|integer',
+                'rejections.*.nos' => 'required|integer|min:1|max:100000',
+                'rejections.*.reason_code_id' => 'required|integer',
+                'rejections.*.notes' => 'nullable|string|max:1000',
             ]);
 
             $qc = $this->qcService->create($batch, $validated, $request->user()->id);

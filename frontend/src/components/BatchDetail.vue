@@ -211,7 +211,7 @@
         </div>
       </div>
       <div class="cut-bar"><div :style="{ width: cutTotals.pct + '%' }"></div></div>
-      <p v-if="canRecordCuts" class="cut-hint">Enter running totals per length: panels cut so far and how many of them were rejected. Good = cut − rejected.</p>
+      <p v-if="canRecordCuts" class="cut-hint">Enter the panels cut so far for each length. To reject panels, press <b>Reject</b>: every rejection needs a reason. Good = cut − rejected.</p>
       <div class="cut-scroll">
         <table class="size-table cut-table">
           <thead>
@@ -234,19 +234,19 @@
                   <span v-if="l.method === 'double'" class="warn-tag" :title="`Produce at ${l.production_length_mm} mm, cut each into 2`">DL {{ l.production_length_mm }}</span>
                 </td>
                 <td class="text-center bold">{{ l.planned_nos }}</td>
-                <template v-if="canRecordCuts">
-                  <td class="text-center"><input class="cut-input" type="number" min="0" inputmode="numeric" v-model.number="cutEdit[l.id].cut_nos" :aria-label="`Cut for ${l.panel_length_mm} mm`" /></td>
-                  <td class="text-center"><input class="cut-input" type="number" min="0" inputmode="numeric" v-model.number="cutEdit[l.id].rejected_nos" :aria-label="`Rejected for ${l.panel_length_mm} mm`" /></td>
-                </template>
-                <template v-else>
-                  <td class="text-center">{{ l.cut_nos }}</td>
-                  <td class="text-center" :class="{ 'cut-rej': l.rejected_nos }">{{ l.rejected_nos }}</td>
-                </template>
+                <td class="text-center">
+                  <input v-if="canRecordCuts" class="cut-input" type="number" min="0" inputmode="numeric" v-model.number="cutEdit[l.id].cut_nos" :aria-label="`Cut for ${l.panel_length_mm} mm`" />
+                  <template v-else>{{ l.cut_nos }}</template>
+                </td>
+                <td class="text-center" :class="{ 'cut-rej': l.rejected_nos }">{{ l.rejected_nos }}</td>
                 <td class="text-center bold">{{ l.good_nos }}</td>
                 <td class="text-center">{{ fmtQty(l.good_sqm) }}</td>
                 <td>
-                  <button v-if="canRecordCuts && cutDirty(l)" class="btn btn-save btn-xs" :disabled="cutSaving[l.id]" @click="saveCut(l)">{{ cutSaving[l.id] ? '…' : 'Save' }}</button>
-                  <span v-else :class="['cut-status', l.status]">{{ { pending: 'Pending', in_progress: 'Running', done: 'Done' }[l.status] }}</span>
+                  <div class="cut-actions">
+                    <button v-if="canRecordCuts && cutDirty(l)" class="btn btn-save btn-xs" :disabled="cutSaving[l.id]" @click="saveCut(l)">{{ cutSaving[l.id] ? '…' : 'Save' }}</button>
+                    <span v-else :class="['cut-status', l.status]">{{ { pending: 'Pending', in_progress: 'Running', done: 'Done' }[l.status] }}</span>
+                    <button v-if="canReject && l.good_nos > 0 && !cutDirty(l)" class="btn btn-reject btn-xs" @click="openReject(l)">Reject</button>
+                  </div>
                 </td>
               </tr>
             </template>
@@ -254,6 +254,38 @@
         </table>
       </div>
       <div v-if="cutError" class="error-msg">{{ cutError }}</div>
+    </div>
+
+    <!-- Rejected panels (WR-2) -->
+    <div class="card" v-if="rejections.length">
+      <div class="cut-head">
+        <h3>Rejected Panels</h3>
+        <div class="cut-progress"><b class="cut-rej">{{ rejTotals.nos }} panels</b> · {{ fmtQty(rejTotals.sqm) }} SQM</div>
+      </div>
+      <div class="cut-scroll">
+        <table class="size-table rej-table">
+          <thead>
+            <tr><th>When</th><th>Length</th><th class="text-center">NOS</th><th class="text-center">SQM</th><th>Reason</th><th>Found at</th><th>By</th><th>Notes</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in rejections" :key="r.id" :class="{ 'rej-void': r.status === 'void' }">
+              <td>{{ fmtDateTime(r.created_at) }}</td>
+              <td class="bold">{{ r.panel_length_mm }}</td>
+              <td class="text-center bold">{{ r.nos }}</td>
+              <td class="text-center">{{ fmtQty(r.sqm) }}</td>
+              <td>{{ r.reason?.label }}</td>
+              <td>{{ stageLabels[r.stage_found] ?? r.stage_found }}</td>
+              <td>{{ r.raised_by?.name ?? '' }}</td>
+              <td class="rej-notes">
+                {{ r.notes }}
+                <a v-for="a in r.attachments" :key="a.id" :href="a.url" target="_blank" rel="noopener" class="rej-photo">📷 Photo</a>
+                <div v-if="r.status === 'void'" class="rej-void-note">Voided: {{ r.void_reason }}</div>
+              </td>
+              <td><button v-if="r.status === 'open'" class="btn btn-ghost btn-xs" @click="voidRejection(r)">Void</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Panel BOQ (from linked order) -->
@@ -388,6 +420,39 @@
           </div>
         </div>
 
+        <!-- Measured values (WR-2) -->
+        <div class="qc-measure">
+          <div class="qc-checklist-label">Measured values</div>
+          <div class="qc-measure-row">
+            <label>Thickness (mm)
+              <input v-model.number="qcMeasure.thickness_mm" type="number" step="0.1" min="0" inputmode="decimal" />
+              <span v-if="specTarget.thickness" class="hint" :class="{ 'out-tol': outOfTol('thickness_mm', specTarget.thickness, 0.5) }">Target {{ specTarget.thickness }} ±0.5</span>
+            </label>
+            <label>Density (kg/m³)
+              <input v-model.number="qcMeasure.density_kgm3" type="number" step="0.1" min="0" inputmode="decimal" />
+              <span v-if="specTarget.density" class="hint" :class="{ 'out-tol': outOfTol('density_kgm3', specTarget.density, 2) }">Target {{ specTarget.density }} ±2</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Panels rejected at this inspection (WR-2) -->
+        <div class="qc-measure">
+          <div class="qc-checklist-label">Panels rejected at QC</div>
+          <div v-for="(row, ri) in qcRejections" :key="ri" class="qc-rej-row">
+            <select v-model="row.cut_line_id" aria-label="Length">
+              <option value="" disabled>Length…</option>
+              <option v-for="l in cutLines.filter(x => x.good_nos > 0)" :key="l.id" :value="l.id">{{ l.panel_length_mm }} mm ({{ l.good_nos }} good)</option>
+            </select>
+            <input v-model.number="row.nos" type="number" min="1" placeholder="NOS" aria-label="Panels" inputmode="numeric" />
+            <select v-model="row.reason_code_id" aria-label="Reason">
+              <option value="" disabled>Reason…</option>
+              <option v-for="r in reasonCodes" :key="r.id" :value="r.id">{{ r.label }}</option>
+            </select>
+            <button class="btn btn-ghost btn-xs" @click="qcRejections.splice(ri, 1)" aria-label="Remove">✕</button>
+          </div>
+          <button v-if="cutLines.length" class="btn btn-ghost btn-xs" @click="addQcRejection">+ Add rejected panels</button>
+        </div>
+
         <!-- Overall verdict -->
         <div class="qc-verdict-row">
           <div class="verdict-label">Overall Result</div>
@@ -433,6 +498,47 @@
           </button>
         </div>
       </template>
+    </div>
+
+    <!-- Reject panels modal (WR-2) -->
+    <div v-if="rejectForm.open" class="modal-overlay" @click.self="rejectForm.open = false">
+      <div class="modal-box">
+        <h3>Reject panels — {{ rejectForm.line.panel_length_mm }} mm</h3>
+        <p class="hint">{{ rejectForm.line.spec_label }} · {{ rejectForm.line.good_nos }} good panels on this line</p>
+        <div class="form-group">
+          <label>How many panels?</label>
+          <input v-model.number="rejectForm.nos" type="number" min="1" :max="rejectForm.line.good_nos" inputmode="numeric" />
+        </div>
+        <div class="form-group">
+          <label>Reason</label>
+          <select v-model="rejectForm.reason_code_id">
+            <option value="" disabled>Choose a reason…</option>
+            <option v-for="r in reasonCodes" :key="r.id" :value="r.id">{{ r.label }}</option>
+          </select>
+          <span v-if="selectedReason?.root_cause_hint" class="hint">Check: {{ selectedReason.root_cause_hint }}</span>
+        </div>
+        <div class="form-group">
+          <label>Found at</label>
+          <select v-model="rejectForm.stage_found">
+            <option v-for="(label, key) in stageLabels" :key="key" :value="key">{{ label }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <input v-model="rejectForm.notes" maxlength="1000" placeholder="e.g. delamination at one end" />
+        </div>
+        <div class="form-group">
+          <label>Photo (optional)</label>
+          <input type="file" accept="image/*" capture="environment" @change="e => (rejectForm.photo = e.target.files[0] ?? null)" />
+        </div>
+        <div v-if="rejectForm.error" class="error-msg">{{ rejectForm.error }}</div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" @click="rejectForm.open = false">Cancel</button>
+          <button class="btn btn-danger" :disabled="rejectForm.saving || !rejectForm.reason_code_id || !(rejectForm.nos > 0)" @click="submitReject">
+            {{ rejectForm.saving ? 'Saving…' : `Reject ${rejectForm.nos || ''} panel${rejectForm.nos === 1 ? '' : 's'}` }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Complete Batch Modal -->
@@ -511,6 +617,8 @@ const cutEdit   = reactive({})
 const cutSaving = reactive({})
 const cutError  = ref(null)
 const canRecordCuts = computed(() => batch.value?.status === 'in_progress')
+// Panels can be rejected from the saw until they leave the factory (matches RejectionService)
+const canReject = computed(() => ['in_progress', 'qc_pending', 'qc_failed', 'qc_passed', 'completed'].includes(batch.value?.status))
 const cutTotals = computed(() => {
   const sum = k => cutLines.value.reduce((a, l) => a + Number(l[k] || 0), 0)
   const planned = sum('planned_nos'), good = sum('good_nos')
@@ -519,14 +627,14 @@ const cutTotals = computed(() => {
 })
 // Once anything is recorded, completed SQM comes from the cut list (backend does the same)
 const cutRecorded = computed(() => cutLines.value.some(l => l.cut_nos > 0))
-const cutDirty = l => cutEdit[l.id] && (cutEdit[l.id].cut_nos !== l.cut_nos || cutEdit[l.id].rejected_nos !== l.rejected_nos)
+const cutDirty = l => cutEdit[l.id] && cutEdit[l.id].cut_nos !== l.cut_nos
 
 async function loadCutLines() {
   if (batch.value?.status === 'draft') { cutLines.value = []; return }
   try {
     const res = await batchService.cutLines(props.batchId)
     cutLines.value = res?.data ?? res ?? []
-    cutLines.value.forEach(l => { cutEdit[l.id] = { cut_nos: l.cut_nos, rejected_nos: l.rejected_nos } })
+    cutLines.value.forEach(l => { cutEdit[l.id] = { cut_nos: l.cut_nos } })
   } catch { cutLines.value = [] }
 }
 
@@ -536,14 +644,102 @@ async function saveCut(l) {
   try {
     const res = await batchService.recordCut(props.batchId, l.id, {
       cut_nos: Number(cutEdit[l.id].cut_nos) || 0,
-      rejected_nos: Number(cutEdit[l.id].rejected_nos) || 0,
     })
     const saved = res?.data ?? res
     cutLines.value = cutLines.value.map(x => (x.id === l.id ? saved : x))
-    cutEdit[l.id] = { cut_nos: saved.cut_nos, rejected_nos: saved.rejected_nos }
+    cutEdit[l.id] = { cut_nos: saved.cut_nos }
   } catch (e) {
     cutError.value = e?.response?.data?.message ?? 'Failed to save.'
   } finally { cutSaving[l.id] = false }
+}
+
+// ── Rejected panels (WR-2) ──────────────────────────────────────
+const stageLabels = { saw: 'Saw / cutting', qc: 'QC inspection', stacking: 'Stacking / packing', store: 'Store / yard' }
+const rejections  = ref([])
+const reasonCodes = ref([])
+const rejTotals   = computed(() => {
+  const open = rejections.value.filter(r => r.status === 'open')
+  return { nos: open.reduce((a, r) => a + r.nos, 0), sqm: open.reduce((a, r) => a + Number(r.sqm), 0) }
+})
+const rejectForm = reactive({ open: false, line: null, nos: 1, reason_code_id: '', stage_found: 'saw', notes: '', photo: null, error: null, saving: false })
+const selectedReason = computed(() => reasonCodes.value.find(r => r.id === rejectForm.reason_code_id))
+
+async function loadRejections() {
+  if (batch.value?.status === 'draft') { rejections.value = []; return }
+  try {
+    const res = await batchService.rejections(props.batchId)
+    rejections.value = res?.data ?? res ?? []
+  } catch { rejections.value = [] }
+}
+
+async function loadReasonCodes() {
+  if (reasonCodes.value.length) return
+  try {
+    const res = await batchService.reasonCodes({ active_only: 1 })
+    reasonCodes.value = (res?.data ?? res ?? []).filter(r => ['defect', 'handling', 'supplier', 'transit'].includes(r.category))
+  } catch { reasonCodes.value = [] }
+}
+
+async function openReject(line) {
+  await loadReasonCodes()
+  const status = batch.value?.status
+  Object.assign(rejectForm, {
+    open: true, line, nos: 1, reason_code_id: '', notes: '', photo: null, error: null, saving: false,
+    stage_found: status === 'in_progress' ? 'saw' : ['qc_pending', 'qc_failed'].includes(status) ? 'qc' : 'store',
+  })
+}
+
+async function submitReject() {
+  rejectForm.saving = true
+  rejectForm.error  = null
+  try {
+    const fields = { cut_line_id: rejectForm.line.id, nos: rejectForm.nos, reason_code_id: rejectForm.reason_code_id,
+                     stage_found: rejectForm.stage_found, notes: rejectForm.notes || '' }
+    let data = fields
+    if (rejectForm.photo) {
+      data = new FormData()
+      Object.entries(fields).forEach(([k, v]) => data.append(k, v))
+      data.append('photo', rejectForm.photo)
+    }
+    await batchService.raiseRejection(props.batchId, data)
+    rejectForm.open = false
+    actionSuccess.value = 'Rejection recorded.'
+    await refreshAfterRejection()
+  } catch (e) {
+    const errs = e?.response?.data?.errors
+    rejectForm.error = errs && !errs.error ? Object.values(errs).flat().join(' ') : (e?.response?.data?.message ?? 'Failed to save.')
+  } finally { rejectForm.saving = false }
+}
+
+async function voidRejection(r) {
+  const reason = window.prompt(`Void this rejection of ${r.nos} × ${r.panel_length_mm} mm? The panels count as good again.\n\nWhy?`)
+  if (!reason) return
+  actionError.value = null
+  try {
+    await batchService.voidRejection(props.batchId, r.id, { reason })
+    actionSuccess.value = 'Rejection voided.'
+    await refreshAfterRejection()
+  } catch (e) { actionError.value = e?.response?.data?.message ?? 'Failed to void.' }
+}
+
+// Rejections change good NOS on the cut list and (after production) the batch's completed SQM
+async function refreshAfterRejection() {
+  const res = await batchService.get(props.batchId)
+  batch.value = res?.data ?? res
+  await Promise.all([loadCutLines(), loadRejections()])
+}
+
+// QC measured values + panels rejected at the inspection
+const qcMeasure     = reactive({ thickness_mm: null, density_kgm3: null })
+const qcRejections  = ref([])
+const specTarget    = computed(() => {
+  const it = batch.value?.order?.items?.[0]
+  return { thickness: it?.thickness ? Number(it.thickness) : null, density: it?.density_kgm3 ? Number(it.density_kgm3) : null }
+})
+const outOfTol = (key, target, tol) => qcMeasure[key] !== null && qcMeasure[key] !== '' && Math.abs(Number(qcMeasure[key]) - target) > tol
+async function addQcRejection() {
+  await loadReasonCodes()
+  qcRejections.value.push({ cut_line_id: '', nos: 1, reason_code_id: '' })
 }
 
 // Per-stage notes keyed by stage_id
@@ -607,7 +803,7 @@ async function load() {
     const res   = await batchService.get(props.batchId)
     batch.value = res?.data ?? res
     editNotes.value = batch.value.notes ?? ''
-    await Promise.all([loadProgress(), loadCutLines()])
+    await Promise.all([loadProgress(), loadCutLines(), loadRejections()])
     if (['qc_pending','qc_passed','qc_failed','completed'].includes(batch.value.status)) {
       await loadQc()
     }
@@ -639,6 +835,9 @@ async function loadQc() {
   reinspect.value = false
   qcForm.status = ''
   qcForm.notes  = ''
+  qcMeasure.thickness_mm = null
+  qcMeasure.density_kgm3 = null
+  qcRejections.value = []
   qcSubmitError.value = null
   approveNote.value   = ''
 }
@@ -652,6 +851,8 @@ async function submitQc() {
       status:    qcForm.status,
       notes:     qcForm.notes || null,
       checklist: qcChecklist.map(c => ({ key: c.key, label: c.label, passed: !!c.passed })),
+      measurements: Object.fromEntries(Object.entries(qcMeasure).filter(([, v]) => v !== null && v !== '')),
+      rejections: qcRejections.value.filter(r => r.cut_line_id && r.nos > 0 && r.reason_code_id),
     })
     const submitted = qcForm.status
     actionSuccess.value = {
@@ -1111,4 +1312,20 @@ onUnmounted(clearTimers)
 .cut-status { font-size: 11px; font-weight: 700; }
 .cut-status.done { color: #2e7d32; } .cut-status.in_progress { color: #b26a00; } .cut-status.pending { color: var(--text-3); }
 .btn-xs { padding: 4px 10px; font-size: 12px; }
+.cut-actions { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.btn-reject { background: #fff; color: #c62828; border: 1px solid #ef9a9a; }
+.btn-reject:hover { background: #ffebee; }
+.rej-table td { vertical-align: top; }
+.rej-notes { font-size: 11.5px; color: var(--text-2); min-width: 140px; }
+.rej-photo { display: inline-block; margin-left: 6px; font-weight: 600; color: var(--primary); }
+.rej-void td { color: var(--text-3); text-decoration: line-through; }
+.rej-void .rej-void-note { text-decoration: none; display: block; font-style: italic; }
+.qc-measure { margin: 14px 0; }
+.qc-measure-row { display: flex; gap: 18px; flex-wrap: wrap; }
+.qc-measure-row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.qc-measure-row input, .qc-rej-row input, .qc-rej-row select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+.qc-measure-row input { width: 120px; }
+.out-tol { color: #c62828; font-weight: 700; }
+.qc-rej-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.qc-rej-row input { width: 80px; }
 </style>

@@ -234,17 +234,16 @@ class ProductionBatchController extends Controller
     }
 
     /**
-     * POST /batches/{id}/cut-lines/{lineId} - Record running totals: panels cut and rejected.
+     * POST /batches/{id}/cut-lines/{lineId} - Record the running total of panels cut (rejections are separate records).
      */
     public function recordCut(Request $request, int $id, int $lineId)
     {
         try {
             $batch = ProductionBatch::where('company_id', $request->user()->company_id)->findOrFail($id);
             $validated = $request->validate([
-                'cut_nos'      => 'required|integer|min:0|max:100000',
-                'rejected_nos' => 'required|integer|min:0|max:100000',
+                'cut_nos' => 'required|integer|min:0|max:100000',
             ]);
-            $line = $this->batchService->recordCut($batch, $lineId, $validated['cut_nos'], $validated['rejected_nos']);
+            $line = $this->batchService->recordCut($batch, $lineId, $validated['cut_nos']);
             return $this->successResponse($line, 'Cut recorded');
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return $this->errorResponse(['id' => ['Batch or cut line not found']], 'Not found', 'NOT_FOUND', 404);

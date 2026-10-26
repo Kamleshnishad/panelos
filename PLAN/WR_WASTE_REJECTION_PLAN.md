@@ -151,6 +151,13 @@ replace rejects. Line status (pending / running / done) is derived, not stored.
 
 **Acceptance:** rejected NOS on cut line == sum of open+closed NCR NOS; held batch cannot be dispatched.
 
+**As built (2026-10-29):** table `production_rejections` (named for the floor's word, not "NCR"). A cut line's
+`rejected_nos` is the sum of its open records — the cut-list endpoint now takes `cut_nos` only. Raise from the
+cut list (*Reject*: NOS, reason, found at saw / QC / stacking / store, notes, photo), or inside a QC inspection
+together with measured thickness and density. Records are `open` or `void` (void = typed in error, with a
+reason); WR-3 adds dispositions. "Hold" is the existing rule: a `qc_failed` batch cannot be dispatched.
+Not done: severity (no clear use yet), per-panel serials.
+
 ### WR-3 · Disposition workflow
 **Goal:** every NCR ends in a decision with an owner.
 - Disposition screen: split an NCR's NOS across dispositions (e.g. 3 → 1 recut, 2 scrap).
