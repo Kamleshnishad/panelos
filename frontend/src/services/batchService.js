@@ -30,8 +30,17 @@ export default {
   approveStage(batchId, stageId, data)  { return api('post', `/api/batches/${batchId}/stages/${stageId}/approve`,  data) },
   rejectStage(batchId, stageId, data)   { return api('post', `/api/batches/${batchId}/stages/${stageId}/reject`,   data) },
 
+  // Cut list (length × NOS) — WR-1
+  cutLines(id)                       { return api('get',  `/api/batches/${id}/cut-lines`) },
+  recordCut(id, lineId, data)        { return api('post', `/api/batches/${id}/cut-lines/${lineId}`, data) },
+
+  // Waste & rejection reason codes — WR-0
+  reasonCodes(params = {})           { return api('get',  '/api/waste/reason-codes', null, params) },
+  createReasonCode(data)             { return api('post', '/api/waste/reason-codes', data) },
+  updateReasonCode(id, data)         { return api('put',  `/api/waste/reason-codes/${id}`, data) },
+
   // QC
-  createQc(id, data)        { return api('post', `/api/batches/${id}/qc`, data) },
+  createQc(id, data)      { return api('post', `/api/batches/${id}/qc`, data) },
   getQc(id)                 { return api('get',  `/api/batches/${id}/qc`) },
   approveQc(qcId, data)     { return api('post', `/api/quality-control/${qcId}/approve`, data) },
   qcStats(params = {})      { return api('get',  '/api/quality-control/statistics', null, params) },

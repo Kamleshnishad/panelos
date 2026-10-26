@@ -13,8 +13,10 @@ class QualityControlService
      */
     public function create(ProductionBatch $batch, array $data, int $userId): QualityControl
     {
-        if ($batch->status !== 'qc_pending') {
-            throw new \Exception('Batch must be in qc_pending status to enter QC');
+        // qc_failed batches may be re-inspected (e.g. after the failed panels were
+        // dealt with); every inspection is kept as history, latest one wins (WR-0).
+        if (!in_array($batch->status, ['qc_pending', 'qc_failed'])) {
+            throw new \Exception('Batch must be in qc_pending or qc_failed status to enter QC');
         }
 
         return DB::transaction(function () use ($batch, $data, $userId) {
@@ -29,11 +31,13 @@ class QualityControlService
             ]);
 
             // Update batch status based on QC result
-            if ($qc->status === 'pass') {
-                $batch->update(['status' => 'qc_passed']);
-            } elseif ($qc->status === 'fail') {
-                $batch->update(['status' => 'qc_failed']);
-            }
+            // rework_required sends the batch back to the floor; completing it
+            // again returns it to qc_pending for a fresh inspection.
+            $batch->update(['status' => match ($qc->status) {
+                'pass'            => 'qc_passed',
+                'fail'            => 'qc_failed',
+                'rework_required' => 'in_progress',
+            }]);
 
             return $qc->load('inspectedByUser');
         });
@@ -45,26 +49,18 @@ class QualityControlService
     public function getForBatch(ProductionBatch $batch): ?QualityControl
     {
         return QualityControl::where('batch_id', $batch->id)
-            ->with('inspectedByUser')
+            ->with('inspectedByUser', 'approvedByUser')
+            ->latest('id')
             ->first();
     }
 
-    /**
-     * Update QC entry (if pending approval)
-     */
-    public function update(QualityControl $qc, array $data, int $userId): QualityControl
+    /** Every inspection of a batch, newest first. */
+    public function historyForBatch(ProductionBatch $batch)
     {
-        if ($qc->status !== 'pending_approval') {
-            throw new \Exception('Can only update QC entries in pending_approval status');
-        }
-
-        $qc->update([
-            'status' => $data['status'] ?? $qc->status,
-            'notes' => $data['notes'] ?? $qc->notes,
-            'inspected_by_user_id' => $userId,
-        ]);
-
-        return $qc->fresh();
+        return QualityControl::where('batch_id', $batch->id)
+            ->with('inspectedByUser', 'approvedByUser')
+            ->latest('id')
+            ->get();
     }
 
     /**

@@ -78,6 +78,7 @@ class EnforceModulePermissions
         'panel-types'       => [null, 'settings.manage'],
         'accessories'       => [null, 'settings.manage'],
         'material-settings' => [null, 'settings.manage'],
+        'waste'             => ['production.view', 'settings.manage'],
         'document-templates'=> [null, 'settings.manage'],
         'gst'               => [null, 'settings.manage'],
         'sms'               => [null, 'settings.manage'],

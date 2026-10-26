@@ -115,6 +115,12 @@ Each phase is shippable on its own and leaves the system consistent.
 
 **Acceptance:** QC can be re-done after fail/rework; masters editable in Settings; tests for QC transitions.
 
+**As built (2026-10-28):** QC fixes + reason-code master (Master Data → Rejection & Waste Reasons)
+shipped. Changes from the plan: no new `waste.*` permissions — reasons use `settings.manage`
+(edit) / `production.view` (read), recording uses `production.manage`, approvals will use the
+existing `production.approve`. The **disposition master moves to WR-3** and the **scrap/disposal
+rates move to WR-6**, where they are first used.
+
 ### WR-1 · Persisted cut list + NOS recording (prerequisite)
 **Goal:** NOS exists in production.
 - New table `production_cut_lines`: batch_id/run_id, order_item_size_id, spec signature,
@@ -128,6 +134,11 @@ Each phase is shippable on its own and leaves the system consistent.
 
 **Acceptance:** an order's size rows appear as cut lines; recording 58 good + 2 rejected of 60
 shows 58/60 and correct SQM; test for DL doubling and SQM derivation.
+
+**As built (2026-10-28):** cut lines are generated on batch start (and on first view for batches
+already running), reuse `CuttingScheduleService`'s DL pairing, and are recorded as running totals
+(cut, rejected) in the Batch screen. Good panels may not exceed the plan; cut may exceed it to
+replace rejects. Line status (pending / running / done) is derived, not stored.
 
 ### WR-2 · Rejection capture (NCR)
 **Goal:** every bad panel recorded with why and where.

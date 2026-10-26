@@ -68,6 +68,11 @@ class ProductionBatch extends BaseModel
         return $this->hasMany(BatchStageLog::class, 'batch_id');
     }
 
+    public function cutLines()
+    {
+        return $this->hasMany(ProductionCutLine::class, 'batch_id')->orderBy('sequence');
+    }
+
     public function qualityControl()
     {
         return $this->hasOne(QualityControl::class, 'batch_id');

@@ -8,7 +8,10 @@ use Illuminate\Support\Facades\DB;
 
 class ProductionBatchService
 {
-    public function __construct(private ProductionMaterialService $materialService) {}
+    public function __construct(
+        private ProductionMaterialService $materialService,
+        private CuttingScheduleService $cuttingService,
+    ) {}
 
     /**
      * Create production batch from order items
@@ -115,6 +118,9 @@ class ProductionBatchService
                 'started_at' => now(),
             ]);
 
+            // The floor works from the cut list (length × NOS), so it exists from the start.
+            $this->cuttingService->generateCutLines($batch);
+
             return $batch->fresh();
         });
     }
@@ -130,13 +136,43 @@ class ProductionBatchService
 
         $this->guardStagesComplete($batch);
 
+        // Once the floor has recorded cuts, output is the good panels on the cut
+        // list — not a typed-in number. Batches with nothing recorded keep the old behaviour.
+        $lines = $batch->cutLines()->get();
+        $completed = $lines->sum('cut_nos') > 0
+            ? round($lines->sum('good_sqm'), 2)
+            : ($data['completed_quantity'] ?? $batch->planned_quantity);
+
         $batch->update([
-            'completed_quantity' => $data['completed_quantity'] ?? $batch->planned_quantity,
+            'completed_quantity' => $completed,
             'status' => 'qc_pending',
             'completed_at' => now(),
         ]);
 
         return $batch->fresh();
+    }
+
+    /**
+     * Record the running totals for one cut line: panels cut so far and how many
+     * of them were rejected. Totals (not increments) so a retry can't double-count.
+     */
+    public function recordCut(ProductionBatch $batch, int $lineId, int $cutNos, int $rejectedNos): \App\Models\ProductionCutLine
+    {
+        if ($batch->status !== 'in_progress') {
+            throw new \Exception('Cuts can only be recorded while the batch is in production.');
+        }
+        if ($rejectedNos > $cutNos) {
+            throw new \Exception('Rejected panels cannot exceed panels cut.');
+        }
+
+        return DB::transaction(function () use ($batch, $lineId, $cutNos, $rejectedNos) {
+            $line = $batch->cutLines()->lockForUpdate()->findOrFail($lineId);
+            if ($cutNos - $rejectedNos > $line->planned_nos) {
+                throw new \Exception("Good panels ({$cutNos} − {$rejectedNos}) cannot exceed the planned {$line->planned_nos}.");
+            }
+            $line->update(['cut_nos' => $cutNos, 'rejected_nos' => $rejectedNos]);
+            return $line;
+        });
     }
 
     /**
