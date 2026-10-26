@@ -48,7 +48,7 @@ class TenantProvisioningService
                 'signup_referrer'     => $data['signup_referrer'] ?? null,
             ]);
             $company->forceFill([
-                'subscription_plan'   => 'starter',
+                'subscription_plan'   => 'enterprise',
                 'subscription_status' => 'trial',
                 'trial_ends_at'       => now()->addDays(self::TRIAL_DAYS),
                 'is_active'           => true,
