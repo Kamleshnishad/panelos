@@ -80,6 +80,9 @@
             </button>
           </template>
 
+          <!-- Help for the page you are on -->
+          <button v-if="!isSuperAdmin" class="help-btn" title="Help for this page" aria-label="Help for this page" @click="openHelp()">?</button>
+
           <!-- Account menu: profile + log out -->
           <div class="user-menu">
             <button class="um-trigger" :aria-expanded="userMenuOpen" aria-haspopup="menu" @click="userMenuOpen = !userMenuOpen">
@@ -100,6 +103,10 @@
                 <button role="menuitem" class="um-item" @click="userMenuOpen = false; profileOpen = true">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                   My Profile
+                </button>
+                <button v-if="!isSuperAdmin" role="menuitem" class="um-item" @click="userMenuOpen = false; openHelp('getting-started')">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  Help &amp; Guide
                 </button>
                 <button role="menuitem" class="um-item um-logout" @click="userMenuOpen = false; $emit('logout')">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 12H3m0 0l4-4m-4 4l4 4M21 3v18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -138,6 +145,7 @@
         <master-data-manager   v-else-if="active === 'master'" />
         <user-management       v-else-if="active === 'users'" />
         <super-admin           v-else-if="active === 'superadmin'" />
+        <guide-page            v-else-if="active === 'guide'" :focus="guideFocus" :can-open="allowed" @navigate="go" />
       </main>
     </div>
     </div>
@@ -145,7 +153,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent, h } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent, h, nextTick } from 'vue'
 import axios from 'axios'
 import authService from '../services/authService.js'
 import { useSessionGuard } from '../composables/useSessionGuard.js'
@@ -196,6 +204,7 @@ const lazy = loader => defineAsyncComponent({
   delay: 150,
 })
 
+const GuidePage = lazy(() => import('./GuidePage.vue'))
 const HomeDashboard = lazy(() => import('./HomeDashboard.vue'))
 const LeadManager = lazy(() => import('./LeadManager.vue'))
 const CustomerManager = lazy(() => import('./CustomerManager.vue'))
@@ -286,6 +295,7 @@ function openQuotation(id) {
 }
 
 const ic = {
+  help:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   dashboard:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 10.5 12 3l9 7.5M5 9v11h14V9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   quote:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 2v6h6M9 13h6M9 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   lead:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
@@ -337,6 +347,9 @@ const nav = [
     { key: 'audit',       label: 'Audit Log',       icon: ic.qc, admin: true },
     { key: 'superadmin',  label: 'Platform Admin',  icon: ic.building, superadmin: true },
   ]},
+  { label: 'Help', items: [
+    { key: 'guide',       label: 'Help & Guide',    icon: ic.help },
+  ]},
 ]
 
 const allItems    = nav.flatMap(g => g.items)
@@ -357,6 +370,14 @@ const initials = computed(() => {
   return n.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 })
 const userMenuOpen = ref(false)
+// Help & Guide: open at a page's section (the ? button passes the page you are on)
+const guideFocus = ref(null)
+async function openHelp(key = active.value) {
+  guideFocus.value = null
+  go('guide')
+  await nextTick() // reset first so asking for the same section again still scrolls
+  guideFocus.value = key === 'guide' ? null : key
+}
 const profileOpen  = ref(false)
 const roleLabel = computed(() => user.value?.is_super_admin ? 'Super Admin' : (user.value?.is_company_admin ? 'Company Admin' : 'User'))
 const isAdmin = computed(() => !!(user.value?.is_admin || user.value?.is_company_admin || user.value?.is_super_admin))
@@ -544,6 +565,8 @@ onMounted(async () => {
 .su-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-600)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
 .su-name { display: block; font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
 .su-role { display: block; font-size: 11px; color: var(--text-3); }
+.help-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-weight: 700; font-size: 15px; cursor: pointer; flex-shrink: 0; }
+.help-btn:hover { border-color: var(--primary-bd); color: var(--primary); }
 .user-menu { position: relative; }
 .um-trigger { display: flex; align-items: center; gap: 9px; background: none; border: 1px solid transparent; border-radius: 10px; padding: 4px 8px 4px 4px; cursor: pointer; text-align: left; }
 .um-trigger:hover, .um-trigger[aria-expanded="true"] { background: var(--surface-2); border-color: var(--border); }
