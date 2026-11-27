@@ -63,8 +63,22 @@ class ServerAlertsAndHealthTest extends TestCase
 
     public function test_the_file_cache_stays_writable_for_whoever_writes_next(): void
     {
-        // PB-062: a cache/lock file written by root locked the scheduler (user panelos) out of every withoutOverlapping task.
-        $this->assertSame(0666, config('cache.stores.file.permission'));
+        // PB-062 is handled by running artisan as panelos. PB-097: a file 'permission' of 0666 was also applied to each new
+        // cache directory, leaving it without an execute bit, so later keys in it threw and login answered 500.
+        $this->assertNull(config('cache.stores.file.permission'));
+
+        $dir = storage_path('framework/testing/pb097-'.uniqid());
+        $store = new \Illuminate\Cache\FileStore(new \Illuminate\Filesystem\Filesystem, $dir, config('cache.stores.file.permission'));
+        $store->put('login-attempts', 1, 60);
+        $store->put('login-attempts', 2, 60);   // a second write into the same directory is what failed live
+        $this->assertSame(2, $store->get('login-attempts'));
+
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST) as $node) {
+            if ($node->isDir()) {
+                $this->assertNotSame(0, fileperms($node->getPathname()) & 0100, $node->getPathname().' cannot be entered');
+            }
+        }
+        (new \Illuminate\Filesystem\Filesystem)->deleteDirectory($dir);
     }
 
     public function test_the_scheduler_actually_has_a_heartbeat_task(): void
