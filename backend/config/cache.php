@@ -51,7 +51,9 @@ return [
             'driver' => 'file',
             'path' => storage_path('framework/cache/data'),
             'lock_path' => storage_path('framework/cache/data'),
-            'permission' => 0666,   // a cache or lock file written by root must not lock the scheduler out (PB-062)
+            // No 'permission' here (PB-097): Laravel also chmods each NEW cache directory to that mode, and 0666 has no
+            // execute bit, so the folder could not be entered and every key hashed into it threw (login 500 via the
+            // rate limiter). Root-owned files (PB-062) are prevented by running artisan as panelos and by the entrypoint.
         ],
 
         'memcached' => [
